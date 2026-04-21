@@ -1,7 +1,9 @@
+import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Bell, Search } from 'lucide-react';
+import { AlertTriangle, Bell, Package, Search, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { formatTime } from '../../data/phaseOneData';
+import { formatRelativeTime } from '../../lib/notifications';
 
 const pageTitles = {
   '/': 'Overview',
@@ -14,14 +16,65 @@ const pageTitles = {
   '/audit': 'Audit Trail',
 };
 
+const notificationMeta = {
+  'low-stock': {
+    icon: Package,
+    label: 'Low stock',
+  },
+  'late-order': {
+    icon: AlertTriangle,
+    label: 'Late order',
+  },
+  'order-received': {
+    icon: ShoppingCart,
+    label: 'Order received',
+  },
+  fifo: {
+    icon: AlertTriangle,
+    label: 'FIFO reminder',
+  },
+};
+
+function getNotificationIcon(notification) {
+  return notificationMeta[notification.type]?.icon ?? Bell;
+}
+
 export default function PhaseOneTopBar() {
-  const { state, dispatch, logout } = useApp();
+  const { state, dispatch, logout, dismissNotification, clearNotifications } = useApp();
   const location = useLocation();
+  const [notificationPanelPath, setNotificationPanelPath] = useState(null);
+  const notificationPanelRef = useRef(null);
   const currentTitle = pageTitles[location.pathname] || 'ModhaniOS';
   const qbHealthy = state.quickBooks.connected && state.quickBooks.status === 'connected';
   const currentUser = state.currentUser ?? { id: '', initials: '?', name: 'Staff user', role: 'staff' };
   const qbStatusLabel = qbHealthy ? 'Connected' : 'Not Configured Yet';
   const qbSyncLabel = state.quickBooks.lastSyncAt ? formatTime(state.quickBooks.lastSyncAt) : 'Not synced yet';
+  const notificationCount = state.notifications.length;
+  const notificationsOpen = notificationPanelPath === location.pathname;
+
+  useEffect(() => {
+    if (!notificationsOpen) return undefined;
+
+    function handlePointerDown(event) {
+      if (!notificationPanelRef.current?.contains(event.target)) {
+        setNotificationPanelPath(null);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') {
+        setNotificationPanelPath(null);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [notificationsOpen]);
 
   return (
     <header className={`topbar${state.sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
@@ -90,10 +143,87 @@ export default function PhaseOneTopBar() {
           </select>
         )}
 
-        <button className="topbar-icon-btn" type="button">
-          <Bell size={20} />
-          <span className="notification-dot" />
-        </button>
+        <div className="topbar-notifications" ref={notificationPanelRef}>
+          <button
+            className="topbar-icon-btn"
+            type="button"
+            aria-label="Open notifications"
+            aria-expanded={notificationsOpen}
+            onClick={() =>
+              setNotificationPanelPath((current) => (current === location.pathname ? null : location.pathname))
+            }
+          >
+            <Bell size={20} />
+            {notificationCount > 0 ? (
+              <span className="topbar-icon-badge">{notificationCount > 99 ? '99+' : notificationCount}</span>
+            ) : null}
+          </button>
+
+          {notificationsOpen ? (
+            <div className="topbar-notifications-panel">
+              <div className="topbar-notifications-header">
+                <div>
+                  <div className="topbar-notifications-title">Notifications</div>
+                  <div className="topbar-notifications-subtitle">
+                    {notificationCount ? `${notificationCount} active operational alert${notificationCount === 1 ? '' : 's'}` : 'No active alerts'}
+                  </div>
+                </div>
+                <div className="topbar-notifications-actions">
+                  {notificationCount > 0 ? (
+                    <button className="btn btn-ghost btn-sm" type="button" onClick={() => clearNotifications()}>
+                      Clear all
+                    </button>
+                  ) : null}
+                    <button
+                      className="topbar-icon-btn topbar-icon-btn-sm"
+                      type="button"
+                      aria-label="Close notifications"
+                      onClick={() => setNotificationPanelPath(null)}
+                    >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+
+              {notificationCount > 0 ? (
+                <div className="topbar-notifications-list">
+                  {state.notifications.map((notification) => {
+                    const Icon = getNotificationIcon(notification);
+
+                    return (
+                      <div key={notification.key} className="notification-item">
+                        <div className={`notification-item-icon ${notification.severity}`}>
+                          <Icon size={16} />
+                        </div>
+                        <div className="notification-item-content">
+                          <div className="notification-item-title">{notification.title}</div>
+                          <div className="notification-item-description">{notification.description}</div>
+                          <div className="notification-item-time">{formatRelativeTime(notification.timestamp)}</div>
+                        </div>
+                        <button
+                          className="notification-item-dismiss"
+                          type="button"
+                          aria-label={`Dismiss ${notification.title}`}
+                          onClick={() => dismissNotification(notification.key)}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="topbar-notifications-empty">
+                  <Bell size={24} />
+                  <div className="topbar-notifications-empty-title">All clear</div>
+                  <div className="topbar-notifications-empty-description">
+                    Low stock, late orders, FIFO reminders, and new order intake alerts will appear here.
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
 
         <div className="topbar-avatar">{currentUser.initials}</div>
       </div>

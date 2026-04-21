@@ -14,7 +14,14 @@ import {
   buildReportRowsFromOrders,
   getEffectiveItemPrice,
 } from '../data/phaseOneData';
-import { executeAdminAction, executeWorkflowAction, fetchRemoteState, persistAction } from '../lib/phaseOneDataStore';
+import { buildOperationalNotifications } from '../lib/notifications';
+import {
+  executeAdminAction,
+  executeWorkflowAction,
+  fetchRemoteState,
+  persistAction,
+  persistNotificationDismissals,
+} from '../lib/phaseOneDataStore';
 import { getSupabaseConfigError, isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
 const demoState = {
@@ -27,6 +34,7 @@ const demoState = {
   batches: BATCHES,
   orders: ORDERS,
   auditLog: AUDIT_LOG,
+  notificationDismissals: [],
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: buildReportRowsFromOrders({
     orders: ORDERS,
@@ -54,6 +62,7 @@ const remoteBootState = {
   batches: [],
   orders: [],
   auditLog: [],
+  notificationDismissals: [],
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: [],
   sidebarCollapsed: false,
@@ -137,6 +146,22 @@ function reducer(state, action) {
         ...state,
         ...action.payload,
       };
+    case 'UPSERT_NOTIFICATION_DISMISSALS': {
+      const nextByKey = new Map(
+        state.notificationDismissals.map((dismissal) => [dismissal.notificationKey, dismissal])
+      );
+
+      action.payload.forEach((dismissal) => {
+        nextByKey.set(dismissal.notificationKey, dismissal);
+      });
+
+      return {
+        ...state,
+        notificationDismissals: Array.from(nextByKey.values()).sort(
+          (left, right) => new Date(right.dismissedAt) - new Date(left.dismissedAt)
+        ),
+      };
+    }
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarCollapsed: !state.sidebarCollapsed };
     case 'SET_CURRENT_USER':
@@ -393,11 +418,32 @@ export function AppProvider({ children }) {
   }, [state]);
 
   const currentUser = state.users.find((user) => user.id === state.currentUserId) ?? state.users[0] ?? null;
+  const notifications = useMemo(() => {
+    const activeNotifications = buildOperationalNotifications({
+      orders: state.orders,
+      batches: state.batches,
+      auditLog: state.auditLog,
+      clients: state.clients,
+      locations: state.locations,
+      products: state.products,
+    });
+    const dismissedKeys = new Set(state.notificationDismissals.map((dismissal) => dismissal.notificationKey));
+
+    return activeNotifications.filter((notification) => !dismissedKeys.has(notification.key));
+  }, [
+    state.auditLog,
+    state.batches,
+    state.clients,
+    state.locations,
+    state.notificationDismissals,
+    state.orders,
+    state.products,
+  ]);
 
   const loadRemoteData = useCallback(async (userId) => {
     if (!supabase) return;
 
-    const data = await fetchRemoteState(supabase);
+    const data = await fetchRemoteState(supabase, userId);
     baseDispatch({
       type: 'INITIALIZE_REMOTE_DATA',
       payload: {
@@ -491,6 +537,7 @@ export function AppProvider({ children }) {
             batches: [],
             orders: [],
             auditLog: [],
+            notificationDismissals: [],
             quickBooks: QUICKBOOKS_SETTINGS,
             reportRows: [],
           },
@@ -576,6 +623,97 @@ export function AppProvider({ children }) {
     await supabase.auth.signOut();
   }, []);
 
+  const dismissNotification = useCallback(
+    async (notificationKey) => {
+      if (!notificationKey || !stateRef.current.currentUserId) return { ok: true };
+
+      if (!supabase) {
+        baseDispatch({
+          type: 'UPSERT_NOTIFICATION_DISMISSALS',
+          payload: [
+            {
+              userId: stateRef.current.currentUserId,
+              notificationKey,
+              dismissedAt: new Date().toISOString(),
+            },
+          ],
+        });
+        return { ok: true };
+      }
+
+      const { data, error } = await persistNotificationDismissals(
+        supabase,
+        stateRef.current.currentUserId,
+        [notificationKey]
+      );
+
+      if (error) {
+        addToast(`Notification clear failed: ${error.message}`, 'warning');
+        return { ok: false, error };
+      }
+
+      baseDispatch({
+        type: 'UPSERT_NOTIFICATION_DISMISSALS',
+        payload:
+          data.length > 0
+            ? data
+            : [
+                {
+                  userId: stateRef.current.currentUserId,
+                  notificationKey,
+                  dismissedAt: new Date().toISOString(),
+                },
+              ],
+      });
+
+      return { ok: true };
+    },
+    [addToast]
+  );
+
+  const clearNotifications = useCallback(async () => {
+    if (!notifications.length) return { ok: true };
+
+    const notificationKeys = notifications.map((notification) => notification.key);
+
+    if (!supabase || !stateRef.current.currentUserId) {
+      baseDispatch({
+        type: 'UPSERT_NOTIFICATION_DISMISSALS',
+        payload: notificationKeys.map((notificationKey) => ({
+          userId: stateRef.current.currentUserId,
+          notificationKey,
+          dismissedAt: new Date().toISOString(),
+        })),
+      });
+      return { ok: true };
+    }
+
+    const { data, error } = await persistNotificationDismissals(
+      supabase,
+      stateRef.current.currentUserId,
+      notificationKeys
+    );
+
+    if (error) {
+      addToast(`Notification clear failed: ${error.message}`, 'warning');
+      return { ok: false, error };
+    }
+
+    baseDispatch({
+      type: 'UPSERT_NOTIFICATION_DISMISSALS',
+      payload:
+        data.length > 0
+          ? data
+          : notificationKeys.map((notificationKey) => ({
+              userId: stateRef.current.currentUserId,
+              notificationKey,
+              dismissedAt: new Date().toISOString(),
+            })),
+    });
+
+    return { ok: true };
+  }, [addToast, notifications]);
+
   const dispatch = useCallback(
     async (action) => {
       if (!supabase || localOnlyActions.has(action.type) || (action.type === 'SET_CURRENT_USER' && !stateRef.current.authConfigured)) {
@@ -646,14 +784,17 @@ export function AppProvider({ children }) {
       state: {
         ...state,
         currentUser,
+        notifications,
       },
       dispatch,
       addToast,
       addAudit,
       login,
       logout,
+      dismissNotification,
+      clearNotifications,
     }),
-    [state, currentUser, dispatch, addToast, addAudit, login, logout]
+    [state, currentUser, notifications, dispatch, addToast, addAudit, login, logout, dismissNotification, clearNotifications]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

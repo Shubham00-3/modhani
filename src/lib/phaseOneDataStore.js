@@ -66,6 +66,7 @@ function batchToUi(batch) {
     qtyProduced: Number(batch.qty_produced),
     qtyRemaining: Number(batch.qty_remaining),
     status: batch.status,
+    updatedAt: batch.updated_at,
   };
 }
 
@@ -81,6 +82,14 @@ function auditToUi(entry) {
     details: entry.details,
     previousValue: entry.previous_value,
     newValue: entry.new_value,
+  };
+}
+
+function notificationDismissalToUi(entry) {
+  return {
+    userId: entry.user_id,
+    notificationKey: entry.notification_key,
+    dismissedAt: entry.dismissed_at,
   };
 }
 
@@ -280,7 +289,7 @@ function quickBooksToDb(settings) {
   };
 }
 
-export async function fetchRemoteState(supabase) {
+export async function fetchRemoteState(supabase, userId) {
   const [
     profilesResult,
     clientsResult,
@@ -294,6 +303,7 @@ export async function fetchRemoteState(supabase) {
     auditResult,
     quickBooksResult,
     reportRowsResult,
+    notificationDismissalsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('clients').select('*').order('name'),
@@ -307,6 +317,13 @@ export async function fetchRemoteState(supabase) {
     supabase.from('audit_events').select('*').order('timestamp', { ascending: false }),
     supabase.from('quickbooks_settings').select('*').limit(1).maybeSingle(),
     supabase.from('report_order_lines').select('*').order('created_at', { ascending: false }),
+    userId
+      ? supabase
+          .from('notification_dismissals')
+          .select('*')
+          .eq('user_id', userId)
+          .order('dismissed_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   const results = [
@@ -322,10 +339,11 @@ export async function fetchRemoteState(supabase) {
     auditResult,
     quickBooksResult,
     reportRowsResult,
+    notificationDismissalsResult,
   ];
 
   const firstError = results
-    .filter((result) => result !== reportRowsResult)
+    .filter((result) => result !== reportRowsResult && result !== notificationDismissalsResult)
     .find((result) => result.error)?.error;
   if (firstError) {
     throw firstError;
@@ -401,8 +419,31 @@ export async function fetchRemoteState(supabase) {
     batches: (batchesResult.data ?? []).map(batchToUi),
     orders,
     auditLog: (auditResult.data ?? []).map(auditToUi),
+    notificationDismissals: notificationDismissalsResult.error
+      ? []
+      : (notificationDismissalsResult.data ?? []).map(notificationDismissalToUi),
     quickBooks: quickBooksToUi(quickBooksResult.data),
     reportRows,
+  };
+}
+
+export async function persistNotificationDismissals(supabase, userId, notificationKeys) {
+  if (!notificationKeys.length) return { error: null, data: [] };
+
+  const rows = notificationKeys.map((notificationKey) => ({
+    user_id: userId,
+    notification_key: notificationKey,
+    dismissed_at: new Date().toISOString(),
+  }));
+
+  const { data, error } = await supabase
+    .from('notification_dismissals')
+    .upsert(rows, { onConflict: 'user_id,notification_key' })
+    .select('*');
+
+  return {
+    data: (data ?? []).map(notificationDismissalToUi),
+    error,
   };
 }
 

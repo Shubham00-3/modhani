@@ -94,6 +94,7 @@ async function resetTables() {
   const deletes = [
     ['batch_assignments', 'order_item_id'],
     ['order_items', 'order_id'],
+    ['notification_dismissals', 'notification_key'],
     ['audit_events', 'id'],
     ['orders', 'id'],
     ['batches', 'id'],
@@ -107,7 +108,10 @@ async function resetTables() {
 
   for (const [table, column] of deletes) {
     const { error } = await supabase.from(table).delete().not(column, 'is', null);
-    if (error) throw error;
+    if (error) {
+      if (table === 'notification_dismissals' && isMissingTableError(error)) continue;
+      throw error;
+    }
   }
 }
 
@@ -261,6 +265,10 @@ async function insertRows(table, rows) {
 function toTimestamp(value) {
   if (!value) return null;
   return new Date(value).toISOString();
+}
+
+function isMissingTableError(error) {
+  return error?.code === 'PGRST205' || /Could not find the table/i.test(error?.message ?? '');
 }
 
 main().catch((error) => {
