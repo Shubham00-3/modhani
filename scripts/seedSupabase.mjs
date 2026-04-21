@@ -201,6 +201,7 @@ async function seedCoreTables(userIdMap) {
         product_id: item.productId,
         quantity: item.quantity,
         fulfilled_qty: item.fulfilledQty,
+        declined_qty: item.declinedQty ?? 0,
         base_price: item.basePrice,
         client_price: item.clientPrice,
         override_price: item.overridePrice,

@@ -20,6 +20,8 @@ export default function PhaseOneTopBar() {
   const currentTitle = pageTitles[location.pathname] || 'ModhaniOS';
   const qbHealthy = state.quickBooks.connected && state.quickBooks.status === 'connected';
   const currentUser = state.currentUser ?? { id: '', initials: '?', name: 'Staff user', role: 'staff' };
+  const qbStatusLabel = qbHealthy ? 'Connected' : 'Not Configured Yet';
+  const qbSyncLabel = state.quickBooks.lastSyncAt ? formatTime(state.quickBooks.lastSyncAt) : 'Not synced yet';
 
   return (
     <header className={`topbar${state.sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
@@ -37,10 +39,10 @@ export default function PhaseOneTopBar() {
             className="topbar-qb-dot"
             style={{ background: qbHealthy ? 'var(--color-success)' : 'var(--color-warning)' }}
           />
-          <span>QuickBooks Desktop - {qbHealthy ? 'Connected' : 'Attention Needed'}</span>
+          <span>QuickBooks Desktop - {qbStatusLabel}</span>
           <span style={{ color: 'var(--color-text-muted)', marginLeft: '4px' }}>|</span>
           <span style={{ color: 'var(--color-text-muted)' }}>
-            Last sync: {formatTime(state.quickBooks.lastSyncAt)}
+            Last sync: {qbSyncLabel}
           </span>
         </div>
       </div>
