@@ -22,7 +22,7 @@ export default function PhaseOneClientsLocations() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-          <button className="btn btn-secondary" type="button" disabled={!canManage} onClick={() => setShowLocationModal(true)}>
+          <button className="btn btn-secondary" type="button" disabled={!canManage || state.clients.length === 0} onClick={() => setShowLocationModal(true)}>
             <Plus size={16} /> Add Location
           </button>
           <button className="btn btn-primary" type="button" disabled={!canManage} onClick={() => setShowClientModal(true)}>

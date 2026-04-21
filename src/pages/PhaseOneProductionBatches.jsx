@@ -10,6 +10,7 @@ import {
 
 export default function PhaseOneProductionBatches() {
   const { state, dispatch, addToast } = useApp();
+  const canLogProduction = state.products.length > 0;
   const [showModal, setShowModal] = useState(false);
   const [productFilter, setProductFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -81,10 +82,22 @@ export default function PhaseOneProductionBatches() {
               Manual production logging creates inventory one batch at a time.
             </div>
           </div>
-          <button className="btn btn-primary" type="button" onClick={() => setShowModal(true)}>
+          <button className="btn btn-primary" type="button" disabled={!canLogProduction} onClick={() => setShowModal(true)}>
             <Plus size={16} /> Log Production
           </button>
         </div>
+
+        {!canLogProduction ? (
+          <div className="alert alert-warning" style={{ marginTop: 'var(--space-4)' }}>
+            <AlertTriangle size={18} />
+            <div className="alert-content">
+              <div className="alert-title">Add products before logging production</div>
+              <div className="alert-description">
+                Production batches can only be created after the product catalogue has been configured.
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="filter-bar">
           <select className="form-select" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>

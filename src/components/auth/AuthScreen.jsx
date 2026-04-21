@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LockKeyhole, Database, ArrowRight } from 'lucide-react';
+import { LockKeyhole, ArrowRight } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 
 export default function AuthScreen() {
@@ -53,42 +53,12 @@ export default function AuthScreen() {
           }}
         >
           <div>
-            <div
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '10px',
-                padding: '10px 14px',
-                borderRadius: '999px',
-                background: 'rgba(26,48,33,0.08)',
-                color: 'var(--color-primary)',
-                fontWeight: 700,
-              }}
-            >
-              <Database size={16} />
-              ModhaniOS Phase 1
-            </div>
-
             <h1 style={{ fontSize: '40px', lineHeight: 1.05, margin: '18px 0 10px' }}>
               Staff Sign In
             </h1>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '16px', maxWidth: '40ch' }}>
-              This app is now prepared for Supabase-backed staff authentication. Sign in with an internal staff account to load persisted operational data.
+              Sign in with your internal staff account to access ModhaniOS.
             </p>
-          </div>
-
-          <div
-            style={{
-              padding: '18px 20px',
-              borderRadius: 'var(--radius-lg)',
-              background: 'var(--color-bg)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <div style={{ fontWeight: 700, marginBottom: '8px' }}>Need setup first?</div>
-            <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-              Run the Supabase migration and seed script, then create internal staff users before using live mode.
-            </div>
           </div>
         </section>
 

@@ -29,6 +29,7 @@ import { printInvoice, printPackingSlip } from '../utils/printDocuments';
 
 export default function PhaseOneOrdersInvoicing() {
   const { state, dispatch, addToast } = useApp();
+  const canCreateOrders = state.clients.length > 0 && state.locations.length > 0 && state.products.length > 0;
   const [filters, setFilters] = useState({
     clientId: '',
     locationId: '',
@@ -165,10 +166,22 @@ export default function PhaseOneOrdersInvoicing() {
             Manual Phase 1 fulfilment, invoicing, QuickBooks sync, and packing slip control.
           </p>
         </div>
-        <button className="btn btn-primary" type="button" onClick={() => setShowAddOrderModal(true)}>
+        <button className="btn btn-primary" type="button" disabled={!canCreateOrders} onClick={() => setShowAddOrderModal(true)}>
           <Plus size={16} /> Add Incoming Order
         </button>
       </div>
+
+      {!canCreateOrders ? (
+        <div className="alert alert-warning section">
+          <AlertTriangle size={18} />
+          <div className="alert-content">
+            <div className="alert-title">Set up master data before receiving orders</div>
+            <div className="alert-description">
+              Add at least one client, location, and product before creating incoming orders.
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="filter-bar">
         <select

@@ -187,7 +187,6 @@ img {
 .app-content {
   flex: 1;
   padding: var(--space-8);
-  padding-top: calc(var(--topbar-height) + var(--space-8));
   max-width: 1400px;
   width: 100%;
 }
@@ -348,22 +347,14 @@ img {
 
 /* ---------- TopBar ---------- */
 .topbar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  left: var(--sidebar-width);
-  height: var(--topbar-height);
+  min-height: var(--topbar-height);
   background: var(--color-bg);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 var(--space-8);
+  padding: var(--space-4) var(--space-8) 0;
   z-index: 90;
-  transition: left var(--transition-slow);
-}
-
-.topbar.sidebar-collapsed {
-  left: var(--sidebar-collapsed);
+  transition: none;
 }
 
 .topbar-left {
@@ -1287,7 +1278,6 @@ input[type='checkbox']:disabled {
   }
   .app-content {
     padding: var(--space-4);
-    padding-top: calc(var(--topbar-height) + var(--space-4));
   }
   .slide-panel {
     width: 100vw;
