@@ -47,41 +47,58 @@ export default function PhaseOneClientsLocations() {
         <div className="card-title">
           <Users size={18} /> Client Directory
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {state.clients.map((client) => (
-            <div key={client.id} className="card" style={{ padding: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>{client.name}</div>
-                  <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                    {state.locations.filter((location) => location.clientId === client.id).length} configured locations
+        {state.clients.length ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+            {state.clients.map((client) => (
+              <div key={client.id} className="card" style={{ padding: 'var(--space-4)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{client.name}</div>
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                      {state.locations.filter((location) => location.clientId === client.id).length} configured locations
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+                    <button className="btn btn-secondary btn-sm" type="button" disabled={!canManage} onClick={() => setPricingClientId(client.id)}>
+                      <DollarSign size={14} /> Pricing
+                    </button>
+                    <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingClient(client)}>
+                      Edit
+                    </button>
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                  <button className="btn btn-secondary btn-sm" type="button" disabled={!canManage} onClick={() => setPricingClientId(client.id)}>
-                    <DollarSign size={14} /> Pricing
-                  </button>
-                  <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingClient(client)}>
-                    Edit
-                  </button>
+                <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                  {state.locations.filter((location) => location.clientId === client.id).length ? (
+                    state.locations
+                      .filter((location) => location.clientId === client.id)
+                      .map((location) => (
+                        <button
+                          key={location.id}
+                          className="btn btn-ghost btn-sm"
+                          type="button"
+                          disabled={!canManage}
+                          onClick={() => setEditingLocation(location)}
+                        >
+                          {location.name}
+                        </button>
+                      ))
+                  ) : (
+                    <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                      No locations configured yet.
+                    </span>
+                  )}
                 </div>
               </div>
-              <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-                {state.locations.filter((location) => location.clientId === client.id).map((location) => (
-                  <button
-                    key={location.id}
-                    className="btn btn-ghost btn-sm"
-                    type="button"
-                    disabled={!canManage}
-                    onClick={() => setEditingLocation(location)}
-                  >
-                    {location.name}
-                  </button>
-                ))}
-              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+            <div className="empty-state-title">No clients configured yet</div>
+            <div className="empty-state-description">
+              Add your first client to start building locations and negotiated pricing.
             </div>
-          ))}
-        </div>
+          </div>
+        )}
       </div>
 
       {showClientModal || editingClient ? (

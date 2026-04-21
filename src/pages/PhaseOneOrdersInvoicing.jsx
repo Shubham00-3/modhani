@@ -39,6 +39,7 @@ export default function PhaseOneOrdersInvoicing() {
   const [showFulfilment, setShowFulfilment] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
+  const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source);
 
   const selectedOrder = state.orders.find((order) => order.id === selectedOrderId) ?? null;
 
@@ -219,48 +220,65 @@ export default function PhaseOneOrdersInvoicing() {
           <option value="edi">EDI</option>
           <option value="portal">Portal</option>
         </select>
+        <button
+          className="btn btn-secondary"
+          type="button"
+          disabled={!hasActiveFilters}
+          onClick={() => setFilters({ clientId: '', locationId: '', status: '', source: '' })}
+        >
+          Reset Filters
+        </button>
       </div>
 
       <div className="card">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Order</th>
-              <th>Status</th>
-              <th>Client</th>
-              <th>Location</th>
-              <th>Source</th>
-              <th>Total Value</th>
-              <th>QB Invoice</th>
-              <th>Packing Slip</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredOrders.map((order) => (
-              <tr key={order.id} onClick={() => openOrder(order.id)}>
-                <td className="cell-monospace">#{order.orderNumber}</td>
-                <td>
-                  <span className={`badge badge-${order.status}`}>{order.status}</span>
-                  {order.lockedBy && order.lockedBy !== state.currentUser.id ? (
-                    <span style={{ marginLeft: 8, color: 'var(--color-warning)' }}>
-                      <Lock size={14} style={{ verticalAlign: 'middle' }} />
-                    </span>
-                  ) : null}
-                </td>
-                <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
-                <td>{getLocationName(state.locations, order.locationId)}</td>
-                <td>
-                  <span className={`badge badge-${order.source}`}>{order.source.toUpperCase()}</span>
-                </td>
-                <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
-                <td className="cell-monospace">{order.qbInvoiceNumber ?? '-'}</td>
-                <td className="cell-monospace">{order.packingSlipNumber ?? '-'}</td>
-                <td>{formatDate(order.createdAt)}</td>
+        {filteredOrders.length ? (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Order</th>
+                <th>Status</th>
+                <th>Client</th>
+                <th>Location</th>
+                <th>Source</th>
+                <th>Total Value</th>
+                <th>QB Invoice</th>
+                <th>Packing Slip</th>
+                <th>Created</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredOrders.map((order) => (
+                <tr key={order.id} onClick={() => openOrder(order.id)}>
+                  <td className="cell-monospace">#{order.orderNumber}</td>
+                  <td>
+                    <span className={`badge badge-${order.status}`}>{order.status}</span>
+                    {order.lockedBy && order.lockedBy !== state.currentUser.id ? (
+                      <span style={{ marginLeft: 8, color: 'var(--color-warning)' }}>
+                        <Lock size={14} style={{ verticalAlign: 'middle' }} />
+                      </span>
+                    ) : null}
+                  </td>
+                  <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
+                  <td>{getLocationName(state.locations, order.locationId)}</td>
+                  <td>
+                    <span className={`badge badge-${order.source}`}>{order.source.toUpperCase()}</span>
+                  </td>
+                  <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
+                  <td className="cell-monospace">{order.qbInvoiceNumber ?? '-'}</td>
+                  <td className="cell-monospace">{order.packingSlipNumber ?? '-'}</td>
+                  <td>{formatDate(order.createdAt)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+            <div className="empty-state-title">No orders match these filters</div>
+            <div className="empty-state-description">
+              Reset the filters or add a new incoming order to continue the workflow.
+            </div>
+          </div>
+        )}
       </div>
 
       {selectedOrder ? (
@@ -913,7 +931,9 @@ function InvoiceModal({ order, onClose }) {
 function AddOrderModal({ onClose }) {
   const { state, dispatch, addToast, addAudit } = useApp();
   const [clientId, setClientId] = useState(state.clients[0]?.id ?? '');
-  const [locationId, setLocationId] = useState('');
+  const [locationId, setLocationId] = useState(
+    () => state.locations.find((location) => location.clientId === (state.clients[0]?.id ?? ''))?.id ?? ''
+  );
   const [source, setSource] = useState('portal');
   const [lines, setLines] = useState([{ id: 'line-1', productId: '', quantity: '' }]);
 
@@ -921,6 +941,10 @@ function AddOrderModal({ onClose }) {
 
   function addLine() {
     setLines((current) => [...current, { id: `line-${Date.now()}`, productId: '', quantity: '' }]);
+  }
+
+  function removeLine(lineId) {
+    setLines((current) => (current.length > 1 ? current.filter((line) => line.id !== lineId) : current));
   }
 
   function saveOrder() {
@@ -934,6 +958,20 @@ function AddOrderModal({ onClose }) {
     if (!validLines.length) {
       addToast('Add at least one product line.', 'warning');
       return;
+    }
+
+    if (validLines.some((line) => !Number.isInteger(Number(line.quantity)))) {
+      addToast('Order quantities must be whole numbers.', 'warning');
+      return;
+    }
+
+    const duplicateProductIds = new Set();
+    for (const line of validLines) {
+      if (duplicateProductIds.has(line.productId)) {
+        addToast('Combine duplicate products into a single line item.', 'warning');
+        return;
+      }
+      duplicateProductIds.add(line.productId);
     }
 
     const nextOrderNumber = Math.max(...state.orders.map((order) => order.orderNumber)) + 1;
@@ -1017,8 +1055,10 @@ function AddOrderModal({ onClose }) {
                 className="form-select"
                 value={clientId}
                 onChange={(event) => {
-                  setClientId(event.target.value);
-                  setLocationId('');
+                  const nextClientId = event.target.value;
+                  const nextLocationId = state.locations.find((location) => location.clientId === nextClientId)?.id ?? '';
+                  setClientId(nextClientId);
+                  setLocationId(nextLocationId);
                 }}
               >
                 {state.clients.map((client) => (
@@ -1042,6 +1082,18 @@ function AddOrderModal({ onClose }) {
             </div>
           </div>
 
+          {!locationOptions.length ? (
+            <div className="alert alert-warning">
+              <AlertTriangle size={18} />
+              <div className="alert-content">
+                <div className="alert-title">No locations available for this client</div>
+                <div className="alert-description">
+                  Add a client location first before creating an incoming order.
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="form-group">
             <label className="form-label">Source</label>
             <select className="form-select" value={source} onChange={(event) => setSource(event.target.value)}>
@@ -1052,7 +1104,15 @@ function AddOrderModal({ onClose }) {
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {lines.map((line) => (
-              <div key={line.id} className="grid-2">
+              <div
+                key={line.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'minmax(0, 1.4fr) minmax(140px, 1fr) auto',
+                  gap: 'var(--space-4)',
+                  alignItems: 'end',
+                }}
+              >
                 <div className="form-group">
                   <label className="form-label">Product</label>
                   <select
@@ -1090,6 +1150,16 @@ function AddOrderModal({ onClose }) {
                       )
                     }
                   />
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'end', paddingBottom: '2px' }}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    type="button"
+                    disabled={lines.length === 1}
+                    onClick={() => removeLine(line.id)}
+                  >
+                    Remove Line
+                  </button>
                 </div>
               </div>
             ))}

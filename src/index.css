@@ -654,6 +654,15 @@ img {
   white-space: nowrap;
 }
 
+.btn:disabled,
+.form-input:disabled,
+.form-select:disabled,
+textarea:disabled,
+input[type='checkbox']:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .btn-primary {
   background: var(--color-primary);
   color: var(--color-text-inverse);
@@ -883,6 +892,8 @@ img {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
   margin-bottom: var(--space-6);
 }
 

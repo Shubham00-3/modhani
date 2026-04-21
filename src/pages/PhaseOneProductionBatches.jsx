@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, FlaskConical, Plus, X } from 'lucide-react';
+import { AlertTriangle, FlaskConical, Plus, RotateCcw, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatDate,
@@ -20,6 +20,7 @@ export default function PhaseOneProductionBatches() {
       .filter((batch) => (statusFilter ? batch.status === statusFilter : true))
       .sort((a, b) => new Date(b.productionDate) - new Date(a.productionDate));
   }, [productFilter, state.batches, statusFilter]);
+  const hasActiveFilters = Boolean(productFilter || statusFilter);
 
   const oldestActive = [...state.batches]
     .filter((batch) => batch.qtyRemaining > 0)
@@ -100,32 +101,52 @@ export default function PhaseOneProductionBatches() {
             <option value="active">Active</option>
             <option value="cleared">Cleared</option>
           </select>
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={!hasActiveFilters}
+            onClick={() => {
+              setProductFilter('');
+              setStatusFilter('');
+            }}
+          >
+            <RotateCcw size={14} /> Reset Filters
+          </button>
         </div>
 
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Batch</th>
-              <th>Product</th>
-              <th>Production Date</th>
-              <th>Produced</th>
-              <th>Remaining</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredBatches.map((batch) => (
-              <tr key={batch.id}>
-                <td className="cell-monospace">{batch.batchNumber}</td>
-                <td>{getProductDisplayName(getProduct(state.products, batch.productId))}</td>
-                <td>{formatDate(batch.productionDate)}</td>
-                <td className="cell-monospace">{batch.qtyProduced.toLocaleString()}</td>
-                <td className="cell-monospace">{batch.qtyRemaining.toLocaleString()}</td>
-                <td><span className={`badge badge-${batch.status}`}>{batch.status}</span></td>
+        {filteredBatches.length ? (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Batch</th>
+                <th>Product</th>
+                <th>Production Date</th>
+                <th>Produced</th>
+                <th>Remaining</th>
+                <th>Status</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {filteredBatches.map((batch) => (
+                <tr key={batch.id}>
+                  <td className="cell-monospace">{batch.batchNumber}</td>
+                  <td>{getProductDisplayName(getProduct(state.products, batch.productId))}</td>
+                  <td>{formatDate(batch.productionDate)}</td>
+                  <td className="cell-monospace">{batch.qtyProduced.toLocaleString()}</td>
+                  <td className="cell-monospace">{batch.qtyRemaining.toLocaleString()}</td>
+                  <td><span className={`badge badge-${batch.status}`}>{batch.status}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+            <div className="empty-state-title">No batches match these filters</div>
+            <div className="empty-state-description">
+              Reset the filters or log a new production batch to bring inventory back into view.
+            </div>
+          </div>
+        )}
       </div>
 
       {showModal ? (
@@ -199,6 +220,16 @@ function LogProductionModal({ onClose, onSave }) {
             onClick={() => {
               if (!productId || Number(quantity) <= 0 || !batchNumber.trim()) {
                 addToast('Complete all production fields.', 'warning');
+                return;
+              }
+
+              if (state.batches.some((batch) => batch.batchNumber.trim().toLowerCase() === batchNumber.trim().toLowerCase())) {
+                addToast('Batch number already exists. Use a unique batch number.', 'warning');
+                return;
+              }
+
+              if (productionDate > new Date().toISOString().slice(0, 10)) {
+                addToast('Production date cannot be in the future.', 'warning');
                 return;
               }
 

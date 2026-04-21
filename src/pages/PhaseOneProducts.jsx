@@ -40,30 +40,39 @@ export default function PhaseOneProducts() {
         <div className="card-title">
           <Package size={18} /> Product Catalogue
         </div>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Product</th>
-              <th>Category</th>
-              <th>Base Catalogue Price</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            {state.products.map((product) => (
-              <tr key={product.id}>
-                <td style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</td>
-                <td>{product.category}</td>
-                <td className="cell-monospace">{formatCurrency(product.baseCataloguePrice)}</td>
-                <td>
-                  <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingProduct(product)}>
-                    Edit
-                  </button>
-                </td>
+        {state.products.length ? (
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Category</th>
+                <th>Base Catalogue Price</th>
+                <th />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {state.products.map((product) => (
+                <tr key={product.id}>
+                  <td style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</td>
+                  <td>{product.category || '-'}</td>
+                  <td className="cell-monospace">{formatCurrency(product.baseCataloguePrice)}</td>
+                  <td>
+                    <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingProduct(product)}>
+                      Edit
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+            <div className="empty-state-title">No products yet</div>
+            <div className="empty-state-description">
+              Add products to make ordering, pricing, and production available across the app.
+            </div>
+          </div>
+        )}
       </div>
 
       {showProductModal || editingProduct ? (

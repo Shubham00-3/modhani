@@ -3,7 +3,7 @@ import { Mail, Settings2, Users } from 'lucide-react';
 import { useApp } from '../context/useApp';
 
 export default function PhaseOneSettings() {
-  const { state, dispatch } = useApp();
+  const { state, dispatch, addToast } = useApp();
   const canManage = state.currentUser.permissions.manageSettings;
   const staffSummary = {
     fulfilment: state.users.filter((user) => user.permissions.fulfilOrders).length,
@@ -110,6 +110,7 @@ export default function PhaseOneSettings() {
           canManage={canManage}
           quickBooks={state.quickBooks}
           dispatch={dispatch}
+          addToast={addToast}
         />
       </div>
 
@@ -178,7 +179,7 @@ function SummaryCard({ label, value }) {
   );
 }
 
-function QuickBooksSettingsCard({ canManage, quickBooks, dispatch }) {
+function QuickBooksSettingsCard({ canManage, quickBooks, dispatch, addToast }) {
   const [qbDraft, setQbDraft] = useState({
     companyName: quickBooks.companyName,
     connectorName: quickBooks.connectorName,
@@ -215,13 +216,23 @@ function QuickBooksSettingsCard({ canManage, quickBooks, dispatch }) {
               qbDraft.connectorName === quickBooks.connectorName)
           }
           onClick={() =>
-            dispatch({
-              type: 'UPDATE_QB_SETTINGS',
-              payload: {
-                companyName: qbDraft.companyName,
-                connectorName: qbDraft.connectorName,
-              },
-            })
+            {
+              const companyName = qbDraft.companyName.trim();
+              const connectorName = qbDraft.connectorName.trim();
+
+              if (!companyName || !connectorName) {
+                addToast('Enter both company name and connector name.', 'warning');
+                return;
+              }
+
+              dispatch({
+                type: 'UPDATE_QB_SETTINGS',
+                payload: {
+                  companyName,
+                  connectorName,
+                },
+              });
+            }
           }
         >
           Save Connection Settings
