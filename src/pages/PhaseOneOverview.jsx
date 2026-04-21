@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { BarChart3, ClipboardList, Package, RefreshCw, ScrollText, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
+  formatClientLocationScale,
   formatCurrency,
   formatDate,
   formatTime,
@@ -33,6 +34,10 @@ export default function PhaseOneOverview() {
         orders: clientOrders.length,
         value: clientOrders.reduce((sum, order) => sum + getOrderValue(order), 0),
         locationCount: state.locations.filter((location) => location.clientId === client.id).length,
+        locationLabel: formatClientLocationScale(
+          client,
+          state.locations.filter((location) => location.clientId === client.id).length
+        ),
       };
     })
     .sort((a, b) => b.value - a.value || b.orders - a.orders)
@@ -64,7 +69,7 @@ export default function PhaseOneOverview() {
                   <div>
                     <div style={{ fontWeight: 700 }}>{client.name}</div>
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      {client.orders} orders across {client.locationCount} configured locations
+                      {client.orders} orders • {client.locationLabel}
                     </div>
                   </div>
                   <div className="cell-monospace">{formatCurrency(client.value)}</div>

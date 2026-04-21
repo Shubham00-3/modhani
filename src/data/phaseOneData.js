@@ -43,6 +43,46 @@ export const PRODUCTS = [
 ];
 
 export const CLIENTS = [
+  {
+    id: 'client-loblaws',
+    name: 'Loblaws',
+    locationCount: 100,
+    emailPackingSlip: true,
+    emailInvoice: true,
+    deliveryMethod: 'email',
+    packingSlipEmail: '',
+    invoiceEmail: '',
+  },
+  {
+    id: 'client-chalo-freshco',
+    name: 'Chalo FreshCo',
+    locationCount: 100,
+    emailPackingSlip: true,
+    emailInvoice: true,
+    deliveryMethod: 'email',
+    packingSlipEmail: '',
+    invoiceEmail: '',
+  },
+  {
+    id: 'client-a1-cash-carry',
+    name: 'A1 Cash & Carry',
+    locationCount: 10,
+    emailPackingSlip: true,
+    emailInvoice: true,
+    deliveryMethod: 'email',
+    packingSlipEmail: '',
+    invoiceEmail: '',
+  },
+  {
+    id: 'client-desi-stores',
+    name: 'Desi Stores',
+    locationCount: 4,
+    emailPackingSlip: true,
+    emailInvoice: true,
+    deliveryMethod: 'email',
+    packingSlipEmail: '',
+    invoiceEmail: '',
+  },
 ];
 
 export const LOCATIONS = [];
@@ -79,6 +119,20 @@ export function getClientName(clients, clientId) {
 
 export function getLocationName(locations, locationId) {
   return locations.find((location) => location.id === locationId)?.name ?? 'Unknown location';
+}
+
+export function formatClientLocationScale(client, configuredCount = 0) {
+  const plannedCount = Number(client?.locationCount ?? 0);
+  if (configuredCount > 0) {
+    return `${configuredCount} configured location${configuredCount === 1 ? '' : 's'}`;
+  }
+  if (plannedCount >= 100) {
+    return `Up to ${plannedCount} locations`;
+  }
+  if (plannedCount > 0) {
+    return `${plannedCount} planned location${plannedCount === 1 ? '' : 's'}`;
+  }
+  return 'No locations configured yet';
 }
 
 export function formatCurrency(amount) {

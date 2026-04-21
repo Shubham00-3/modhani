@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { DollarSign, Plus, Settings2, Users } from 'lucide-react';
 import { useApp } from '../context/useApp';
+import { formatClientLocationScale } from '../data/phaseOneData';
 import { ClientModal, LocationModal, PricingModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneClientsLocations() {
@@ -49,13 +50,16 @@ export default function PhaseOneClientsLocations() {
         </div>
         {state.clients.length ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {state.clients.map((client) => (
-              <div key={client.id} className="card" style={{ padding: 'var(--space-4)' }}>
+            {state.clients.map((client) => {
+              const clientLocations = state.locations.filter((location) => location.clientId === client.id);
+
+              return (
+                <div key={client.id} className="card" style={{ padding: 'var(--space-4)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
                   <div>
                     <div style={{ fontWeight: 700 }}>{client.name}</div>
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      {state.locations.filter((location) => location.clientId === client.id).length} configured locations
+                      {formatClientLocationScale(client, clientLocations.length)}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
@@ -68,9 +72,8 @@ export default function PhaseOneClientsLocations() {
                   </div>
                 </div>
                 <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
-                  {state.locations.filter((location) => location.clientId === client.id).length ? (
-                    state.locations
-                      .filter((location) => location.clientId === client.id)
+                  {clientLocations.length ? (
+                    clientLocations
                       .map((location) => (
                         <button
                           key={location.id}
@@ -84,12 +87,13 @@ export default function PhaseOneClientsLocations() {
                       ))
                   ) : (
                     <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      No locations configured yet.
+                      No locations configured yet. Add them as the rollout progresses.
                     </span>
                   )}
                 </div>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
