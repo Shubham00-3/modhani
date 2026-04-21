@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QuickBooks Desktop Questions for Manager</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --ink: #16202a;
+        --muted: #5f6b76;
+        --line: #d9e0e6;
+        --accent: #1a3021;
+        --accent-soft: #eef4ef;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        color: var(--ink);
+        background: #ffffff;
+        line-height: 1.5;
+      }
+
+      .page {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 40px 44px 48px;
+      }
+
+      .hero {
+        border: 1px solid var(--line);
+        background: linear-gradient(180deg, #f7faf8 0%, #ffffff 100%);
+        border-radius: 18px;
+        padding: 24px 28px;
+        margin-bottom: 24px;
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 30px;
+        line-height: 1.15;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .section {
+        margin-top: 22px;
+      }
+
+      h2 {
+        margin: 0 0 10px;
+        font-size: 18px;
+        color: var(--accent);
+      }
+
+      ol {
+        margin: 0;
+        padding-left: 22px;
+      }
+
+      li {
+        margin: 0 0 12px;
+      }
+
+      .card {
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 16px 18px;
+        margin-top: 14px;
+      }
+
+      .label {
+        font-weight: 700;
+      }
+
+      .note {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 12px;
+        background: var(--accent-soft);
+        border: 1px solid #d7e3d8;
+      }
+
+      ul {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+
+      .footer {
+        margin-top: 28px;
+        font-size: 13px;
+        color: var(--muted);
+        border-top: 1px solid var(--line);
+        padding-top: 14px;
+      }
+
+      @media print {
+        .page {
+          max-width: none;
+          padding: 18mm 16mm 18mm;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <h1>QuickBooks Desktop Questions for Manager</h1>
+        <p class="subtitle">
+          Information needed before building the ModhaniOS to QuickBooks Desktop integration.
+        </p>
+      </section>
+
+      <section class="section">
+        <h2>Please help confirm the following</h2>
+        <ol>
+          <li>
+            <span class="label">QuickBooks version details:</span>
+            which edition and year the client is using, for example Pro, Premier, or Enterprise, and the exact year/version.
+          </li>
+          <li>
+            <span class="label">Company file setup:</span>
+            does the client use one QuickBooks company file or multiple company files?
+          </li>
+          <li>
+            <span class="label">Target company file:</span>
+            if there are multiple company files, which one should ModhaniOS connect to and send invoices into?
+          </li>
+          <li>
+            <span class="label">What should sync first:</span>
+            recommended first scope is invoices only.
+          </li>
+          <li>
+            <span class="label">How ModhaniOS data should map into QuickBooks:</span>
+            <ul>
+              <li>client in ModhaniOS to customer in QuickBooks</li>
+              <li>location in ModhaniOS to ship-to, job, or custom field in QuickBooks</li>
+              <li>product in ModhaniOS to item in QuickBooks</li>
+            </ul>
+          </li>
+          <li>
+            <span class="label">Missing customer or item rule:</span>
+            if a customer or item is not already present in QuickBooks, should it be created automatically or should sync stop and require manual creation first?
+          </li>
+          <li>
+            <span class="label">Test data for safe setup:</span>
+            if possible, arrange a backup/test company file. If that is not possible, get sample customers, items, and sample invoice examples.
+          </li>
+        </ol>
+      </section>
+
+      <section class="section">
+        <div class="card">
+          <div class="label">Needed later during final setup</div>
+          <ul>
+            <li>QuickBooks Admin available on the client side</li>
+            <li>permission to use or install QuickBooks Web Connector if required</li>
+            <li>access to the Windows machine where QuickBooks Desktop is installed</li>
+          </ul>
+        </div>
+
+        <div class="note">
+          <strong>Important:</strong> from my side I can prepare the integration logic and app workflow, but these details are needed first so the QuickBooks Desktop setup is built correctly and we avoid rework later.
+        </div>
+      </section>
+
+      <div class="footer">
+        Prepared for ModhaniOS QuickBooks Desktop planning.
+      </div>
+    </main>
+  </body>
+</html>
