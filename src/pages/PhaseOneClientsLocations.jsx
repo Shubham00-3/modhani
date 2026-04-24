@@ -61,6 +61,9 @@ export default function PhaseOneClientsLocations() {
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
                       {formatClientLocationScale(client, clientLocations.length)}
                     </div>
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: 4 }}>
+                      QB Customer: {client.qbCustomerName || client.name}
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                     <button className="btn btn-secondary btn-sm" type="button" disabled={!canManage} onClick={() => setPricingClientId(client.id)}>
@@ -83,6 +86,7 @@ export default function PhaseOneClientsLocations() {
                           onClick={() => setEditingLocation(location)}
                         >
                           {location.name}
+                          {location.qbMappingStatus !== 'ready' ? ' - needs address' : ''}
                         </button>
                       ))
                   ) : (

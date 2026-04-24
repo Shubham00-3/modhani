@@ -5,7 +5,9 @@ import { getProductDisplayName } from '../../data/phaseOneData';
 
 export function ProductModal({ product, onClose }) {
   const { state, dispatch, addToast } = useApp();
-  const [form, setForm] = useState(product ?? { name: '', unitSize: '', category: '', baseCataloguePrice: '' });
+  const [form, setForm] = useState(
+    product ?? { name: '', unitSize: '', category: '', baseCataloguePrice: '', qbItemName: '' }
+  );
 
   return (
     <SimpleModal
@@ -14,6 +16,7 @@ export function ProductModal({ product, onClose }) {
       onSave={async () => {
         const name = form.name.trim();
         const unitSize = form.unitSize.trim();
+        const qbItemName = (form.qbItemName || `${name} ${unitSize}`).trim();
         const baseCataloguePrice = Number(form.baseCataloguePrice);
 
         if (!name || !unitSize) {
@@ -47,6 +50,8 @@ export function ProductModal({ product, onClose }) {
             unitSize,
             id: product?.id ?? `prod-${Date.now()}`,
             baseCataloguePrice,
+            qbItemName,
+            qbMappingStatus: qbItemName ? 'ready' : 'needs_mapping',
           },
         });
 
@@ -61,6 +66,7 @@ export function ProductModal({ product, onClose }) {
       <FormInput label="Unit Size" value={form.unitSize} onChange={(value) => setForm((current) => ({ ...current, unitSize: value }))} />
       <FormInput label="Category" value={form.category} onChange={(value) => setForm((current) => ({ ...current, category: value }))} />
       <FormInput label="Base Catalogue Price" type="number" value={form.baseCataloguePrice} onChange={(value) => setForm((current) => ({ ...current, baseCataloguePrice: value }))} />
+      <FormInput label="QuickBooks Item Name" value={form.qbItemName ?? ''} onChange={(value) => setForm((current) => ({ ...current, qbItemName: value }))} />
     </SimpleModal>
   );
 }
@@ -76,6 +82,7 @@ export function ClientModal({ client, onClose }) {
       emailInvoice: true,
       packingSlipEmail: '',
       invoiceEmail: '',
+      qbCustomerName: '',
     }
   );
 
@@ -88,6 +95,7 @@ export function ClientModal({ client, onClose }) {
         const locationCount = Number(form.locationCount);
         const packingSlipEmail = form.packingSlipEmail?.trim() ?? '';
         const invoiceEmail = form.invoiceEmail?.trim() ?? '';
+        const qbCustomerName = (form.qbCustomerName || name).trim();
 
         if (!name) {
           addToast('Enter a client name.', 'warning');
@@ -128,6 +136,8 @@ export function ClientModal({ client, onClose }) {
             locationCount,
             packingSlipEmail,
             invoiceEmail,
+            qbCustomerName,
+            qbMappingStatus: qbCustomerName ? 'ready' : 'needs_mapping',
           },
         });
 
@@ -142,13 +152,27 @@ export function ClientModal({ client, onClose }) {
       <FormInput label="Location Count" type="number" value={form.locationCount} onChange={(value) => setForm((current) => ({ ...current, locationCount: Number(value) }))} />
       <FormInput label="Packing Slip Email" value={form.packingSlipEmail ?? ''} onChange={(value) => setForm((current) => ({ ...current, packingSlipEmail: value }))} />
       <FormInput label="Invoice Email" value={form.invoiceEmail ?? ''} onChange={(value) => setForm((current) => ({ ...current, invoiceEmail: value }))} />
+      <FormInput label="QuickBooks Customer Name" value={form.qbCustomerName ?? ''} onChange={(value) => setForm((current) => ({ ...current, qbCustomerName: value }))} />
     </SimpleModal>
   );
 }
 
 export function LocationModal({ location, onClose }) {
   const { state, dispatch, addToast } = useApp();
-  const [form, setForm] = useState(location ?? { clientId: state.clients[0]?.id ?? '', code: '', city: '', name: '' });
+  const [form, setForm] = useState(
+    location ?? {
+      clientId: state.clients[0]?.id ?? '',
+      code: '',
+      city: '',
+      name: '',
+      addressLine1: '',
+      addressLine2: '',
+      province: '',
+      postalCode: '',
+      country: 'Canada',
+      qbShipToName: '',
+    }
+  );
 
   return (
     <SimpleModal
@@ -158,6 +182,12 @@ export function LocationModal({ location, onClose }) {
         const name = form.name.trim();
         const code = form.code?.trim() ?? '';
         const city = form.city?.trim() ?? '';
+        const addressLine1 = form.addressLine1?.trim() ?? '';
+        const addressLine2 = form.addressLine2?.trim() ?? '';
+        const province = form.province?.trim() ?? '';
+        const postalCode = form.postalCode?.trim() ?? '';
+        const country = (form.country || 'Canada').trim();
+        const qbShipToName = (form.qbShipToName || name).trim();
 
         if (!form.clientId || !name) {
           addToast('Select a client and location name.', 'warning');
@@ -185,6 +215,13 @@ export function LocationModal({ location, onClose }) {
             name,
             code,
             city,
+            addressLine1,
+            addressLine2,
+            province,
+            postalCode,
+            country,
+            qbShipToName,
+            qbMappingStatus: addressLine1 && city && province && postalCode ? 'ready' : 'needs_address',
           },
         });
 
@@ -204,8 +241,14 @@ export function LocationModal({ location, onClose }) {
         </select>
       </div>
       <FormInput label="Location Code" value={form.code} onChange={(value) => setForm((current) => ({ ...current, code: value }))} />
-      <FormInput label="City" value={form.city} onChange={(value) => setForm((current) => ({ ...current, city: value }))} />
       <FormInput label="Display Name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+      <FormInput label="QuickBooks Ship-To Name" value={form.qbShipToName ?? ''} onChange={(value) => setForm((current) => ({ ...current, qbShipToName: value }))} />
+      <FormInput label="Address Line 1" value={form.addressLine1 ?? ''} onChange={(value) => setForm((current) => ({ ...current, addressLine1: value }))} />
+      <FormInput label="Address Line 2" value={form.addressLine2 ?? ''} onChange={(value) => setForm((current) => ({ ...current, addressLine2: value }))} />
+      <FormInput label="City" value={form.city} onChange={(value) => setForm((current) => ({ ...current, city: value }))} />
+      <FormInput label="Province" value={form.province ?? ''} onChange={(value) => setForm((current) => ({ ...current, province: value }))} />
+      <FormInput label="Postal Code" value={form.postalCode ?? ''} onChange={(value) => setForm((current) => ({ ...current, postalCode: value }))} />
+      <FormInput label="Country" value={form.country ?? 'Canada'} onChange={(value) => setForm((current) => ({ ...current, country: value }))} />
     </SimpleModal>
   );
 }

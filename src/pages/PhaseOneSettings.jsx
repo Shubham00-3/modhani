@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Mail, Settings2, Users } from 'lucide-react';
 import { useApp } from '../context/useApp';
+import { formatDateTime } from '../data/phaseOneData';
 
 export default function PhaseOneSettings() {
   const { state, dispatch, addToast } = useApp();
@@ -10,6 +11,7 @@ export default function PhaseOneSettings() {
     pricing: state.users.filter((user) => user.permissions.overridePrices).length,
     settings: state.users.filter((user) => user.permissions.manageSettings).length,
     emailEnabled: state.clients.filter((client) => client.emailInvoice || client.emailPackingSlip).length,
+    failedQbSyncs: state.quickBooksJobs.filter((job) => job.status === 'failed').length,
   };
 
   return (
@@ -39,7 +41,7 @@ export default function PhaseOneSettings() {
         <SummaryCard label="Fulfilment Access" value={`${staffSummary.fulfilment} staff`} />
         <SummaryCard label="Override Access" value={`${staffSummary.pricing} staff`} />
         <SummaryCard label="Settings Admins" value={`${staffSummary.settings} staff`} />
-        <SummaryCard label="Email Enabled Clients" value={`${staffSummary.emailEnabled} clients`} />
+        <SummaryCard label="Failed QB Syncs" value={`${staffSummary.failedQbSyncs} jobs`} />
       </div>
 
       <div className="grid-2">
@@ -186,8 +188,14 @@ function QuickBooksSettingsCard({ canManage, quickBooks, dispatch, addToast }) {
   });
 
   return (
-    <div className="card">
-      <div className="card-title">QuickBooks Connection</div>
+      <div className="card">
+        <div className="card-title">QuickBooks Connection</div>
+      <div className="grid-2" style={{ marginBottom: 'var(--space-4)' }}>
+        <SummaryCard label="Connector Status" value={quickBooks.status?.replaceAll('_', ' ') ?? 'Not configured'} />
+        <SummaryCard label="Last Check-In" value={formatDateTime(quickBooks.connectorLastSeenAt)} />
+        <SummaryCard label="Last Successful Sync" value={formatDateTime(quickBooks.lastSyncAt)} />
+        <SummaryCard label="Failed Sync Count" value={String(quickBooks.failedSyncCount ?? 0)} />
+      </div>
       <div className="form-group">
         <label className="form-label">Company Name</label>
         <input

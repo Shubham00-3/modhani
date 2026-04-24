@@ -20,10 +20,12 @@ import {
   getInvoiceableTotal,
   getItemOutstandingQty,
   getLocationName,
+  getQuickBooksSyncLabel,
   getOrderOutstandingQty,
   getOrderValue,
   getProduct,
   getProductDisplayName,
+  isLocationShipToReady,
 } from '../data/phaseOneData';
 import { printInvoice, printPackingSlip } from '../utils/printDocuments';
 
@@ -105,20 +107,45 @@ export default function PhaseOneOrdersInvoicing() {
     setShowFulfilment(true);
   }
 
-  async function handlePushToQuickBooks(order) {
-    const qbInvoiceNumber = `INV-${state.quickBooks.nextInvoiceSequence}`;
+  async function handleQueueQuickBooks(order) {
+    const client = state.clients.find((entry) => entry.id === order.clientId);
+    const location = state.locations.find((entry) => entry.id === order.locationId);
+    const missingProduct = order.items
+      .filter((item) => item.fulfilledQty > 0)
+      .map((item) => state.products.find((product) => product.id === item.productId))
+      .find((product) => !product?.qbItemName?.trim());
+
+    if (!order.invoiceNumber) {
+      addToast('Create the ModhaniOS invoice before queueing QuickBooks sync.', 'warning');
+      return;
+    }
+
+    if (!client?.qbCustomerName?.trim()) {
+      addToast('Add the QuickBooks customer name on the client before syncing.', 'warning');
+      return;
+    }
+
+    if (!isLocationShipToReady(location)) {
+      addToast('Add the full Ship-To address on the location before syncing.', 'warning');
+      return;
+    }
+
+    if (missingProduct) {
+      addToast(`Add the QuickBooks item name for ${getProductDisplayName(missingProduct)}.`, 'warning');
+      return;
+    }
 
     const result = await dispatch({
-      type: 'PUSH_QB_INVOICE',
+      type: 'QUEUE_QB_INVOICE',
       payload: {
         orderId: order.id,
-        qbInvoiceNumber,
+        timestamp: new Date().toISOString(),
       },
     });
 
     if (!result?.ok) return;
 
-    addToast(`QuickBooks invoice ${qbInvoiceNumber} linked to Order #${order.orderNumber}.`);
+    addToast(`Invoice ${order.invoiceNumber} queued for QuickBooks Desktop sync.`);
   }
 
   async function handleConfirmShipment(order) {
@@ -277,7 +304,7 @@ export default function PhaseOneOrdersInvoicing() {
                     <span className={`badge badge-${order.source}`}>{order.source.toUpperCase()}</span>
                   </td>
                   <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
-                  <td className="cell-monospace">{order.qbInvoiceNumber ?? '-'}</td>
+                  <td className="cell-monospace">{getQuickBooksSyncLabel(order)}</td>
                   <td className="cell-monospace">{order.packingSlipNumber ?? '-'}</td>
                   <td>{formatDate(order.createdAt)}</td>
                 </tr>
@@ -326,7 +353,7 @@ export default function PhaseOneOrdersInvoicing() {
                   order={selectedOrder}
                   onStartFulfilment={beginFulfilment}
                   onCreateInvoice={() => setShowInvoiceModal(true)}
-                  onPushToQuickBooks={handlePushToQuickBooks}
+                  onPushToQuickBooks={handleQueueQuickBooks}
                   onConfirmShipment={handleConfirmShipment}
                   onPrintPackingSlip={(currentOrder) =>
                     printPackingSlip({
@@ -382,6 +409,10 @@ function OrderDetailPanel({
   const orderAudit = state.auditLog.filter((entry) => entry.orderId === order.id);
   const lockedBy = order.lockedBy ? state.users.find((user) => user.id === order.lockedBy) : null;
   const invoiceableTotal = getInvoiceableTotal(order);
+  const quickBooksJob = state.quickBooksJobs.find(
+    (job) => job.orderId === order.id && job.jobType === 'invoice' && job.status !== 'pushed'
+  );
+  const quickBooksStatus = getQuickBooksSyncLabel(order);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -403,8 +434,22 @@ function OrderDetailPanel({
         <InfoCard label="Created" value={formatDateTime(order.createdAt)} />
         <InfoCard label="Outstanding" value={`${getOrderOutstandingQty(order).toLocaleString()} units`} />
         <InfoCard label="Invoice" value={order.invoiceNumber ?? '-'} />
-        <InfoCard label="QuickBooks" value={order.qbInvoiceNumber ?? '-'} />
+        <InfoCard label="QuickBooks" value={quickBooksStatus} />
       </div>
+
+      {quickBooksJob ? (
+        <div className={`alert ${quickBooksJob.status === 'failed' ? 'alert-warning' : 'alert-info'}`}>
+          <AlertTriangle size={18} />
+          <div className="alert-content">
+            <div className="alert-title">QuickBooks sync {quickBooksJob.status}</div>
+            <div className="alert-description">
+              {quickBooksJob.status === 'failed'
+                ? quickBooksJob.errorMessage || 'The connector returned an error. Review the mapping and retry.'
+                : 'QuickBooks Web Connector will pick up this invoice on its next run.'}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div>
         <h3 className="card-title" style={{ marginBottom: 'var(--space-3)' }}>Line Items</h3>
@@ -470,9 +515,15 @@ function OrderDetailPanel({
           </button>
         ) : null}
 
-        {order.status === 'invoiced' && !order.qbInvoiceNumber ? (
+        {order.status === 'invoiced' && order.qbSyncStatus !== 'pushed' && order.qbSyncStatus !== 'syncing' && order.qbSyncStatus !== 'pending' ? (
           <button className="btn btn-secondary" type="button" onClick={() => onPushToQuickBooks(order)}>
-            <FileText size={16} /> Push to QuickBooks
+            <FileText size={16} /> Queue for QuickBooks Sync
+          </button>
+        ) : null}
+
+        {order.status === 'invoiced' && order.qbSyncStatus === 'failed' ? (
+          <button className="btn btn-secondary" type="button" onClick={() => onPushToQuickBooks(order)}>
+            <FileText size={16} /> Retry QuickBooks Sync
           </button>
         ) : null}
 

@@ -46,6 +46,7 @@ export default function PhaseOneProducts() {
               <tr>
                 <th>Product</th>
                 <th>Category</th>
+                <th>QuickBooks Item</th>
                 <th>Base Catalogue Price</th>
                 <th />
               </tr>
@@ -55,6 +56,7 @@ export default function PhaseOneProducts() {
                 <tr key={product.id}>
                   <td style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</td>
                   <td>{product.category || '-'}</td>
+                  <td>{product.qbItemName || getProductDisplayName(product)}</td>
                   <td className="cell-monospace">{formatCurrency(product.baseCataloguePrice)}</td>
                   <td>
                     <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingProduct(product)}>

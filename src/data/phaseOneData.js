@@ -52,6 +52,8 @@ export const CLIENTS = [
     deliveryMethod: 'email',
     packingSlipEmail: '',
     invoiceEmail: '',
+    qbCustomerName: 'Loblaws',
+    qbMappingStatus: 'ready',
   },
   {
     id: 'client-chalo-freshco',
@@ -62,6 +64,8 @@ export const CLIENTS = [
     deliveryMethod: 'email',
     packingSlipEmail: '',
     invoiceEmail: '',
+    qbCustomerName: 'Chalo FreshCo',
+    qbMappingStatus: 'ready',
   },
   {
     id: 'client-a1-cash-carry',
@@ -72,6 +76,8 @@ export const CLIENTS = [
     deliveryMethod: 'email',
     packingSlipEmail: '',
     invoiceEmail: '',
+    qbCustomerName: 'A1 Cash & Carry',
+    qbMappingStatus: 'ready',
   },
   {
     id: 'client-desi-stores',
@@ -82,6 +88,8 @@ export const CLIENTS = [
     deliveryMethod: 'email',
     packingSlipEmail: '',
     invoiceEmail: '',
+    qbCustomerName: 'Desi Stores',
+    qbMappingStatus: 'ready',
   },
 ];
 
@@ -95,6 +103,8 @@ export const QUICKBOOKS_SETTINGS = {
   connectorName: 'QuickBooks Desktop Web Connector',
   status: 'setup_pending',
   lastSyncAt: null,
+  connectorLastSeenAt: null,
+  failedSyncCount: 0,
   nextInvoiceSequence: 9101,
 };
 
@@ -119,6 +129,23 @@ export function getClientName(clients, clientId) {
 
 export function getLocationName(locations, locationId) {
   return locations.find((location) => location.id === locationId)?.name ?? 'Unknown location';
+}
+
+export function getQuickBooksSyncLabel(order) {
+  if (order.qbSyncStatus === 'pushed') return order.qbInvoiceNumber ?? 'Pushed';
+  if (order.qbSyncStatus === 'syncing') return 'Syncing';
+  if (order.qbSyncStatus === 'failed') return 'Failed';
+  if (order.qbSyncStatus === 'pending') return 'Pending sync';
+  return '-';
+}
+
+export function isLocationShipToReady(location) {
+  return Boolean(
+    location?.addressLine1?.trim() &&
+      location?.city?.trim() &&
+      location?.province?.trim() &&
+      location?.postalCode?.trim()
+  );
 }
 
 export function formatClientLocationScale(client, configuredCount = 0) {

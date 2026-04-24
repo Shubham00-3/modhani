@@ -25,6 +25,8 @@ function clientToUi(client) {
     deliveryMethod: client.delivery_method,
     packingSlipEmail: client.packing_slip_email,
     invoiceEmail: client.invoice_email,
+    qbCustomerName: client.qb_customer_name ?? client.name,
+    qbMappingStatus: client.qb_mapping_status ?? 'ready',
   };
 }
 
@@ -35,6 +37,13 @@ function locationToUi(location) {
     code: location.code,
     city: location.city,
     name: location.name,
+    addressLine1: location.address_line1 ?? '',
+    addressLine2: location.address_line2 ?? '',
+    province: location.province ?? '',
+    postalCode: location.postal_code ?? '',
+    country: location.country ?? 'Canada',
+    qbShipToName: location.qb_ship_to_name ?? location.name,
+    qbMappingStatus: location.qb_mapping_status ?? 'needs_address',
   };
 }
 
@@ -45,6 +54,23 @@ function productToUi(product) {
     unitSize: product.unit_size,
     category: product.category,
     baseCataloguePrice: Number(product.base_catalogue_price),
+    qbItemName: product.qb_item_name ?? `${product.name} ${product.unit_size}`.trim(),
+    qbMappingStatus: product.qb_mapping_status ?? 'ready',
+  };
+}
+
+function quickBooksJobToUi(job) {
+  return {
+    id: job.id,
+    orderId: job.order_id,
+    jobType: job.job_type,
+    status: job.status,
+    qbInvoiceNumber: job.qb_invoice_number,
+    qbTxnId: job.qb_txn_id,
+    errorMessage: job.error_message,
+    attempts: Number(job.attempts ?? 0),
+    createdAt: job.created_at,
+    updatedAt: job.updated_at,
   };
 }
 
@@ -103,6 +129,8 @@ function quickBooksToUi(settings) {
     connectorName: settings.connector_name,
     status: settings.status,
     lastSyncAt: settings.last_sync_at,
+    connectorLastSeenAt: settings.connector_last_seen_at,
+    failedSyncCount: Number(settings.failed_sync_count ?? 0),
     nextInvoiceSequence: settings.next_invoice_sequence,
   };
 }
@@ -167,6 +195,8 @@ function clientToDb(client) {
     delivery_method: client.deliveryMethod,
     packing_slip_email: client.packingSlipEmail ?? null,
     invoice_email: client.invoiceEmail ?? null,
+    qb_customer_name: client.qbCustomerName ?? client.name,
+    qb_mapping_status: client.qbMappingStatus ?? 'ready',
   };
 }
 
@@ -177,6 +207,13 @@ function locationToDb(location) {
     code: location.code ?? null,
     city: location.city ?? null,
     name: location.name,
+    address_line1: location.addressLine1 ?? null,
+    address_line2: location.addressLine2 ?? null,
+    province: location.province ?? null,
+    postal_code: location.postalCode ?? null,
+    country: location.country ?? 'Canada',
+    qb_ship_to_name: location.qbShipToName ?? location.name,
+    qb_mapping_status: location.qbMappingStatus ?? 'needs_address',
   };
 }
 
@@ -187,6 +224,8 @@ function productToDb(product) {
     unit_size: product.unitSize,
     category: product.category ?? null,
     base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
+    qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
+    qb_mapping_status: product.qbMappingStatus ?? 'ready',
   };
 }
 
@@ -285,6 +324,8 @@ function quickBooksToDb(settings) {
     connector_name: settings.connectorName,
     status: settings.status,
     last_sync_at: settings.lastSyncAt,
+    connector_last_seen_at: settings.connectorLastSeenAt ?? null,
+    failed_sync_count: Number(settings.failedSyncCount ?? 0),
     next_invoice_sequence: Number(settings.nextInvoiceSequence),
   };
 }
@@ -302,6 +343,7 @@ export async function fetchRemoteState(supabase, userId) {
     assignmentsResult,
     auditResult,
     quickBooksResult,
+    quickBooksJobsResult,
     reportRowsResult,
     notificationDismissalsResult,
   ] = await Promise.all([
@@ -316,6 +358,7 @@ export async function fetchRemoteState(supabase, userId) {
     supabase.from('batch_assignments').select('*'),
     supabase.from('audit_events').select('*').order('timestamp', { ascending: false }),
     supabase.from('quickbooks_settings').select('*').limit(1).maybeSingle(),
+    supabase.from('quickbooks_sync_jobs').select('*').order('created_at', { ascending: false }),
     supabase.from('report_order_lines').select('*').order('created_at', { ascending: false }),
     userId
       ? supabase
@@ -338,12 +381,13 @@ export async function fetchRemoteState(supabase, userId) {
     assignmentsResult,
     auditResult,
     quickBooksResult,
+    quickBooksJobsResult,
     reportRowsResult,
     notificationDismissalsResult,
   ];
 
   const firstError = results
-    .filter((result) => result !== reportRowsResult && result !== notificationDismissalsResult)
+    .filter((result) => result !== reportRowsResult && result !== notificationDismissalsResult && result !== quickBooksJobsResult)
     .find((result) => result.error)?.error;
   if (firstError) {
     throw firstError;
@@ -423,6 +467,7 @@ export async function fetchRemoteState(supabase, userId) {
       ? []
       : (notificationDismissalsResult.data ?? []).map(notificationDismissalToUi),
     quickBooks: quickBooksToUi(quickBooksResult.data),
+    quickBooksJobs: quickBooksJobsResult.error ? [] : (quickBooksJobsResult.data ?? []).map(quickBooksJobToUi),
     reportRows,
   };
 }
@@ -492,6 +537,11 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_user_id: currentUser.id,
         p_qb_invoice_number: action.payload.qbInvoiceNumber,
       });
+    case 'QUEUE_QB_INVOICE':
+      return callRpc(supabase, 'modhanios_queue_qb_invoice', {
+        p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+      });
     case 'CONFIRM_SHIPMENT':
       return callRpc(supabase, 'modhanios_confirm_shipment', {
         p_order_id: action.payload.orderId,
@@ -525,6 +575,7 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_unit_size: product.unitSize,
         p_category: product.category ?? null,
         p_base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
+        p_qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
       });
     }
     case 'ADD_CLIENT':
@@ -548,6 +599,7 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_email_invoice: Boolean(client.emailInvoice),
         p_packing_slip_email: client.packingSlipEmail ?? null,
         p_invoice_email: client.invoiceEmail ?? null,
+        p_qb_customer_name: client.qbCustomerName ?? client.name,
       });
     }
     case 'ADD_LOCATION':
@@ -560,6 +612,12 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_code: location.code ?? null,
         p_city: location.city ?? null,
         p_name: location.name,
+        p_address_line1: location.addressLine1 ?? null,
+        p_address_line2: location.addressLine2 ?? null,
+        p_province: location.province ?? null,
+        p_postal_code: location.postalCode ?? null,
+        p_country: location.country ?? 'Canada',
+        p_qb_ship_to_name: location.qbShipToName ?? location.name,
       });
     }
     case 'SET_CLIENT_PRICING': {
@@ -627,6 +685,7 @@ export async function persistAction(supabase, action, previousState, nextState) 
     case 'DECLINE_ORDER':
     case 'CREATE_INVOICE':
     case 'PUSH_QB_INVOICE':
+    case 'QUEUE_QB_INVOICE':
     case 'CONFIRM_SHIPMENT': {
       const order = nextState.orders.find((entry) => entry.id === action.payload.orderId);
       if (!order) return { error: null };

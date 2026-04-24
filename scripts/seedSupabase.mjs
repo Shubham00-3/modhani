@@ -93,6 +93,8 @@ async function ensureAuthUsers() {
 async function resetTables() {
   const deletes = [
     ['batch_assignments', 'order_item_id'],
+    ['quickbooks_sync_attempts', 'id'],
+    ['quickbooks_sync_jobs', 'id'],
     ['order_items', 'order_id'],
     ['notification_dismissals', 'notification_key'],
     ['audit_events', 'id'],
@@ -109,7 +111,7 @@ async function resetTables() {
   for (const [table, column] of deletes) {
     const { error } = await supabase.from(table).delete().not(column, 'is', null);
     if (error) {
-      if (table === 'notification_dismissals' && isMissingTableError(error)) continue;
+      if ((table === 'notification_dismissals' || table.startsWith('quickbooks_sync_')) && isMissingTableError(error)) continue;
       throw error;
     }
   }
@@ -136,6 +138,8 @@ async function seedCoreTables(userIdMap) {
     delivery_method: client.deliveryMethod,
     packing_slip_email: client.packingSlipEmail,
     invoice_email: client.invoiceEmail,
+    qb_customer_name: client.qbCustomerName ?? client.name,
+    qb_mapping_status: client.qbMappingStatus ?? 'ready',
   })));
 
   await insertRows('locations', LOCATIONS.map((location) => ({
@@ -144,6 +148,13 @@ async function seedCoreTables(userIdMap) {
     code: location.code,
     city: location.city,
     name: location.name,
+    address_line1: location.addressLine1 ?? null,
+    address_line2: location.addressLine2 ?? null,
+    province: location.province ?? null,
+    postal_code: location.postalCode ?? null,
+    country: location.country ?? 'Canada',
+    qb_ship_to_name: location.qbShipToName ?? location.name,
+    qb_mapping_status: location.qbMappingStatus ?? 'needs_address',
   })));
 
   await insertRows('products', PRODUCTS.map((product) => ({
@@ -152,6 +163,8 @@ async function seedCoreTables(userIdMap) {
     unit_size: product.unitSize,
     category: product.category,
     base_catalogue_price: product.baseCataloguePrice,
+    qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
+    qb_mapping_status: product.qbMappingStatus ?? 'ready',
   })));
 
   await insertRows('client_product_prices', CLIENT_PRICING.map((price) => ({
@@ -249,6 +262,8 @@ async function seedCoreTables(userIdMap) {
       connector_name: QUICKBOOKS_SETTINGS.connectorName,
       status: QUICKBOOKS_SETTINGS.status,
       last_sync_at: toTimestamp(QUICKBOOKS_SETTINGS.lastSyncAt),
+      connector_last_seen_at: toTimestamp(QUICKBOOKS_SETTINGS.connectorLastSeenAt),
+      failed_sync_count: QUICKBOOKS_SETTINGS.failedSyncCount ?? 0,
       next_invoice_sequence: QUICKBOOKS_SETTINGS.nextInvoiceSequence,
     },
   ]);

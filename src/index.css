@@ -774,6 +774,8 @@ img {
 
 .badge-pushed { background: var(--color-success-bg); color: var(--color-success); }
 .badge-qb-pending { background: #FEF3C7; color: #D97706; }
+.badge-syncing { background: var(--color-info-bg); color: var(--color-info); }
+.badge-failed { background: var(--color-error-bg); color: var(--color-error); }
 
 /* ---------- Tables ---------- */
 .data-table {

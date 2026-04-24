@@ -35,6 +35,7 @@ const demoState = {
   orders: ORDERS,
   auditLog: AUDIT_LOG,
   notificationDismissals: [],
+  quickBooksJobs: [],
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: buildReportRowsFromOrders({
     orders: ORDERS,
@@ -63,6 +64,7 @@ const remoteBootState = {
   orders: [],
   auditLog: [],
   notificationDismissals: [],
+  quickBooksJobs: [],
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: [],
   sidebarCollapsed: false,
@@ -341,6 +343,30 @@ function reducer(state, action) {
           status: 'connected',
         },
       };
+    case 'QUEUE_QB_INVOICE':
+      return {
+        ...state,
+        orders: state.orders.map((order) =>
+          order.id === action.payload.orderId
+            ? {
+                ...order,
+                qbSyncStatus: 'pending',
+              }
+            : order
+        ),
+        quickBooksJobs: [
+          {
+            id: `qb-job-${Date.now()}`,
+            orderId: action.payload.orderId,
+            jobType: 'invoice',
+            status: 'pending',
+            attempts: 0,
+            createdAt: action.payload.timestamp,
+            updatedAt: action.payload.timestamp,
+          },
+          ...state.quickBooksJobs.filter((job) => job.orderId !== action.payload.orderId || job.status === 'pushed'),
+        ],
+      };
     case 'CONFIRM_SHIPMENT':
       return {
         ...state,
@@ -394,6 +420,7 @@ const serverWorkflowActions = new Set([
   'DECLINE_ORDER',
   'CREATE_INVOICE',
   'PUSH_QB_INVOICE',
+  'QUEUE_QB_INVOICE',
   'CONFIRM_SHIPMENT',
   'LOG_PRODUCTION_BATCH',
 ]);
@@ -538,6 +565,7 @@ export function AppProvider({ children }) {
             orders: [],
             auditLog: [],
             notificationDismissals: [],
+            quickBooksJobs: [],
             quickBooks: QUICKBOOKS_SETTINGS,
             reportRows: [],
           },
