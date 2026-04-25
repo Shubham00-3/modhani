@@ -215,9 +215,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.modhanios_can_manage_settings(p_user_id) then
-    raise exception 'This user cannot manage settings.';
-  end if;
+  perform public.modhanios_assert_manage_settings(p_user_id);
 
   insert into public.clients (
     id,
@@ -279,9 +277,7 @@ as $$
 declare
   v_status text;
 begin
-  if not public.modhanios_can_manage_settings(p_user_id) then
-    raise exception 'This user cannot manage settings.';
-  end if;
+  perform public.modhanios_assert_manage_settings(p_user_id);
 
   v_status := case
     when nullif(btrim(coalesce(p_address_line1, '')), '') is not null
@@ -351,9 +347,7 @@ security definer
 set search_path = public
 as $$
 begin
-  if not public.modhanios_can_manage_settings(p_user_id) then
-    raise exception 'This user cannot manage settings.';
-  end if;
+  perform public.modhanios_assert_manage_settings(p_user_id);
 
   insert into public.products (
     id,
