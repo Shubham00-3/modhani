@@ -3,10 +3,26 @@ import { X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { getProductDisplayName } from '../../data/phaseOneData';
 
+const PRODUCT_UNIT_OPTIONS = ['kg', 'grams', 'liters', 'ml'];
+
 export function ProductModal({ product, onClose }) {
   const { state, dispatch, addToast } = useApp();
+  const initialUnit = parseUnitSize(product?.unitSize);
   const [form, setForm] = useState(
-    product ?? { name: '', unitSize: '', category: '', baseCataloguePrice: '', qbItemName: '' }
+    product
+      ? {
+          ...product,
+          unitQuantity: initialUnit.quantity,
+          unitMeasure: initialUnit.unit,
+        }
+      : {
+          name: '',
+          unitQuantity: '',
+          unitMeasure: 'kg',
+          category: '',
+          baseCataloguePrice: '',
+          qbItemName: '',
+        }
   );
 
   return (
@@ -15,12 +31,24 @@ export function ProductModal({ product, onClose }) {
       onClose={onClose}
       onSave={async () => {
         const name = form.name.trim();
-        const unitSize = form.unitSize.trim();
+        const unitQuantity = Number(form.unitQuantity);
+        const unitMeasure = form.unitMeasure;
+        const unitSize = `${form.unitQuantity} ${unitMeasure}`.trim();
         const qbItemName = (form.qbItemName || `${name} ${unitSize}`).trim();
         const baseCataloguePrice = Number(form.baseCataloguePrice);
 
-        if (!name || !unitSize) {
-          addToast('Enter product name and unit size.', 'warning');
+        if (!name) {
+          addToast('Enter product name.', 'warning');
+          return false;
+        }
+
+        if (Number.isNaN(unitQuantity) || unitQuantity <= 0) {
+          addToast('Unit quantity must be a number greater than zero.', 'warning');
+          return false;
+        }
+
+        if (!PRODUCT_UNIT_OPTIONS.includes(unitMeasure)) {
+          addToast('Select a valid unit.', 'warning');
           return false;
         }
 
@@ -63,7 +91,18 @@ export function ProductModal({ product, onClose }) {
       }}
     >
       <FormInput label="Product Name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
-      <FormInput label="Unit Size" value={form.unitSize} onChange={(value) => setForm((current) => ({ ...current, unitSize: value }))} />
+      <FormInput
+        label="Quantity"
+        type="number"
+        value={form.unitQuantity}
+        onChange={(value) => setForm((current) => ({ ...current, unitQuantity: value }))}
+      />
+      <FormSelect
+        label="Unit"
+        value={form.unitMeasure}
+        options={PRODUCT_UNIT_OPTIONS}
+        onChange={(value) => setForm((current) => ({ ...current, unitMeasure: value }))}
+      />
       <FormInput label="Category" value={form.category} onChange={(value) => setForm((current) => ({ ...current, category: value }))} />
       <FormInput label="Base Catalogue Price" type="number" value={form.baseCataloguePrice} onChange={(value) => setForm((current) => ({ ...current, baseCataloguePrice: value }))} />
       <FormInput label="QuickBooks Item Name" value={form.qbItemName ?? ''} onChange={(value) => setForm((current) => ({ ...current, qbItemName: value }))} />
@@ -355,6 +394,53 @@ function FormInput({ label, value, onChange, type = 'text' }) {
       <input className="form-input" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
   );
+}
+
+function FormSelect({ label, value, options, onChange }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      <select className="form-select" value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+function parseUnitSize(unitSize = '') {
+  const normalized = String(unitSize).trim();
+  const match = normalized.match(/^(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|liters?|litres?|l|ml|milliliters?)$/i);
+
+  if (!match) {
+    return { quantity: '', unit: 'kg' };
+  }
+
+  const unit = match[2].toLowerCase();
+  const unitMap = {
+    g: 'grams',
+    gram: 'grams',
+    grams: 'grams',
+    kilogram: 'kg',
+    kilograms: 'kg',
+    kg: 'kg',
+    l: 'liters',
+    liter: 'liters',
+    liters: 'liters',
+    litre: 'liters',
+    litres: 'liters',
+    ml: 'ml',
+    milliliter: 'ml',
+    milliliters: 'ml',
+  };
+
+  return {
+    quantity: match[1],
+    unit: unitMap[unit] ?? 'kg',
+  };
 }
 
 function isValidEmail(value) {

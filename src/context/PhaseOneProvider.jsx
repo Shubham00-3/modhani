@@ -436,6 +436,22 @@ const serverAdminActions = new Set([
   'UPDATE_QB_SETTINGS',
 ]);
 
+function buildLocalNotificationDismissals(userId, notificationKeys) {
+  return notificationKeys.map((notificationKey) => ({
+    userId,
+    notificationKey,
+    dismissedAt: new Date().toISOString(),
+  }));
+}
+
+function isMissingNotificationDismissalsTable(error) {
+  const message = error?.message ?? '';
+  return (
+    error?.code === 'PGRST205' ||
+    message.includes('notification_dismissals') && message.includes('schema cache')
+  );
+}
+
 export function AppProvider({ children }) {
   const [state, baseDispatch] = useReducer(reducer, initialState);
   const stateRef = useRef(state);
@@ -676,6 +692,14 @@ export function AppProvider({ children }) {
       );
 
       if (error) {
+        if (isMissingNotificationDismissalsTable(error)) {
+          baseDispatch({
+            type: 'UPSERT_NOTIFICATION_DISMISSALS',
+            payload: buildLocalNotificationDismissals(stateRef.current.currentUserId, [notificationKey]),
+          });
+          return { ok: true };
+        }
+
         addToast(`Notification clear failed: ${error.message}`, 'warning');
         return { ok: false, error };
       }
@@ -686,11 +710,7 @@ export function AppProvider({ children }) {
           data.length > 0
             ? data
             : [
-                {
-                  userId: stateRef.current.currentUserId,
-                  notificationKey,
-                  dismissedAt: new Date().toISOString(),
-                },
+                ...buildLocalNotificationDismissals(stateRef.current.currentUserId, [notificationKey]),
               ],
       });
 
@@ -723,6 +743,14 @@ export function AppProvider({ children }) {
     );
 
     if (error) {
+      if (isMissingNotificationDismissalsTable(error)) {
+        baseDispatch({
+          type: 'UPSERT_NOTIFICATION_DISMISSALS',
+          payload: buildLocalNotificationDismissals(stateRef.current.currentUserId, notificationKeys),
+        });
+        return { ok: true };
+      }
+
       addToast(`Notification clear failed: ${error.message}`, 'warning');
       return { ok: false, error };
     }
@@ -732,11 +760,7 @@ export function AppProvider({ children }) {
       payload:
         data.length > 0
           ? data
-          : notificationKeys.map((notificationKey) => ({
-              userId: stateRef.current.currentUserId,
-              notificationKey,
-              dismissedAt: new Date().toISOString(),
-            })),
+          : buildLocalNotificationDismissals(stateRef.current.currentUserId, notificationKeys),
     });
 
     return { ok: true };
