@@ -515,7 +515,7 @@ function OrderDetailPanel({
           </button>
         ) : null}
 
-        {order.status === 'invoiced' && order.qbSyncStatus !== 'pushed' && order.qbSyncStatus !== 'syncing' && order.qbSyncStatus !== 'pending' ? (
+        {order.status === 'invoiced' && order.qbSyncStatus !== 'pushed' && order.qbSyncStatus !== 'syncing' && !quickBooksJob ? (
           <button className="btn btn-secondary" type="button" onClick={() => onPushToQuickBooks(order)}>
             <FileText size={16} /> Queue for QuickBooks Sync
           </button>
@@ -1076,7 +1076,7 @@ function AddOrderModal({ onClose }) {
       invoiceNumber: null,
       invoiceTotal: null,
       qbInvoiceNumber: null,
-      qbSyncStatus: 'pending',
+      qbSyncStatus: null,
       packingSlipNumber: null,
       createdAt: timestamp,
       fulfilledAt: null,
