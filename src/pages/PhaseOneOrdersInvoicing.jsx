@@ -1011,7 +1011,7 @@ function AddOrderModal({ onClose }) {
     setLines((current) => (current.length > 1 ? current.filter((line) => line.id !== lineId) : current));
   }
 
-  function saveOrder() {
+  async function saveOrder() {
     if (!clientId || !locationId) {
       addToast('Select a client and location.', 'warning');
       return;
@@ -1038,7 +1038,7 @@ function AddOrderModal({ onClose }) {
       duplicateProductIds.add(line.productId);
     }
 
-    const nextOrderNumber = Math.max(...state.orders.map((order) => order.orderNumber)) + 1;
+    const nextOrderNumber = Math.max(1049, ...state.orders.map((order) => Number(order.orderNumber) || 0)) + 1;
     const timestamp = new Date().toISOString();
 
     const items = validLines.map((line, index) => {
@@ -1090,7 +1090,9 @@ function AddOrderModal({ onClose }) {
       items,
     };
 
-    dispatch({ type: 'ADD_ORDER', payload: order });
+    const result = await dispatch({ type: 'ADD_ORDER', payload: order });
+    if (!result?.ok) return;
+
     addAudit({
       action: 'order_received',
       orderId: order.id,
