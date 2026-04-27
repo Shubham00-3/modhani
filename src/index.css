@@ -735,9 +735,23 @@ img {
   transition: all var(--transition-fast);
 }
 
+.stat-card-clickable {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
 .stat-card:hover {
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
+}
+
+.stat-card-clickable:hover {
+  border-color: rgba(26, 48, 33, 0.22);
+}
+
+.stat-card-clickable:focus-visible {
+  box-shadow: 0 0 0 3px rgba(26, 48, 33, 0.16), var(--shadow-md);
 }
 
 .stat-card-header {

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   FileText,
@@ -31,6 +32,8 @@ import { printInvoice, printPackingSlip } from '../utils/printDocuments';
 
 export default function PhaseOneOrdersInvoicing() {
   const { state, dispatch, addToast } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const dashboardView = searchParams.get('view') ?? '';
   const canCreateOrders = state.clients.length > 0 && state.locations.length > 0 && state.products.length > 0;
   const [filters, setFilters] = useState({
     clientId: '',
@@ -42,18 +45,46 @@ export default function PhaseOneOrdersInvoicing() {
   const [showFulfilment, setShowFulfilment] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
-  const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source);
+  const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || dashboardView);
 
   const selectedOrder = state.orders.find((order) => order.id === selectedOrderId) ?? null;
 
   const filteredOrders = useMemo(() => {
+    const todayKey = new Date().toISOString().slice(0, 10);
+
     return [...state.orders]
+      .filter((order) => {
+        if (dashboardView === 'open') {
+          return ['pending', 'partial', 'fulfilled', 'invoiced'].includes(order.status);
+        }
+
+        if (dashboardView === 'outstanding') {
+          return getOrderOutstandingQty(order) > 0;
+        }
+
+        if (dashboardView === 'qb-pending') {
+          return Boolean(order.invoiceNumber && !order.qbInvoiceNumber);
+        }
+
+        if (dashboardView === 'shipments-today') {
+          return order.shippedAt?.slice(0, 10) === todayKey;
+        }
+
+        return true;
+      })
       .filter((order) => (filters.clientId ? order.clientId === filters.clientId : true))
       .filter((order) => (filters.locationId ? order.locationId === filters.locationId : true))
       .filter((order) => (filters.status ? order.status === filters.status : true))
       .filter((order) => (filters.source ? order.source === filters.source : true))
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [filters, state.orders]);
+  }, [dashboardView, filters, state.orders]);
+
+  const dashboardViewLabel = {
+    open: 'Open Orders',
+    outstanding: 'Outstanding Units',
+    'qb-pending': 'Pending QuickBooks Push',
+    'shipments-today': 'Shipments Today',
+  }[dashboardView];
 
   const locationOptions = filters.clientId
     ? state.locations.filter((location) => location.clientId === filters.clientId)
@@ -63,6 +94,16 @@ export default function PhaseOneOrdersInvoicing() {
     setSelectedOrderId(orderId);
     setShowFulfilment(false);
     setShowInvoiceModal(false);
+  }
+
+  function updateFilters(updater) {
+    setSearchParams({});
+    setFilters(updater);
+  }
+
+  function resetFilters() {
+    setSearchParams({});
+    setFilters({ clientId: '', locationId: '', status: '', source: '' });
   }
 
   async function closePanel() {
@@ -211,10 +252,22 @@ export default function PhaseOneOrdersInvoicing() {
       ) : null}
 
       <div className="filter-bar">
+        {dashboardViewLabel ? (
+          <div className="alert alert-info" style={{ flex: '1 1 100%' }}>
+            <FileText size={18} />
+            <div className="alert-content">
+              <div className="alert-title">Showing {dashboardViewLabel}</div>
+              <div className="alert-description">
+                This view was opened from the dashboard. Use Reset Filters to return to all orders.
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <select
           className="form-select"
           value={filters.clientId}
-          onChange={(event) => setFilters((current) => ({ ...current, clientId: event.target.value, locationId: '' }))}
+          onChange={(event) => updateFilters((current) => ({ ...current, clientId: event.target.value, locationId: '' }))}
         >
           <option value="">All Clients</option>
           {state.clients.map((client) => (
@@ -227,7 +280,7 @@ export default function PhaseOneOrdersInvoicing() {
         <select
           className="form-select"
           value={filters.locationId}
-          onChange={(event) => setFilters((current) => ({ ...current, locationId: event.target.value }))}
+          onChange={(event) => updateFilters((current) => ({ ...current, locationId: event.target.value }))}
         >
           <option value="">All Locations</option>
           {locationOptions.map((location) => (
@@ -240,7 +293,7 @@ export default function PhaseOneOrdersInvoicing() {
         <select
           className="form-select"
           value={filters.status}
-          onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}
+          onChange={(event) => updateFilters((current) => ({ ...current, status: event.target.value }))}
         >
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
@@ -254,7 +307,7 @@ export default function PhaseOneOrdersInvoicing() {
         <select
           className="form-select"
           value={filters.source}
-          onChange={(event) => setFilters((current) => ({ ...current, source: event.target.value }))}
+          onChange={(event) => updateFilters((current) => ({ ...current, source: event.target.value }))}
         >
           <option value="">All Sources</option>
           <option value="edi">EDI</option>
@@ -264,7 +317,7 @@ export default function PhaseOneOrdersInvoicing() {
           className="btn btn-secondary"
           type="button"
           disabled={!hasActiveFilters}
-          onClick={() => setFilters({ clientId: '', locationId: '', status: '', source: '' })}
+          onClick={resetFilters}
         >
           Reset Filters
         </button>

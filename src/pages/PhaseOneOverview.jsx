@@ -1,4 +1,5 @@
 import { createElement } from 'react';
+import { Link } from 'react-router-dom';
 import { BarChart3, ClipboardList, Package, RefreshCw, ScrollText, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
@@ -46,15 +47,34 @@ export default function PhaseOneOverview() {
   return (
     <div>
       <div className="stat-cards-grid section">
-        <StatCard icon={ClipboardList} label="Open Orders" value={activeOrders.length} detail="Pending through invoiced" />
-        <StatCard icon={Package} label="Outstanding Units" value={outstandingUnits.toLocaleString()} detail="Awaiting next batch or manual fulfilment" />
+        <StatCard
+          icon={ClipboardList}
+          label="Open Orders"
+          value={activeOrders.length}
+          detail="Pending through invoiced"
+          to="/orders?view=open"
+        />
+        <StatCard
+          icon={Package}
+          label="Outstanding Units"
+          value={outstandingUnits.toLocaleString()}
+          detail="Awaiting next batch or manual fulfilment"
+          to="/orders?view=outstanding"
+        />
         <StatCard
           icon={RefreshCw}
           label="Pending QB Push"
           value={invoicesPendingQb}
           detail={state.quickBooks.lastSyncAt ? `Last sync ${formatTime(state.quickBooks.lastSyncAt)}` : 'No sync recorded yet'}
+          to="/orders?view=qb-pending"
         />
-        <StatCard icon={Truck} label="Shipments Today" value={shipmentsToday} detail="Packing slips generated per shipment" />
+        <StatCard
+          icon={Truck}
+          label="Shipments Today"
+          value={shipmentsToday}
+          detail="Packing slips generated per shipment"
+          to="/orders?view=shipments-today"
+        />
       </div>
 
       <div className="grid-2 section">
@@ -160,9 +180,9 @@ export default function PhaseOneOverview() {
   );
 }
 
-function StatCard({ icon, label, value, detail }) {
-  return (
-    <div className="stat-card">
+function StatCard({ icon, label, value, detail, to }) {
+  const content = (
+    <>
       <div className="stat-card-header">
         <div className="stat-card-icon">
           {createElement(icon, { size: 20 })}
@@ -171,6 +191,20 @@ function StatCard({ icon, label, value, detail }) {
       <div className="stat-card-value">{value}</div>
       <div className="stat-card-label">{label}</div>
       <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>{detail}</div>
+    </>
+  );
+
+  if (to) {
+    return (
+      <Link className="stat-card stat-card-clickable" to={to} aria-label={`View ${label}`}>
+        {content}
+      </Link>
+    );
+  }
+
+  return (
+    <div className="stat-card">
+      {content}
     </div>
   );
 }
