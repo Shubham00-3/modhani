@@ -42,7 +42,9 @@ export default async function handler(req, res) {
         return;
 
       case 'authenticate': {
-        const [username, password] = getTagValues(body, 'string');
+        const stringValues = getTagValues(body, 'string');
+        const username = getTagValue(body, 'strUserName') || stringValues[0];
+        const password = getTagValue(body, 'strPassword') || stringValues[1];
         const expectedPassword = getConnectorPassword();
 
         if (!expectedPassword || password !== expectedPassword) {
