@@ -156,8 +156,19 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
   if (error) throw error;
   if (!job) return 100;
 
+  const qbStatus = getQuickBooksStatus(responseXml);
+  if (qbStatus.statusCode && qbStatus.statusCode !== '0') {
+    await failInvoiceJob(supabase, ticket, qbStatus.message || `QuickBooks rejected the invoice with status ${qbStatus.statusCode}.`);
+    return 100;
+  }
+
   const qbTxnId = getTagValue(responseXml, 'TxnID');
   const qbRefNumber = getTagValue(responseXml, 'RefNumber');
+  if (!qbTxnId) {
+    await failInvoiceJob(supabase, ticket, 'QuickBooks did not return an invoice transaction ID.');
+    return 100;
+  }
+
   const qbInvoiceNumber = qbRefNumber || `QB-${job.order_id}`;
   const now = new Date().toISOString();
 
@@ -192,6 +203,16 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
   }).eq('id', 'singleton');
 
   return 100;
+}
+
+function getQuickBooksStatus(responseXml) {
+  const statusCodeMatch = responseXml.match(/<InvoiceAddRs\b[^>]*\bstatusCode="([^"]*)"/i);
+  const statusMessageMatch = responseXml.match(/<InvoiceAddRs\b[^>]*\bstatusMessage="([^"]*)"/i);
+
+  return {
+    statusCode: statusCodeMatch?.[1] ?? '',
+    message: statusMessageMatch?.[1] ? unescapeXml(statusMessageMatch[1]) : '',
+  };
 }
 
 export async function failInvoiceJob(supabase, ticket, message) {
