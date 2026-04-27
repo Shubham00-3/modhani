@@ -25,6 +25,7 @@ export default function AuthScreen() {
 
   return (
     <div
+      className="auth-screen"
       style={{
         minHeight: '100vh',
         display: 'grid',
@@ -35,10 +36,11 @@ export default function AuthScreen() {
       }}
     >
       <div
+        className="auth-shell"
         style={{
           width: 'min(960px, 100%)',
           display: 'grid',
-          gridTemplateColumns: '1.2fr 1fr',
+          gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
           gap: '24px',
         }}
       >
@@ -53,7 +55,7 @@ export default function AuthScreen() {
           }}
         >
           <div>
-            <h1 style={{ fontSize: '40px', lineHeight: 1.05, margin: '18px 0 10px' }}>
+            <h1 className="auth-title" style={{ fontSize: '40px', lineHeight: 1.05, margin: '18px 0 10px' }}>
               Staff Sign In
             </h1>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '16px', maxWidth: '40ch' }}>

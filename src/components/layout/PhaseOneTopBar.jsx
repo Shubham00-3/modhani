@@ -108,6 +108,7 @@ export default function PhaseOneTopBar() {
 
         {state.authConfigured ? (
           <div
+            className="topbar-user-control"
             style={{
               display: 'flex',
               alignItems: 'center',
