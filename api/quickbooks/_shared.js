@@ -99,20 +99,19 @@ export async function hasPendingQuickBooksWork(supabase) {
   return Number(count ?? 0) > 0;
 }
 
-export async function lockNextInvoiceJob(supabase, ticket) {
+export async function lockNextQuickBooksJob(supabase, ticket) {
   const { data: jobs, error } = await supabase
     .from('quickbooks_sync_jobs')
     .select('*')
     .eq('status', 'pending')
     .order('created_at', { ascending: true })
-    .limit(1);
+    .limit(50);
 
   if (error) throw error;
-  const job = jobs?.[0];
+  const job = [...(jobs ?? [])].sort((a, b) => getJobPriority(a) - getJobPriority(b))[0];
   if (!job) return null;
 
-  const payload = await buildInvoicePayload(supabase, job.order_id);
-  const requestXml = buildInvoiceAddRequest(payload);
+  const requestXml = await buildQuickBooksRequest(supabase, job);
   const now = new Date().toISOString();
 
   const { data: lockedJob, error: updateError } = await supabase
@@ -133,7 +132,10 @@ export async function lockNextInvoiceJob(supabase, ticket) {
   if (updateError) throw updateError;
   if (!lockedJob) return null;
 
-  await supabase.from('orders').update({ qb_sync_status: 'syncing' }).eq('id', job.order_id);
+  if (job.job_type === 'invoice') {
+    await supabase.from('orders').update({ qb_sync_status: 'syncing' }).eq('id', job.order_id);
+  }
+
   await supabase.from('quickbooks_settings').update({
     connected: true,
     status: 'connected',
@@ -141,6 +143,12 @@ export async function lockNextInvoiceJob(supabase, ticket) {
   }).eq('id', 'singleton');
 
   return { ...lockedJob, request_xml: requestXml };
+}
+
+function getJobPriority(job) {
+  if (job.job_type === 'customer') return 1;
+  if (job.job_type === 'item') return 2;
+  return 3;
 }
 
 export async function completeInvoiceJob(supabase, ticket, responseXml) {
@@ -156,9 +164,19 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
   if (error) throw error;
   if (!job) return 100;
 
-  const qbStatus = getQuickBooksStatus(responseXml);
+  const qbStatus = getQuickBooksStatus(responseXml, job.job_type);
   if (qbStatus.statusCode && qbStatus.statusCode !== '0') {
-    await failInvoiceJob(supabase, ticket, qbStatus.message || `QuickBooks rejected the invoice with status ${qbStatus.statusCode}.`);
+    if (isAlreadyExistsStatus(job, qbStatus)) {
+      await markJobPushed(supabase, job, responseXml, null, getReferenceNumber(job));
+      return 100;
+    }
+
+    await failInvoiceJob(supabase, ticket, qbStatus.message || `QuickBooks rejected the ${job.job_type} job with status ${qbStatus.statusCode}.`);
+    return 100;
+  }
+
+  if (job.job_type !== 'invoice') {
+    await markJobPushed(supabase, job, responseXml, getTagValue(responseXml, 'ListID'), getReferenceNumber(job));
     return 100;
   }
 
@@ -169,14 +187,18 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
     return 100;
   }
 
-  const qbInvoiceNumber = qbRefNumber || `QB-${job.order_id}`;
+  await markJobPushed(supabase, job, responseXml, qbTxnId, qbRefNumber || `QB-${job.order_id}`);
+  return 100;
+}
+
+async function markJobPushed(supabase, job, responseXml, qbId, qbReference) {
   const now = new Date().toISOString();
 
   await supabase.from('quickbooks_sync_jobs').update({
     status: 'pushed',
     response_xml: responseXml,
-    qb_txn_id: qbTxnId || null,
-    qb_invoice_number: qbInvoiceNumber,
+    qb_txn_id: qbId || null,
+    qb_invoice_number: qbReference || null,
     error_message: null,
     locked_by_ticket: null,
     locked_at: null,
@@ -189,11 +211,13 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
     response_xml: responseXml,
   });
 
-  await supabase.from('orders').update({
-    qb_invoice_number: qbInvoiceNumber,
-    qb_sync_status: 'pushed',
-    qb_synced_at: now,
-  }).eq('id', job.order_id);
+  if (job.job_type === 'invoice') {
+    await supabase.from('orders').update({
+      qb_invoice_number: qbReference,
+      qb_sync_status: 'pushed',
+      qb_synced_at: now,
+    }).eq('id', job.order_id);
+  }
 
   await supabase.from('quickbooks_settings').update({
     connected: true,
@@ -201,18 +225,30 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
     last_sync_at: now,
     connector_last_seen_at: now,
   }).eq('id', 'singleton');
-
-  return 100;
 }
 
-function getQuickBooksStatus(responseXml) {
-  const statusCodeMatch = responseXml.match(/<InvoiceAddRs\b[^>]*\bstatusCode="([^"]*)"/i);
-  const statusMessageMatch = responseXml.match(/<InvoiceAddRs\b[^>]*\bstatusMessage="([^"]*)"/i);
+function getQuickBooksStatus(responseXml, jobType) {
+  const responseTag = {
+    customer: 'CustomerAddRs',
+    item: 'ItemNonInventoryAddRs',
+    invoice: 'InvoiceAddRs',
+  }[jobType] || 'InvoiceAddRs';
+  const statusCodeMatch = responseXml.match(new RegExp(`<${responseTag}\\b[^>]*\\bstatusCode="([^"]*)"`, 'i'));
+  const statusMessageMatch = responseXml.match(new RegExp(`<${responseTag}\\b[^>]*\\bstatusMessage="([^"]*)"`, 'i'));
 
   return {
     statusCode: statusCodeMatch?.[1] ?? '',
     message: statusMessageMatch?.[1] ? unescapeXml(statusMessageMatch[1]) : '',
   };
+}
+
+function isAlreadyExistsStatus(job, qbStatus) {
+  if (!['customer', 'item'].includes(job.job_type)) return false;
+  return qbStatus.statusCode === '3100' || /already exists|already in use/i.test(qbStatus.message);
+}
+
+function getReferenceNumber(job) {
+  return job.entity_id || job.order_id || job.id;
 }
 
 export async function failInvoiceJob(supabase, ticket, message) {
@@ -244,7 +280,9 @@ export async function failInvoiceJob(supabase, ticket, message) {
     error_message: safeMessage,
   });
 
-  await supabase.from('orders').update({ qb_sync_status: 'failed' }).eq('id', job.order_id);
+  if (job.job_type === 'invoice') {
+    await supabase.from('orders').update({ qb_sync_status: 'failed' }).eq('id', job.order_id);
+  }
 
   const { data: settings } = await supabase
     .from('quickbooks_settings')
@@ -293,6 +331,110 @@ async function buildInvoicePayload(supabase, orderId) {
         batches: (assignments ?? []).filter((assignment) => assignment.order_item_id === item.id),
       })),
   };
+}
+
+async function buildQuickBooksRequest(supabase, job) {
+  if (job.job_type === 'customer') {
+    const payload = await buildCustomerPayload(supabase, job.entity_id);
+    return buildCustomerAddRequest(payload);
+  }
+
+  if (job.job_type === 'item') {
+    const payload = await buildItemPayload(supabase, job.entity_id);
+    return buildItemAddRequest(payload);
+  }
+
+  const payload = await buildInvoicePayload(supabase, job.order_id);
+  return buildInvoiceAddRequest(payload);
+}
+
+async function buildCustomerPayload(supabase, clientId) {
+  const { data: client, error: clientError } = await supabase
+    .from('clients')
+    .select('*')
+    .eq('id', clientId)
+    .single();
+
+  if (clientError) throw clientError;
+
+  const { data: location, error: locationError } = await supabase
+    .from('locations')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('created_at')
+    .limit(1)
+    .maybeSingle();
+
+  if (locationError) throw locationError;
+  return { client, location };
+}
+
+async function buildItemPayload(supabase, productId) {
+  const { data: product, error } = await supabase
+    .from('products')
+    .select('*')
+    .eq('id', productId)
+    .single();
+
+  if (error) throw error;
+  return product;
+}
+
+function buildCustomerAddRequest({ client, location }) {
+  const fullName = client.qb_customer_name || client.name;
+  const address = location || {};
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<?qbxml version="16.0"?>
+<QBXML>
+  <QBXMLMsgsRq onError="stopOnError">
+    <CustomerAddRq requestID="${escapeXml(client.id)}">
+      <CustomerAdd>
+        <Name>${escapeXml(fullName)}</Name>
+        <CompanyName>${escapeXml(client.name)}</CompanyName>
+        <BillAddress>
+          <Addr1>${escapeXml(fullName)}</Addr1>
+          <Addr2>${escapeXml(address.address_line1 || '')}</Addr2>
+          <City>${escapeXml(address.city || '')}</City>
+          <State>${escapeXml(address.province || '')}</State>
+          <PostalCode>${escapeXml(address.postal_code || '')}</PostalCode>
+          <Country>${escapeXml(address.country || 'Canada')}</Country>
+        </BillAddress>
+        <ShipAddress>
+          <Addr1>${escapeXml(address.qb_ship_to_name || address.name || fullName)}</Addr1>
+          <Addr2>${escapeXml(address.address_line1 || '')}</Addr2>
+          <City>${escapeXml(address.city || '')}</City>
+          <State>${escapeXml(address.province || '')}</State>
+          <PostalCode>${escapeXml(address.postal_code || '')}</PostalCode>
+          <Country>${escapeXml(address.country || 'Canada')}</Country>
+        </ShipAddress>
+      </CustomerAdd>
+    </CustomerAddRq>
+  </QBXMLMsgsRq>
+</QBXML>`;
+}
+
+function buildItemAddRequest(product) {
+  const itemName = product.qb_item_name || `${product.name} ${product.unit_size}`.trim();
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<?qbxml version="16.0"?>
+<QBXML>
+  <QBXMLMsgsRq onError="stopOnError">
+    <ItemNonInventoryAddRq requestID="${escapeXml(product.id)}">
+      <ItemNonInventoryAdd>
+        <Name>${escapeXml(itemName)}</Name>
+        <SalesOrPurchase>
+          <Desc>${escapeXml(`${product.name} ${product.unit_size}`.trim())}</Desc>
+          <Price>${Number(product.base_catalogue_price ?? 0).toFixed(2)}</Price>
+          <AccountRef>
+            <FullName>Sales</FullName>
+          </AccountRef>
+        </SalesOrPurchase>
+      </ItemNonInventoryAdd>
+    </ItemNonInventoryAddRq>
+  </QBXMLMsgsRq>
+</QBXML>`;
 }
 
 function buildInvoiceAddRequest({ order, lines }) {

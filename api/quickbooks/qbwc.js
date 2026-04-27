@@ -7,7 +7,7 @@ import {
   getTagValue,
   getTagValues,
   hasPendingQuickBooksWork,
-  lockNextInvoiceJob,
+  lockNextQuickBooksJob,
   soapArray,
   soapString,
 } from './_shared.js';
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
 
       case 'sendRequestXML': {
         const ticket = getTagValue(body, 'ticket');
-        const job = await lockNextInvoiceJob(supabase, ticket);
+        const job = await lockNextQuickBooksJob(supabase, ticket);
         res.status(200).send(soapString('sendRequestXML', job?.request_xml ?? ''));
         return;
       }

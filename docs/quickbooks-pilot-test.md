@@ -11,10 +11,12 @@ It is not a full import. It adds a small set of real QuickBooks-style customers,
 
 1. In Supabase SQL Editor, run all existing migrations through `20260423_fix_quickbooks_admin_helpers.sql`.
 2. Run `supabase/migrations/20260424_quickbooks_pilot_sample_data.sql`.
-3. Refresh ModhaniOS.
-4. Confirm the pilot clients appear in `Clients & Locations`.
-5. Confirm the pilot products appear in `Products`.
-6. Confirm pilot batches appear in `Production & Batches`.
+3. Run `supabase/migrations/20260425_quickbooks_pilot_master_sync_jobs.sql`.
+4. Refresh ModhaniOS.
+5. Confirm the pilot clients appear in `Clients & Locations`.
+6. Confirm the pilot products appear in `Products`.
+7. Confirm pilot batches appear in `Production & Batches`.
+8. Run QuickBooks Web Connector once before invoice testing so it creates the pilot customers and items in the QuickBooks test company file.
 
 ## Recommended Test Orders
 
@@ -34,7 +36,7 @@ For each order:
 4. Save batch assignment.
 5. Create invoice.
 6. Queue QuickBooks sync.
-7. Confirm a pending row appears in `quickbooks_sync_jobs`.
+7. Confirm a pending invoice row appears in `quickbooks_sync_jobs`.
 8. Run QuickBooks Web Connector.
 9. Verify the invoice in QuickBooks Desktop.
 
