@@ -13,8 +13,14 @@ import {
 } from './_shared.js';
 
 export default async function handler(req, res) {
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.status(200).send('ModhaniOS QuickBooks Web Connector endpoint is available.');
+    return;
+  }
+
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'GET, HEAD, POST');
     res.status(405).send('Method Not Allowed');
     return;
   }
