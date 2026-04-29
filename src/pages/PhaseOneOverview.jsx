@@ -46,6 +46,14 @@ export default function PhaseOneOverview() {
 
   return (
     <div>
+      <div className="dashboard-brand section">
+        <img src="/modhani-logo.svg" alt="Modhani" />
+        <div>
+          <div className="dashboard-brand-title">Operations Dashboard</div>
+          <div className="dashboard-brand-subtitle">Orders, fulfilment, invoicing, and QuickBooks sync.</div>
+        </div>
+      </div>
+
       <div className="stat-cards-grid section">
         <StatCard
           icon={ClipboardList}

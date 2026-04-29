@@ -52,9 +52,14 @@ function openPrintableWindow(title, markup) {
   return true;
 }
 
+function getLogoSrc() {
+  return `${window.location.origin}/modhani-logo.svg`;
+}
+
 export function printPackingSlip({ order, clients, locations, products, batches }) {
   const clientName = getClientName(clients, order.clientId);
   const locationName = getLocationName(locations, order.locationId);
+  const logoSrc = getLogoSrc();
   const rows = order.items
     .map((item) => {
       const product = getProduct(products, item.productId);
@@ -83,10 +88,13 @@ export function printPackingSlip({ order, clients, locations, products, batches 
     `Packing Slip ${order.packingSlipNumber ?? order.orderNumber}`,
     `
       <main style="font-family:Segoe UI,Arial,sans-serif;padding:32px;color:#111827;">
-          <header style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;">
-            <div>
+          <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:28px;">
+            <div style="display:flex;align-items:center;gap:18px;">
+              <img src="${logoSrc}" alt="Modhani" style="width:168px;height:auto;object-fit:contain;" />
+              <div>
               <div style="font-size:28px;font-weight:700;">Packing Slip</div>
               <div style="margin-top:6px;color:#6b7280;">ModhaniOS Shipment Document</div>
+              </div>
             </div>
             <div style="text-align:right;">
               <div><strong>Slip #:</strong> ${order.packingSlipNumber ?? `PS-${order.orderNumber}`}</div>
@@ -120,6 +128,7 @@ export function printPackingSlip({ order, clients, locations, products, batches 
 export function printInvoice({ order, clients, locations, products }) {
   const clientName = getClientName(clients, order.clientId);
   const locationName = getLocationName(locations, order.locationId);
+  const logoSrc = getLogoSrc();
   const rows = order.items
     .filter((item) => item.fulfilledQty > 0)
     .map((item) => {
@@ -142,10 +151,13 @@ export function printInvoice({ order, clients, locations, products }) {
     `Invoice ${order.invoiceNumber ?? order.orderNumber}`,
     `
       <main style="font-family:Segoe UI,Arial,sans-serif;padding:32px;color:#111827;">
-          <header style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;">
-            <div>
+          <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:28px;">
+            <div style="display:flex;align-items:center;gap:18px;">
+              <img src="${logoSrc}" alt="Modhani" style="width:168px;height:auto;object-fit:contain;" />
+              <div>
               <div style="font-size:28px;font-weight:700;">Invoice</div>
               <div style="margin-top:6px;color:#6b7280;">ModhaniOS Billing Document</div>
+              </div>
             </div>
             <div style="text-align:right;">
               <div><strong>Invoice #:</strong> ${order.invoiceNumber ?? `MOD-${order.orderNumber}`}</div>

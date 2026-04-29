@@ -219,9 +219,10 @@ img {
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-6) var(--space-6);
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
   border-bottom: 1px solid var(--color-border-light);
+  min-width: 0;
 }
 
 .sidebar-brand-icon {
@@ -237,6 +238,25 @@ img {
 .sidebar-brand-icon svg {
   width: 36px;
   height: 36px;
+}
+
+.sidebar-brand-logo {
+  width: 132px;
+  height: 54px;
+  object-fit: contain;
+  object-position: left center;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  justify-content: center;
+  padding-inline: var(--space-2);
+}
+
+.sidebar.collapsed .sidebar-brand-logo {
+  width: 44px;
+  height: 44px;
+  object-position: left center;
 }
 
 .sidebar-brand-text {
@@ -375,6 +395,42 @@ img {
   align-items: center;
   gap: var(--space-2);
   font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+.topbar-logo {
+  width: 96px;
+  height: 38px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.dashboard-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5) var(--space-6);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.dashboard-brand img {
+  width: 172px;
+  height: 70px;
+  object-fit: contain;
+  object-position: left center;
+  flex-shrink: 0;
+}
+
+.dashboard-brand-title {
+  font-size: var(--font-size-xl);
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.dashboard-brand-subtitle {
+  margin-top: 4px;
   color: var(--color-text-secondary);
 }
 
@@ -1660,6 +1716,17 @@ input[type='checkbox']:disabled {
   .page-header .btn {
     width: 100%;
     justify-content: center;
+  }
+
+  .dashboard-brand {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: var(--space-4);
+  }
+
+  .dashboard-brand img {
+    width: 150px;
+    height: 60px;
   }
 
   .filter-bar {

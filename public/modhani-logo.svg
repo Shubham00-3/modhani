@@ -1,0 +1,13 @@
+<svg width="640" height="260" viewBox="0 0 640 260" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Modhani logo</title>
+  <desc id="desc">Modhani wordmark with orange brush oval and sun mark.</desc>
+  <path d="M225 70C301 29 453 35 529 86C591 128 586 190 498 218C405 248 250 229 193 174C147 130 165 94 225 70Z" stroke="#F6A623" stroke-width="14" stroke-linecap="round" opacity="0.96"/>
+  <path d="M210 196C281 235 421 238 503 205" stroke="#F6A623" stroke-width="10" stroke-linecap="round" opacity="0.78"/>
+  <g transform="translate(484 58)">
+    <circle cx="31" cy="31" r="25" fill="#F6A623"/>
+    <path d="M31 14V1M31 61V48M48 31H61M1 31H14M43 19L52 10M10 52L19 43M43 43L52 52M10 10L19 19" stroke="#F6A623" stroke-width="8" stroke-linecap="round"/>
+    <path d="M40 34C38 43 26 44 21 37C15 28 23 17 33 20C41 23 42 34 34 37C28 40 23 34 26 29C28 25 33 25 35 28" stroke="#18301F" stroke-width="6" stroke-linecap="round" fill="none"/>
+  </g>
+  <text x="45" y="153" fill="#18301F" font-family="Brush Script MT, Segoe Script, Comic Sans MS, cursive" font-size="108" font-weight="700" letter-spacing="0">modhani</text>
+  <text x="552" y="79" fill="#F6A623" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700">TM</text>
+</svg>

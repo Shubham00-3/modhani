@@ -20,7 +20,7 @@ export default function TopBar() {
     <header className={`topbar${state.sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <div className="topbar-left">
         <div className="topbar-breadcrumb">
-          <span>ModhaniOS</span>
+          <img className="topbar-logo" src="/modhani-logo.svg" alt="Modhani" />
           <span>/</span>
           <span className="topbar-breadcrumb-current">{currentTitle}</span>
         </div>

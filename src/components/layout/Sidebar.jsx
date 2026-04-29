@@ -20,15 +20,8 @@ export default function Sidebar() {
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-brand">
-        <div className="sidebar-brand-icon">
-          <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="24" cy="24" r="22" fill="#1A3021" />
-            <path d="M16 28c0-6 4-12 8-12s8 6 8 12" stroke="#D1A14E" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-            <circle cx="24" cy="30" r="4" fill="#D1A14E" />
-            <path d="M20 18c2-4 6-4 8 0" stroke="#8FA899" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-          </svg>
-        </div>
-        {!collapsed && <span className="sidebar-brand-text">ModhaniOS</span>}
+        <img className="sidebar-brand-logo" src="/modhani-logo.svg" alt="Modhani" />
+        {!collapsed && <span className="sidebar-brand-text">OS</span>}
       </div>
 
       <nav className="sidebar-nav">
