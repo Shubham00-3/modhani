@@ -34,7 +34,6 @@ export default function PhaseOneSidebar() {
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-brand">
         <img className="sidebar-brand-logo" src="/modhani-logo.svg" alt="Modhani" />
-        {!collapsed && <span className="sidebar-brand-text">OS</span>}
       </div>
 
       <nav className="sidebar-nav">
