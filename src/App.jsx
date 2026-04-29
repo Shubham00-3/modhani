@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route, useLocation } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import AuthScreen from './components/auth/AuthScreen';
 import { useApp } from './context/useApp';
@@ -10,9 +10,12 @@ import PhaseOneSettings from './pages/PhaseOneSettings';
 import PhaseOneAuditTrail from './pages/PhaseOneAuditTrail';
 import PhaseOneClientsLocations from './pages/PhaseOneClientsLocations';
 import PhaseOneProducts from './pages/PhaseOneProducts';
+import { CustomerPortalDashboard, CustomerPortalNewOrder } from './pages/CustomerPortal';
 
 export default function App() {
   const { state } = useApp();
+  const location = useLocation();
+  const isPortalPath = location.pathname.startsWith('/portal');
 
   if (!state.initialized || state.authLoading) {
     return (
@@ -35,7 +38,17 @@ export default function App() {
   }
 
   if (state.authConfigured && !state.isAuthenticated) {
-    return <AuthScreen />;
+    return <AuthScreen portal={isPortalPath} />;
+  }
+
+  if (state.userAccessType === 'customer') {
+    return (
+      <Routes>
+        <Route path="/portal" element={<CustomerPortalDashboard />} />
+        <Route path="/portal/orders/new" element={<CustomerPortalNewOrder />} />
+        <Route path="*" element={<Navigate to="/portal" replace />} />
+      </Routes>
+    );
   }
 
   return (
@@ -49,6 +62,7 @@ export default function App() {
         <Route path="/clients-locations" element={<PhaseOneClientsLocations />} />
         <Route path="/products" element={<PhaseOneProducts />} />
         <Route path="/settings" element={<PhaseOneSettings />} />
+        <Route path="/portal/*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
   );

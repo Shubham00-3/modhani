@@ -17,8 +17,11 @@ import {
 import { buildOperationalNotifications } from '../lib/notifications';
 import {
   executeAdminAction,
+  executePortalAction,
   executeWorkflowAction,
+  fetchPortalState,
   fetchRemoteState,
+  fetchUserAccess,
   persistAction,
   persistNotificationDismissals,
 } from '../lib/phaseOneDataStore';
@@ -36,6 +39,7 @@ const demoState = {
   auditLog: AUDIT_LOG,
   notificationDismissals: [],
   quickBooksJobs: [],
+  invoiceRevisions: [],
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: buildReportRowsFromOrders({
     orders: ORDERS,
@@ -50,6 +54,8 @@ const demoState = {
   authConfigured: false,
   authLoading: false,
   isAuthenticated: true,
+  userAccessType: 'staff',
+  customerContact: null,
   authError: getSupabaseConfigError(),
 };
 
@@ -65,6 +71,7 @@ const remoteBootState = {
   auditLog: [],
   notificationDismissals: [],
   quickBooksJobs: [],
+  invoiceRevisions: [],
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: [],
   sidebarCollapsed: false,
@@ -73,6 +80,8 @@ const remoteBootState = {
   authConfigured: true,
   authLoading: true,
   isAuthenticated: false,
+  userAccessType: null,
+  customerContact: null,
   authError: null,
 };
 
@@ -226,6 +235,8 @@ function reducer(state, action) {
       };
     case 'ADD_ORDER':
       return { ...state, orders: [action.payload, ...state.orders] };
+    case 'ADD_PORTAL_ORDER':
+      return { ...state, orders: [action.payload, ...state.orders] };
     case 'LOCK_ORDER':
       return {
         ...state,
@@ -305,6 +316,7 @@ function reducer(state, action) {
             if (!override) return item;
             return {
               ...item,
+              invoiceQty: item.fulfilledQty,
               overridePrice: override.overridePrice,
               overrideReason: override.overrideReason,
             };
@@ -382,6 +394,36 @@ function reducer(state, action) {
             : order
         ),
       };
+    case 'EDIT_INVOICE':
+      return {
+        ...state,
+        orders: state.orders.map((order) => {
+          if (order.id !== action.payload.orderId) return order;
+
+          const nextItems = order.items.map((item) => {
+            const edit = action.payload.lines.find((entry) => entry.orderItemId === item.id);
+            if (!edit) return item;
+            return {
+              ...item,
+              invoiceQty: Number(edit.invoiceQty),
+              overridePrice: edit.overridePrice,
+              overrideReason: edit.overrideReason,
+            };
+          });
+          const invoiceTotal = nextItems.reduce(
+            (sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item),
+            0
+          );
+          const needsQuickBooksUpdate = order.qbSyncStatus === 'pushed';
+
+          return {
+            ...order,
+            items: nextItems,
+            invoiceTotal,
+            qbSyncStatus: needsQuickBooksUpdate ? 'pending_update' : order.qbSyncStatus,
+          };
+        }),
+      };
     case 'UPDATE_USER':
       return {
         ...state,
@@ -421,9 +463,11 @@ const serverWorkflowActions = new Set([
   'CREATE_INVOICE',
   'PUSH_QB_INVOICE',
   'QUEUE_QB_INVOICE',
+  'EDIT_INVOICE',
   'CONFIRM_SHIPMENT',
   'LOG_PRODUCTION_BATCH',
 ]);
+const serverPortalActions = new Set(['ADD_PORTAL_ORDER']);
 const serverAdminActions = new Set([
   'ADD_PRODUCT',
   'UPDATE_PRODUCT',
@@ -486,7 +530,17 @@ export function AppProvider({ children }) {
   const loadRemoteData = useCallback(async (userId) => {
     if (!supabase) return;
 
-    const data = await fetchRemoteState(supabase, userId);
+    const access = await fetchUserAccess(supabase, userId);
+
+    if (!access.profile && !access.customerContact) {
+      throw new Error(
+        access.missingContactTable
+          ? 'No staff profile exists for this login, and the customer portal migration has not been applied yet.'
+          : 'No staff or customer portal access exists for this login.'
+      );
+    }
+
+    const data = access.profile ? await fetchRemoteState(supabase, userId) : await fetchPortalState(supabase, userId);
     baseDispatch({
       type: 'INITIALIZE_REMOTE_DATA',
       payload: {
@@ -582,8 +636,11 @@ export function AppProvider({ children }) {
             auditLog: [],
             notificationDismissals: [],
             quickBooksJobs: [],
+            invoiceRevisions: [],
             quickBooks: QUICKBOOKS_SETTINGS,
             reportRows: [],
+            userAccessType: null,
+            customerContact: null,
           },
         });
         return;
@@ -778,6 +835,26 @@ export function AppProvider({ children }) {
       }
 
       const previousState = stateRef.current;
+
+      if (serverPortalActions.has(action.type)) {
+        const { error } = await executePortalAction(supabase, action);
+
+        if (error) {
+          addToast(`Save failed: ${error.message}`, 'warning');
+          return { ok: false, error };
+        }
+
+        if (previousState.currentUserId) {
+          try {
+            await loadRemoteData(previousState.currentUserId);
+          } catch (reloadError) {
+            addToast(`Reload failed: ${reloadError.message}`, 'warning');
+            return { ok: false, error: reloadError };
+          }
+        }
+
+        return { ok: true };
+      }
 
       if (serverWorkflowActions.has(action.type) || serverAdminActions.has(action.type)) {
         const currentUser = previousState.users.find((user) => user.id === previousState.currentUserId);

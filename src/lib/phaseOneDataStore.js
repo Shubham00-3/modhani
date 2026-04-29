@@ -63,6 +63,7 @@ function quickBooksJobToUi(job) {
   return {
     id: job.id,
     orderId: job.order_id,
+    entityId: job.entity_id,
     jobType: job.job_type,
     status: job.status,
     qbInvoiceNumber: job.qb_invoice_number,
@@ -71,6 +72,35 @@ function quickBooksJobToUi(job) {
     attempts: Number(job.attempts ?? 0),
     createdAt: job.created_at,
     updatedAt: job.updated_at,
+  };
+}
+
+function customerContactToUi(contact) {
+  return {
+    id: contact.id,
+    userId: contact.user_id,
+    clientId: contact.client_id,
+    name: contact.full_name,
+    email: contact.email,
+    phone: contact.phone,
+    status: contact.status,
+  };
+}
+
+function invoiceRevisionToUi(revision) {
+  return {
+    id: revision.id,
+    orderId: revision.order_id,
+    reason: revision.reason,
+    editedBy: revision.edited_by,
+    editedByName: revision.edited_by_name,
+    previousTotal: revision.previous_total == null ? null : Number(revision.previous_total),
+    nextTotal: revision.next_total == null ? null : Number(revision.next_total),
+    previousLines: revision.previous_lines ?? [],
+    nextLines: revision.next_lines ?? [],
+    qbJobId: revision.qb_job_id,
+    qbUpdateStatus: revision.qb_update_status,
+    createdAt: revision.created_at,
   };
 }
 
@@ -264,6 +294,11 @@ function orderToDb(order) {
     invoice_total: order.invoiceTotal,
     qb_invoice_number: order.qbInvoiceNumber,
     qb_sync_status: order.qbSyncStatus,
+    qb_txn_id: order.qbTxnId,
+    qb_edit_sequence: order.qbEditSequence,
+    portal_contact_id: order.portalContactId,
+    requested_delivery_date: order.requestedDeliveryDate,
+    portal_notes: order.portalNotes,
     packing_slip_number: order.packingSlipNumber,
     created_at: order.createdAt,
     fulfilled_at: order.fulfilledAt,
@@ -284,11 +319,13 @@ function orderItemToDb(orderId, item) {
     product_id: item.productId,
     quantity: Number(item.quantity),
     fulfilled_qty: Number(item.fulfilledQty),
+    invoice_qty: item.invoiceQty == null ? null : Number(item.invoiceQty),
     declined_qty: Number(item.declinedQty ?? 0),
     base_price: Number(item.basePrice),
     client_price: Number(item.clientPrice),
     override_price: item.overridePrice == null ? null : Number(item.overridePrice),
     override_reason: item.overrideReason ?? null,
+    qb_txn_line_id: item.qbTxnLineId ?? null,
   };
 }
 
@@ -345,6 +382,7 @@ export async function fetchRemoteState(supabase, userId) {
     quickBooksResult,
     quickBooksJobsResult,
     reportRowsResult,
+    invoiceRevisionsResult,
     notificationDismissalsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
@@ -360,6 +398,7 @@ export async function fetchRemoteState(supabase, userId) {
     supabase.from('quickbooks_settings').select('*').limit(1).maybeSingle(),
     supabase.from('quickbooks_sync_jobs').select('*').order('created_at', { ascending: false }),
     supabase.from('report_order_lines').select('*').order('created_at', { ascending: false }),
+    supabase.from('invoice_revisions').select('*').order('created_at', { ascending: false }),
     userId
       ? supabase
           .from('notification_dismissals')
@@ -383,11 +422,18 @@ export async function fetchRemoteState(supabase, userId) {
     quickBooksResult,
     quickBooksJobsResult,
     reportRowsResult,
+    invoiceRevisionsResult,
     notificationDismissalsResult,
   ];
 
   const firstError = results
-    .filter((result) => result !== reportRowsResult && result !== notificationDismissalsResult && result !== quickBooksJobsResult)
+    .filter(
+      (result) =>
+        result !== reportRowsResult &&
+        result !== notificationDismissalsResult &&
+        result !== quickBooksJobsResult &&
+        result !== invoiceRevisionsResult
+    )
     .find((result) => result.error)?.error;
   if (firstError) {
     throw firstError;
@@ -408,11 +454,13 @@ export async function fetchRemoteState(supabase, userId) {
       productId: item.product_id,
       quantity: Number(item.quantity),
       fulfilledQty: Number(item.fulfilled_qty),
+      invoiceQty: item.invoice_qty == null ? Number(item.fulfilled_qty) : Number(item.invoice_qty),
       declinedQty: Number(item.declined_qty ?? 0),
       basePrice: Number(item.base_price),
       clientPrice: Number(item.client_price),
       overridePrice: item.override_price == null ? null : Number(item.override_price),
       overrideReason: item.override_reason,
+      qbTxnLineId: item.qb_txn_line_id,
       assignedBatches: assignmentsByItemId.get(item.id) ?? [],
     });
     itemsByOrderId.set(item.order_id, current);
@@ -431,6 +479,11 @@ export async function fetchRemoteState(supabase, userId) {
     invoiceTotal: order.invoice_total == null ? null : Number(order.invoice_total),
     qbInvoiceNumber: order.qb_invoice_number,
     qbSyncStatus: order.qb_sync_status,
+    qbTxnId: order.qb_txn_id,
+    qbEditSequence: order.qb_edit_sequence,
+    portalContactId: order.portal_contact_id,
+    requestedDeliveryDate: order.requested_delivery_date,
+    portalNotes: order.portal_notes,
     packingSlipNumber: order.packing_slip_number,
     createdAt: order.created_at,
     fulfilledAt: order.fulfilled_at,
@@ -468,7 +521,163 @@ export async function fetchRemoteState(supabase, userId) {
       : (notificationDismissalsResult.data ?? []).map(notificationDismissalToUi),
     quickBooks: quickBooksToUi(quickBooksResult.data),
     quickBooksJobs: quickBooksJobsResult.error ? [] : (quickBooksJobsResult.data ?? []).map(quickBooksJobToUi),
+    invoiceRevisions: invoiceRevisionsResult.error ? [] : (invoiceRevisionsResult.data ?? []).map(invoiceRevisionToUi),
+    customerContact: null,
+    userAccessType: 'staff',
     reportRows,
+  };
+}
+
+export async function fetchUserAccess(supabase, userId) {
+  const [profileResult, contactResult] = await Promise.all([
+    supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
+    supabase.from('customer_contacts').select('*').eq('user_id', userId).eq('status', 'active').maybeSingle(),
+  ]);
+
+  const missingContactTable =
+    contactResult.error?.code === 'PGRST205' ||
+    (contactResult.error?.message ?? '').includes('customer_contacts');
+
+  if (profileResult.error) throw profileResult.error;
+  if (contactResult.error && !missingContactTable) throw contactResult.error;
+
+  return {
+    profile: profileResult.data ? profileToUi(profileResult.data) : null,
+    customerContact: contactResult.data ? customerContactToUi(contactResult.data) : null,
+    missingContactTable,
+  };
+}
+
+export async function fetchPortalState(supabase, userId) {
+  const contactResult = await supabase
+    .from('customer_contacts')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (contactResult.error) throw contactResult.error;
+  if (!contactResult.data) {
+    throw new Error('No active customer portal contact is configured for this login.');
+  }
+
+  const contact = customerContactToUi(contactResult.data);
+
+  const [clientResult, linksResult, pricingResult, ordersResult] = await Promise.all([
+    supabase.from('clients').select('*').eq('id', contact.clientId).single(),
+    supabase.from('customer_contact_locations').select('location_id').eq('contact_id', contact.id),
+    supabase.from('client_product_prices').select('*').eq('client_id', contact.clientId),
+    supabase.from('orders').select('*').eq('client_id', contact.clientId).order('created_at', { ascending: false }),
+  ]);
+
+  const firstError = [clientResult, linksResult, pricingResult, ordersResult].find((result) => result.error)?.error;
+  if (firstError) throw firstError;
+
+  const locationIds = (linksResult.data ?? []).map((entry) => entry.location_id);
+  const orderIds = (ordersResult.data ?? []).map((order) => order.id);
+  const productIds = (pricingResult.data ?? []).map((price) => price.product_id);
+
+  const [locationsResult, productsResult, orderItemsResult] = await Promise.all([
+    locationIds.length
+      ? supabase.from('locations').select('*').in('id', locationIds).order('name')
+      : Promise.resolve({ data: [], error: null }),
+    productIds.length
+      ? supabase.from('products').select('*').in('id', productIds).order('name')
+      : Promise.resolve({ data: [], error: null }),
+    orderIds.length
+      ? supabase.from('order_items').select('*').in('order_id', orderIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const secondError = [locationsResult, productsResult, orderItemsResult].find((result) => result.error)?.error;
+  if (secondError) throw secondError;
+
+  const itemsByOrderId = new Map();
+  (orderItemsResult.data ?? []).forEach((item) => {
+    const current = itemsByOrderId.get(item.order_id) ?? [];
+    current.push({
+      id: item.id,
+      productId: item.product_id,
+      quantity: Number(item.quantity),
+      fulfilledQty: Number(item.fulfilled_qty),
+      invoiceQty: item.invoice_qty == null ? Number(item.fulfilled_qty) : Number(item.invoice_qty),
+      declinedQty: Number(item.declined_qty ?? 0),
+      basePrice: Number(item.base_price),
+      clientPrice: Number(item.client_price),
+      overridePrice: item.override_price == null ? null : Number(item.override_price),
+      overrideReason: item.override_reason,
+      qbTxnLineId: item.qb_txn_line_id,
+      assignedBatches: [],
+    });
+    itemsByOrderId.set(item.order_id, current);
+  });
+
+  const orders = (ordersResult.data ?? []).map((order) => ({
+    id: order.id,
+    orderNumber: Number(order.order_number),
+    clientId: order.client_id,
+    locationId: order.location_id,
+    source: order.source,
+    status: order.status,
+    lockedBy: null,
+    lockedAt: null,
+    invoiceNumber: order.invoice_number,
+    invoiceTotal: order.invoice_total == null ? null : Number(order.invoice_total),
+    qbInvoiceNumber: order.qb_invoice_number,
+    qbSyncStatus: order.qb_sync_status,
+    qbTxnId: order.qb_txn_id,
+    qbEditSequence: order.qb_edit_sequence,
+    portalContactId: order.portal_contact_id,
+    requestedDeliveryDate: order.requested_delivery_date,
+    portalNotes: order.portal_notes,
+    packingSlipNumber: order.packing_slip_number,
+    createdAt: order.created_at,
+    fulfilledAt: order.fulfilled_at,
+    invoicedAt: order.invoiced_at,
+    qbSyncedAt: order.qb_synced_at,
+    shippedAt: order.shipped_at,
+    declinedAt: order.declined_at,
+    declineReason: order.decline_reason,
+    packingSlipSentAt: order.packing_slip_sent_at,
+    invoiceEmailSentAt: order.invoice_email_sent_at,
+    items: itemsByOrderId.get(order.id) ?? [],
+  }));
+
+  return {
+    currentUserId: userId,
+    users: [
+      {
+        id: userId,
+        email: contact.email,
+        name: contact.name,
+        initials: contact.name
+          .split(' ')
+          .map((part) => part[0])
+          .join('')
+          .slice(0, 2)
+          .toUpperCase(),
+        role: 'customer',
+        permissions: {
+          fulfilOrders: false,
+          overridePrices: false,
+          manageSettings: false,
+        },
+      },
+    ],
+    clients: [clientToUi(clientResult.data)],
+    locations: (locationsResult.data ?? []).map(locationToUi),
+    products: (productsResult.data ?? []).map(productToUi),
+    clientPricing: (pricingResult.data ?? []).map(pricingToUi),
+    batches: [],
+    orders,
+    auditLog: [],
+    notificationDismissals: [],
+    quickBooksJobs: [],
+    invoiceRevisions: [],
+    quickBooks: QUICKBOOKS_SETTINGS,
+    reportRows: [],
+    customerContact: contact,
+    userAccessType: 'customer',
   };
 }
 
@@ -542,6 +751,13 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_order_id: action.payload.orderId,
         p_user_id: currentUser.id,
       });
+    case 'EDIT_INVOICE':
+      return callRpc(supabase, 'modhanios_edit_invoice', {
+        p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+        p_lines: action.payload.lines,
+        p_reason: action.payload.reason,
+      });
     case 'CONFIRM_SHIPMENT':
       return callRpc(supabase, 'modhanios_confirm_shipment', {
         p_order_id: action.payload.orderId,
@@ -557,6 +773,20 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_production_date: action.payload.productionDate,
         p_qty_produced: action.payload.qtyProduced,
         p_user_id: currentUser.id,
+      });
+    default:
+      return { error: null };
+  }
+}
+
+export async function executePortalAction(supabase, action) {
+  switch (action.type) {
+    case 'ADD_PORTAL_ORDER':
+      return callRpc(supabase, 'modhanios_create_portal_order', {
+        p_location_id: action.payload.locationId,
+        p_requested_delivery_date: action.payload.requestedDeliveryDate || null,
+        p_notes: action.payload.notes || null,
+        p_items: action.payload.items,
       });
     default:
       return { error: null };

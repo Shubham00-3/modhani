@@ -136,6 +136,10 @@ export async function lockNextQuickBooksJob(supabase, ticket) {
     await supabase.from('orders').update({ qb_sync_status: 'syncing' }).eq('id', job.order_id);
   }
 
+  if (job.job_type === 'invoice_mod') {
+    await supabase.from('orders').update({ qb_sync_status: 'updating' }).eq('id', job.order_id);
+  }
+
   await supabase.from('quickbooks_settings').update({
     connected: true,
     status: 'connected',
@@ -175,7 +179,7 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
     return 100;
   }
 
-  if (job.job_type !== 'invoice') {
+  if (!['invoice', 'invoice_mod'].includes(job.job_type)) {
     await markJobPushed(supabase, job, responseXml, getTagValue(responseXml, 'ListID'), getReferenceNumber(job));
     return 100;
   }
@@ -212,11 +216,33 @@ async function markJobPushed(supabase, job, responseXml, qbId, qbReference) {
   });
 
   if (job.job_type === 'invoice') {
+    const qbEditSequence = getTagValue(responseXml, 'EditSequence');
+    await storeInvoiceLineTxnIds(supabase, job.order_id, responseXml);
     await supabase.from('orders').update({
       qb_invoice_number: qbReference,
       qb_sync_status: 'pushed',
+      qb_txn_id: qbId || null,
+      qb_edit_sequence: qbEditSequence || null,
       qb_synced_at: now,
     }).eq('id', job.order_id);
+  }
+
+  if (job.job_type === 'invoice_mod') {
+    const qbEditSequence = getTagValue(responseXml, 'EditSequence');
+    await supabase.from('orders').update({
+      qb_invoice_number: qbReference,
+      qb_sync_status: 'pushed',
+      qb_txn_id: qbId || null,
+      qb_edit_sequence: qbEditSequence || null,
+      qb_synced_at: now,
+    }).eq('id', job.order_id);
+
+    if (job.entity_type === 'invoice_revision' && job.entity_id) {
+      await supabase
+        .from('invoice_revisions')
+        .update({ qb_update_status: 'pushed' })
+        .eq('id', job.entity_id);
+    }
   }
 
   await supabase.from('quickbooks_settings').update({
@@ -232,6 +258,7 @@ function getQuickBooksStatus(responseXml, jobType) {
     customer: 'CustomerAddRs',
     item: 'ItemNonInventoryAddRs',
     invoice: 'InvoiceAddRs',
+    invoice_mod: 'InvoiceModRs',
   }[jobType] || 'InvoiceAddRs';
   const statusCodeMatch = responseXml.match(new RegExp(`<${responseTag}\\b[^>]*\\bstatusCode="([^"]*)"`, 'i'));
   const statusMessageMatch = responseXml.match(new RegExp(`<${responseTag}\\b[^>]*\\bstatusMessage="([^"]*)"`, 'i'));
@@ -284,6 +311,16 @@ export async function failInvoiceJob(supabase, ticket, message) {
     await supabase.from('orders').update({ qb_sync_status: 'failed' }).eq('id', job.order_id);
   }
 
+  if (job.job_type === 'invoice_mod') {
+    await supabase.from('orders').update({ qb_sync_status: 'failed_update' }).eq('id', job.order_id);
+    if (job.entity_type === 'invoice_revision' && job.entity_id) {
+      await supabase
+        .from('invoice_revisions')
+        .update({ qb_update_status: 'failed' })
+        .eq('id', job.entity_id);
+    }
+  }
+
   const { data: settings } = await supabase
     .from('quickbooks_settings')
     .select('failed_sync_count')
@@ -310,7 +347,8 @@ async function buildInvoicePayload(supabase, orderId) {
   const { data: items, error: itemError } = await supabase
     .from('order_items')
     .select('*, products(*)')
-    .eq('order_id', orderId);
+    .eq('order_id', orderId)
+    .order('id');
 
   if (itemError) throw itemError;
 
@@ -345,6 +383,9 @@ async function buildQuickBooksRequest(supabase, job) {
   }
 
   const payload = await buildInvoicePayload(supabase, job.order_id);
+  if (job.job_type === 'invoice_mod') {
+    return buildInvoiceModRequest(payload);
+  }
   return buildInvoiceAddRequest(payload);
 }
 
@@ -469,8 +510,47 @@ function buildInvoiceAddRequest({ order, lines }) {
 </QBXML>`;
 }
 
+function buildInvoiceModRequest({ order, lines }) {
+  const client = order.clients;
+  const location = order.locations;
+
+  if (!order.qb_txn_id || !order.qb_edit_sequence) {
+    throw new Error('QuickBooks invoice transaction IDs are missing for this invoice update.');
+  }
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<?qbxml version="16.0"?>
+<QBXML>
+  <QBXMLMsgsRq onError="stopOnError">
+    <InvoiceModRq requestID="${escapeXml(order.id)}">
+      <InvoiceMod>
+        <TxnID>${escapeXml(order.qb_txn_id)}</TxnID>
+        <EditSequence>${escapeXml(order.qb_edit_sequence)}</EditSequence>
+        <CustomerRef>
+          <FullName>${escapeXml(client.qb_customer_name || client.name)}</FullName>
+        </CustomerRef>
+        <TxnDate>${escapeXml(toDate(order.invoiced_at || order.created_at))}</TxnDate>
+        <RefNumber>${escapeXml(order.invoice_number)}</RefNumber>
+        <ShipAddress>
+          <Addr1>${escapeXml(location.qb_ship_to_name || location.name)}</Addr1>
+          <Addr2>${escapeXml(location.address_line1 || '')}</Addr2>
+          ${location.address_line2 ? `<Addr3>${escapeXml(location.address_line2)}</Addr3>` : ''}
+          <City>${escapeXml(location.city || '')}</City>
+          <State>${escapeXml(location.province || '')}</State>
+          <PostalCode>${escapeXml(location.postal_code || '')}</PostalCode>
+          <Country>${escapeXml(location.country || 'Canada')}</Country>
+        </ShipAddress>
+        <Memo>${escapeXml(`ModhaniOS Order #${order.order_number} invoice update`)}</Memo>
+        ${lines.map(buildInvoiceLineMod).join('')}
+      </InvoiceMod>
+    </InvoiceModRq>
+  </QBXMLMsgsRq>
+</QBXML>`;
+}
+
 function buildInvoiceLine({ item, product, batches }) {
   const unitPrice = item.override_price ?? item.client_price ?? item.base_price ?? 0;
+  const quantity = item.invoice_qty ?? item.fulfilled_qty;
   const batchText = batches
     .map((assignment) => `${assignment.batches?.batch_number ?? assignment.batch_id}: ${Number(assignment.qty).toLocaleString()} units`)
     .join(', ');
@@ -480,9 +560,54 @@ function buildInvoiceLine({ item, product, batches }) {
             <FullName>${escapeXml(product.qb_item_name || `${product.name} ${product.unit_size}`.trim())}</FullName>
           </ItemRef>
           <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Batches: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
-          <Quantity>${Number(item.fulfilled_qty)}</Quantity>
+          <Quantity>${Number(quantity)}</Quantity>
           <Rate>${Number(unitPrice).toFixed(2)}</Rate>
         </InvoiceLineAdd>`;
+}
+
+function buildInvoiceLineMod({ item, product, batches }) {
+  if (!item.qb_txn_line_id) {
+    throw new Error(`QuickBooks line ID is missing for ${product.name}.`);
+  }
+
+  const unitPrice = item.override_price ?? item.client_price ?? item.base_price ?? 0;
+  const quantity = item.invoice_qty ?? item.fulfilled_qty;
+  const batchText = batches
+    .map((assignment) => `${assignment.batches?.batch_number ?? assignment.batch_id}: ${Number(assignment.qty).toLocaleString()} units`)
+    .join(', ');
+
+  return `<InvoiceLineMod>
+          <TxnLineID>${escapeXml(item.qb_txn_line_id)}</TxnLineID>
+          <ItemRef>
+            <FullName>${escapeXml(product.qb_item_name || `${product.name} ${product.unit_size}`.trim())}</FullName>
+          </ItemRef>
+          <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Batches: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
+          <Quantity>${Number(quantity)}</Quantity>
+          <Rate>${Number(unitPrice).toFixed(2)}</Rate>
+        </InvoiceLineMod>`;
+}
+
+async function storeInvoiceLineTxnIds(supabase, orderId, responseXml) {
+  const lineIds = Array.from(responseXml.matchAll(/<InvoiceLineRet\b[\s\S]*?<TxnLineID(?:\s[^>]*)?>([\s\S]*?)<\/TxnLineID>[\s\S]*?<\/InvoiceLineRet>/gi))
+    .map((match) => unescapeXml(match[1].trim()))
+    .filter(Boolean);
+
+  if (!lineIds.length) return;
+
+  const { data: items, error } = await supabase
+    .from('order_items')
+    .select('id')
+    .eq('order_id', orderId)
+    .gt('fulfilled_qty', 0)
+    .order('id');
+
+  if (error || !items?.length) return;
+
+  await Promise.all(
+    items.slice(0, lineIds.length).map((item, index) =>
+      supabase.from('order_items').update({ qb_txn_line_id: lineIds[index] }).eq('id', item.id)
+    )
+  );
 }
 
 function toDate(value) {

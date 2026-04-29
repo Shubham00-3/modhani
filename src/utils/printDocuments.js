@@ -4,6 +4,7 @@ import {
   formatDate,
   getClientName,
   getEffectiveItemPrice,
+  getInvoiceItemQty,
   getLocationName,
   getProduct,
   getProductDisplayName,
@@ -125,12 +126,13 @@ export function printInvoice({ order, clients, locations, products }) {
     .map((item) => {
       const product = getProduct(products, item.productId);
       const unitPrice = getEffectiveItemPrice(item);
-      const lineTotal = unitPrice * item.fulfilledQty;
+      const invoiceQty = getInvoiceItemQty(item);
+      const lineTotal = unitPrice * invoiceQty;
 
       return `
         <tr>
           <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">${getProductDisplayName(product)}</td>
-          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">${item.fulfilledQty.toLocaleString()}</td>
+          <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">${invoiceQty.toLocaleString()}</td>
           <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">${formatCurrency(unitPrice)}</td>
           <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">${formatCurrency(lineTotal)}</td>
         </tr>

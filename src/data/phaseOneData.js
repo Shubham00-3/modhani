@@ -133,6 +133,9 @@ export function getLocationName(locations, locationId) {
 
 export function getQuickBooksSyncLabel(order) {
   if (order.qbSyncStatus === 'pushed') return order.qbInvoiceNumber ?? 'Pushed';
+  if (order.qbSyncStatus === 'pending_update') return 'Pending QB update';
+  if (order.qbSyncStatus === 'updating') return 'Updating QB';
+  if (order.qbSyncStatus === 'failed_update') return 'QB update failed';
   if (order.qbSyncStatus === 'syncing') return 'Syncing';
   if (order.qbSyncStatus === 'failed') return 'Failed';
   if (order.qbSyncStatus === 'pending') return 'Pending sync';
@@ -209,6 +212,10 @@ export function getEffectiveItemPrice(item) {
   return item.overridePrice ?? item.clientPrice ?? item.basePrice ?? 0;
 }
 
+export function getInvoiceItemQty(item) {
+  return item.invoiceQty == null ? item.fulfilledQty : item.invoiceQty;
+}
+
 export function getItemOutstandingQty(item) {
   return Math.max(item.quantity - item.fulfilledQty - (item.declinedQty ?? 0), 0);
 }
@@ -233,7 +240,7 @@ export function getOrderValue(order) {
 
 export function getInvoiceableTotal(order) {
   return order.items.reduce((sum, item) => {
-    return sum + getEffectiveItemPrice(item) * item.fulfilledQty;
+    return sum + getEffectiveItemPrice(item) * getInvoiceItemQty(item);
   }, 0);
 }
 

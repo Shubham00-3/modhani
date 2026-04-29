@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { LockKeyhole, ArrowRight } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 
-export default function AuthScreen() {
+export default function AuthScreen({ portal = false }) {
   const { state, login } = useApp();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -56,10 +56,12 @@ export default function AuthScreen() {
         >
           <div>
             <h1 className="auth-title" style={{ fontSize: '40px', lineHeight: 1.05, margin: '18px 0 10px' }}>
-              Staff Sign In
+              {portal ? 'Customer Portal Sign In' : 'Staff Sign In'}
             </h1>
             <p style={{ color: 'var(--color-text-secondary)', fontSize: '16px', maxWidth: '40ch' }}>
-              Sign in with your internal staff account to access ModhaniOS.
+              {portal
+                ? 'Sign in with your buyer account to place and track company orders.'
+                : 'Sign in with your internal staff account to access ModhaniOS.'}
             </p>
           </div>
         </section>
@@ -82,7 +84,7 @@ export default function AuthScreen() {
             <div>
               <div style={{ fontWeight: 700, fontSize: '18px' }}>Login</div>
               <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-                Internal staff access only
+                {portal ? 'Customer ordering access' : 'Internal staff access only'}
               </div>
             </div>
           </div>
