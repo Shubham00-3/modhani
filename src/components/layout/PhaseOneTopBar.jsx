@@ -80,8 +80,6 @@ export default function PhaseOneTopBar() {
     <header className={`topbar${state.sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <div className="topbar-left">
         <div className="topbar-breadcrumb">
-          <img className="topbar-logo" src="/modhani-logo.svg" alt="Modhani" />
-          <span>/</span>
           <span className="topbar-breadcrumb-current">{currentTitle}</span>
         </div>
       </div>
