@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { DollarSign, Plus, Settings2, Users } from 'lucide-react';
+import { Check, DollarSign, Plus, Settings2, UserRoundCheck, Users } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatClientLocationScale } from '../data/phaseOneData';
 import { ClientModal, LocationModal, PricingModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneClientsLocations() {
-  const { state } = useApp();
+  const { state, dispatch, addToast } = useApp();
   const canManage = state.currentUser.permissions.manageSettings;
   const [editingClient, setEditingClient] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
   const [pricingClientId, setPricingClientId] = useState(null);
+  const [contactDrafts, setContactDrafts] = useState({});
   const [showClientModal, setShowClientModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
 
@@ -104,6 +105,84 @@ export default function PhaseOneClientsLocations() {
             <div className="empty-state-title">No clients configured yet</div>
             <div className="empty-state-description">
               Add your first client to start building locations and negotiated pricing.
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="card">
+        <div className="card-title">
+          <UserRoundCheck size={18} /> Customer Portal Contacts
+        </div>
+        {(state.customerContacts ?? []).length ? (
+          <div className="customer-contact-list">
+            {state.customerContacts.map((contact) => {
+              const draft = contactDrafts[contact.userId] ?? contact;
+
+              return (
+                <div className="customer-contact-row" key={contact.userId}>
+                  <div>
+                    <strong>{contact.fullName || contact.email}</strong>
+                    <p>{contact.email}</p>
+                  </div>
+                  <select
+                    className="form-select"
+                    value={draft.clientId ?? ''}
+                    disabled={!canManage}
+                    onChange={(event) =>
+                      setContactDrafts((current) => ({
+                        ...current,
+                        [contact.userId]: { ...draft, clientId: event.target.value },
+                      }))
+                    }
+                  >
+                    <option value="">Select company</option>
+                    {state.clients.map((client) => (
+                      <option key={client.id} value={client.id}>
+                        {client.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="form-select"
+                    value={draft.status}
+                    disabled={!canManage}
+                    onChange={(event) =>
+                      setContactDrafts((current) => ({
+                        ...current,
+                        [contact.userId]: { ...draft, status: event.target.value },
+                      }))
+                    }
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="active">Active</option>
+                    <option value="disabled">Disabled</option>
+                  </select>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    type="button"
+                    disabled={!canManage}
+                    onClick={async () => {
+                      const payload = {
+                        ...contact,
+                        ...draft,
+                        status: draft.clientId && draft.status === 'pending' ? 'active' : draft.status,
+                      };
+                      const result = await dispatch({ type: 'UPDATE_CUSTOMER_CONTACT', payload });
+                      if (result.ok) addToast('Customer contact updated.');
+                    }}
+                  >
+                    <Check size={14} /> Save
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+            <div className="empty-state-title">No customer signups yet</div>
+            <div className="empty-state-description">
+              Customer self-signups will appear here for company linking and approval.
             </div>
           </div>
         )}

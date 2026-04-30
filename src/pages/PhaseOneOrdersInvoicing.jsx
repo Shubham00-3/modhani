@@ -26,6 +26,7 @@ import {
   getOrderValue,
   getProduct,
   getProductDisplayName,
+  getProductImageUrl,
   isLocationShipToReady,
 } from '../data/phaseOneData';
 import { printInvoice, printPackingSlip } from '../utils/printDocuments';
@@ -519,14 +520,17 @@ function OrderDetailPanel({
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{getProductDisplayName(product)}</div>
-                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                  Ordered {item.quantity.toLocaleString()} | Fulfilled {item.fulfilledQty.toLocaleString()} | Outstanding{' '}
-                  {getItemOutstandingQty(item).toLocaleString()}
-                  {(item.declinedQty ?? 0) > 0 ? ` | Declined ${item.declinedQty.toLocaleString()}` : ''}
-                </div>
-              </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
+                    <ProductThumbnail product={product} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700 }}>{getProductDisplayName(product)}</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
+                        Ordered {item.quantity.toLocaleString()} | Fulfilled {item.fulfilledQty.toLocaleString()} | Outstanding{' '}
+                        {getItemOutstandingQty(item).toLocaleString()}
+                        {(item.declinedQty ?? 0) > 0 ? ` | Declined ${item.declinedQty.toLocaleString()}` : ''}
+                      </div>
+                    </div>
+                  </div>
                   <div className="cell-monospace">{formatCurrency(item.overridePrice ?? item.clientPrice)}</div>
                 </div>
 
@@ -979,10 +983,13 @@ function InvoiceModal({ order, onClose }) {
             return (
               <div key={item.id} className="card" style={{ padding: 'var(--space-4)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-                  <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
+                    <ProductThumbnail product={product} />
+                    <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700 }}>{getProductDisplayName(product)}</div>
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
                       Bill {item.fulfilledQty.toLocaleString()} units
+                    </div>
                     </div>
                   </div>
                   <div className="cell-monospace">
@@ -1225,33 +1232,31 @@ function AddOrderModal({ onClose }) {
             {lines.map((line) => (
               <div
                 key={line.id}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'minmax(0, 1.4fr) minmax(140px, 1fr) auto',
-                  gap: 'var(--space-4)',
-                  alignItems: 'end',
-                }}
+                className="order-line-editor"
               >
                 <div className="form-group">
                   <label className="form-label">Product</label>
-                  <select
-                    className="form-select"
-                    value={line.productId}
-                    onChange={(event) =>
-                      setLines((current) =>
-                        current.map((entry) =>
-                          entry.id === line.id ? { ...entry, productId: event.target.value } : entry
+                  <div className="product-select-with-thumb">
+                    <ProductThumbnail product={getProduct(state.products, line.productId)} />
+                    <select
+                      className="form-select"
+                      value={line.productId}
+                      onChange={(event) =>
+                        setLines((current) =>
+                          current.map((entry) =>
+                            entry.id === line.id ? { ...entry, productId: event.target.value } : entry
+                          )
                         )
-                      )
-                    }
-                  >
-                    <option value="">Select product</option>
-                    {state.products.map((product) => (
-                      <option key={product.id} value={product.id}>
-                        {getProductDisplayName(product)}
-                      </option>
-                    ))}
-                  </select>
+                      }
+                    >
+                      <option value="">Select product</option>
+                      {state.products.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {getProductDisplayName(product)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="form-group">
@@ -1297,6 +1302,16 @@ function AddOrderModal({ onClose }) {
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ProductThumbnail({ product }) {
+  const imageUrl = getProductImageUrl(product);
+
+  return (
+    <div className="product-thumb product-thumb-sm">
+      {imageUrl ? <img src={imageUrl} alt={getProductDisplayName(product)} /> : <Package size={16} />}
     </div>
   );
 }

@@ -10,6 +10,7 @@ import PhaseOneSettings from './pages/PhaseOneSettings';
 import PhaseOneAuditTrail from './pages/PhaseOneAuditTrail';
 import PhaseOneClientsLocations from './pages/PhaseOneClientsLocations';
 import PhaseOneProducts from './pages/PhaseOneProducts';
+import CustomerPortal from './pages/CustomerPortal';
 
 export default function App() {
   const { state } = useApp();
@@ -27,7 +28,7 @@ export default function App() {
         <div className="card" style={{ padding: '28px 32px', textAlign: 'center', minWidth: 320 }}>
           <div style={{ fontWeight: 700, fontSize: '20px' }}>Loading ModhaniOS</div>
           <div style={{ color: 'var(--color-text-secondary)', marginTop: '8px' }}>
-            Preparing {state.authConfigured ? 'Supabase-backed staff data' : 'demo workspace'}...
+            Preparing {state.authConfigured ? 'Supabase-backed workspace' : 'demo workspace'}...
           </div>
         </div>
       </div>
@@ -36,6 +37,10 @@ export default function App() {
 
   if (state.authConfigured && !state.isAuthenticated) {
     return <AuthScreen />;
+  }
+
+  if (state.authConfigured && state.authRole === 'customer') {
+    return <CustomerPortal />;
   }
 
   return (

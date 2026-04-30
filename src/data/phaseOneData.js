@@ -123,6 +123,10 @@ export function getProductDisplayName(product) {
   return `${product.name} ${product.unitSize}`;
 }
 
+export function getProductImageUrl(product) {
+  return product?.imageUrl || product?.imagePath || '';
+}
+
 export function getClientName(clients, clientId) {
   return clients.find((client) => client.id === clientId)?.name ?? 'Unknown client';
 }

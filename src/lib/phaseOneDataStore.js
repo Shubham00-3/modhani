@@ -56,6 +56,8 @@ function productToUi(product) {
     baseCataloguePrice: Number(product.base_catalogue_price),
     qbItemName: product.qb_item_name ?? `${product.name} ${product.unit_size}`.trim(),
     qbMappingStatus: product.qb_mapping_status ?? 'ready',
+    imageUrl: product.image_url ?? '',
+    imagePath: product.image_path ?? '',
   };
 }
 
@@ -80,6 +82,7 @@ function pricingToUi(pricing) {
     clientId: pricing.client_id,
     productId: pricing.product_id,
     price: Number(pricing.price),
+    isActive: Boolean(pricing.is_active),
   };
 }
 
@@ -226,6 +229,8 @@ function productToDb(product) {
     base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
     qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
     qb_mapping_status: product.qbMappingStatus ?? 'ready',
+    image_url: product.imageUrl ?? null,
+    image_path: product.imagePath ?? null,
   };
 }
 
@@ -235,6 +240,19 @@ function pricingToDb(pricing) {
     client_id: pricing.clientId,
     product_id: pricing.productId,
     price: Number(pricing.price ?? 0),
+    is_active: Boolean(pricing.isActive),
+  };
+}
+
+function customerContactToUi(contact) {
+  return {
+    userId: contact.user_id,
+    email: contact.email,
+    fullName: contact.full_name,
+    clientId: contact.client_id,
+    status: contact.status,
+    createdAt: contact.created_at,
+    updatedAt: contact.updated_at,
   };
 }
 
@@ -346,6 +364,7 @@ export async function fetchRemoteState(supabase, userId) {
     quickBooksJobsResult,
     reportRowsResult,
     notificationDismissalsResult,
+    customerContactsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('clients').select('*').order('name'),
@@ -367,6 +386,7 @@ export async function fetchRemoteState(supabase, userId) {
           .eq('user_id', userId)
           .order('dismissed_at', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
+    supabase.from('customer_contacts').select('*').order('created_at', { ascending: false }),
   ]);
 
   const results = [
@@ -384,10 +404,17 @@ export async function fetchRemoteState(supabase, userId) {
     quickBooksJobsResult,
     reportRowsResult,
     notificationDismissalsResult,
+    customerContactsResult,
   ];
 
   const firstError = results
-    .filter((result) => result !== reportRowsResult && result !== notificationDismissalsResult && result !== quickBooksJobsResult)
+    .filter(
+      (result) =>
+        result !== reportRowsResult &&
+        result !== notificationDismissalsResult &&
+        result !== quickBooksJobsResult &&
+        result !== customerContactsResult
+    )
     .find((result) => result.error)?.error;
   if (firstError) {
     throw firstError;
@@ -469,7 +496,140 @@ export async function fetchRemoteState(supabase, userId) {
     quickBooks: quickBooksToUi(quickBooksResult.data),
     quickBooksJobs: quickBooksJobsResult.error ? [] : (quickBooksJobsResult.data ?? []).map(quickBooksJobToUi),
     reportRows,
+    customerContacts: customerContactsResult.error ? [] : (customerContactsResult.data ?? []).map(customerContactToUi),
   };
+}
+
+export async function fetchAuthIdentity(supabase, userId) {
+  const { data: staffProfile, error: staffError } = await supabase
+    .from('profiles')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (staffError) throw staffError;
+  if (staffProfile) return 'staff';
+  return 'customer';
+}
+
+export async function fetchCustomerPortalState(supabase, user) {
+  const { data: contact, error: contactError } = await supabase
+    .from('customer_contacts')
+    .select('*')
+    .eq('user_id', user.id)
+    .maybeSingle();
+
+  if (contactError) throw contactError;
+
+  if (!contact) {
+    return {
+      contact: null,
+      client: null,
+      locations: [],
+      products: [],
+      recentOrders: [],
+    };
+  }
+
+  if (contact.status !== 'active' || !contact.client_id) {
+    return {
+      contact: customerContactToUi(contact),
+      client: null,
+      locations: [],
+      products: [],
+      recentOrders: [],
+    };
+  }
+
+  const [
+    clientResult,
+    locationsResult,
+    productsResult,
+    pricingResult,
+    ordersResult,
+    orderItemsResult,
+  ] = await Promise.all([
+    supabase.from('clients').select('*').eq('id', contact.client_id).maybeSingle(),
+    supabase.from('locations').select('*').eq('client_id', contact.client_id).order('name'),
+    supabase.from('products').select('*').order('name'),
+    supabase.from('client_product_prices').select('*').eq('client_id', contact.client_id),
+    supabase
+      .from('orders')
+      .select('*')
+      .eq('client_id', contact.client_id)
+      .eq('source', 'portal')
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase.from('order_items').select('*'),
+  ]);
+
+  const firstError = [clientResult, locationsResult, productsResult, pricingResult, ordersResult, orderItemsResult].find(
+    (result) => result.error
+  )?.error;
+  if (firstError) throw firstError;
+
+  const pricingByProductId = new Map((pricingResult.data ?? []).map((pricing) => [pricing.product_id, pricing]));
+  const products = (productsResult.data ?? []).map((product) => {
+    const productUi = productToUi(product);
+    const pricing = pricingByProductId.get(product.id);
+
+    return {
+      ...productUi,
+      clientPrice: pricing ? Number(pricing.price) : productUi.baseCataloguePrice,
+      pricingId: pricing?.id ?? null,
+    };
+  });
+
+  const itemsByOrderId = new Map();
+  (orderItemsResult.data ?? []).forEach((item) => {
+    const current = itemsByOrderId.get(item.order_id) ?? [];
+    current.push({
+      id: item.id,
+      productId: item.product_id,
+      quantity: Number(item.quantity),
+      fulfilledQty: Number(item.fulfilled_qty),
+      declinedQty: Number(item.declined_qty ?? 0),
+      basePrice: Number(item.base_price),
+      clientPrice: Number(item.client_price),
+      overridePrice: item.override_price == null ? null : Number(item.override_price),
+      overrideReason: item.override_reason,
+      assignedBatches: [],
+    });
+    itemsByOrderId.set(item.order_id, current);
+  });
+
+  const recentOrders = (ordersResult.data ?? []).map((order) => ({
+    id: order.id,
+    orderNumber: Number(order.order_number),
+    clientId: order.client_id,
+    locationId: order.location_id,
+    source: order.source,
+    status: order.status,
+    createdAt: order.created_at,
+    items: itemsByOrderId.get(order.id) ?? [],
+  }));
+
+  return {
+    contact: customerContactToUi(contact),
+    client: clientResult.data ? clientToUi(clientResult.data) : null,
+    locations: (locationsResult.data ?? []).map(locationToUi),
+    products,
+    recentOrders,
+  };
+}
+
+export async function registerCustomerProfile(supabase, fullName) {
+  return callRpc(supabase, 'modhanios_register_customer_profile', {
+    p_full_name: fullName,
+  });
+}
+
+export async function submitCustomerOrder(supabase, { clientId, locationId, items }) {
+  return callRpc(supabase, 'modhanios_submit_customer_order', {
+    p_client_id: clientId,
+    p_location_id: locationId,
+    p_items: items,
+  });
 }
 
 export async function persistNotificationDismissals(supabase, userId, notificationKeys) {
@@ -576,6 +736,8 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_category: product.category ?? null,
         p_base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
         p_qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
+        p_image_url: product.imageUrl ?? null,
+        p_image_path: product.imagePath ?? null,
       });
     }
     case 'ADD_CLIENT':
@@ -628,6 +790,17 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_client_id: pricing.clientId,
         p_product_id: pricing.productId,
         p_price: Number(pricing.price ?? 0),
+        p_is_active: Boolean(pricing.isActive),
+      });
+    }
+    case 'UPDATE_CUSTOMER_CONTACT': {
+      const contact = action.payload;
+      return callRpc(supabase, 'modhanios_update_customer_contact', {
+        p_user_id: currentUser.id,
+        p_contact_user_id: contact.userId,
+        p_full_name: contact.fullName,
+        p_client_id: contact.clientId || null,
+        p_status: contact.status,
       });
     }
     case 'UPDATE_USER': {

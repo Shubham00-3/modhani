@@ -18,9 +18,13 @@ import { buildOperationalNotifications } from '../lib/notifications';
 import {
   executeAdminAction,
   executeWorkflowAction,
+  fetchAuthIdentity,
+  fetchCustomerPortalState,
   fetchRemoteState,
   persistAction,
   persistNotificationDismissals,
+  registerCustomerProfile,
+  submitCustomerOrder,
 } from '../lib/phaseOneDataStore';
 import { getSupabaseConfigError, isSupabaseConfigured, supabase } from '../lib/supabaseClient';
 
@@ -36,6 +40,8 @@ const demoState = {
   auditLog: AUDIT_LOG,
   notificationDismissals: [],
   quickBooksJobs: [],
+  customerContacts: [],
+  customerPortal: null,
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: buildReportRowsFromOrders({
     orders: ORDERS,
@@ -50,6 +56,7 @@ const demoState = {
   authConfigured: false,
   authLoading: false,
   isAuthenticated: true,
+  authRole: 'staff',
   authError: getSupabaseConfigError(),
 };
 
@@ -65,6 +72,8 @@ const remoteBootState = {
   auditLog: [],
   notificationDismissals: [],
   quickBooksJobs: [],
+  customerContacts: [],
+  customerPortal: null,
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: [],
   sidebarCollapsed: false,
@@ -73,6 +82,7 @@ const remoteBootState = {
   authConfigured: true,
   authLoading: true,
   isAuthenticated: false,
+  authRole: null,
   authError: null,
 };
 
@@ -141,6 +151,31 @@ function reducer(state, action) {
         initialized: true,
         authLoading: false,
         isAuthenticated: true,
+        authRole: 'staff',
+        customerPortal: null,
+        authError: null,
+      };
+    case 'INITIALIZE_CUSTOMER_PORTAL':
+      return {
+        ...state,
+        currentUserId: action.payload.currentUserId,
+        users: [],
+        products: [],
+        clients: [],
+        locations: [],
+        clientPricing: [],
+        batches: [],
+        orders: [],
+        auditLog: [],
+        notificationDismissals: [],
+        quickBooksJobs: [],
+        quickBooks: QUICKBOOKS_SETTINGS,
+        reportRows: [],
+        customerPortal: action.payload.data,
+        initialized: true,
+        authLoading: false,
+        isAuthenticated: true,
+        authRole: 'customer',
         authError: null,
       };
     case 'SET_AUTH_STATUS':
@@ -214,6 +249,13 @@ function reducer(state, action) {
         ),
       };
     }
+    case 'UPDATE_CUSTOMER_CONTACT':
+      return {
+        ...state,
+        customerContacts: state.customerContacts.map((contact) =>
+          contact.userId === action.payload.userId ? { ...contact, ...action.payload } : contact
+        ),
+      };
     case 'ADD_BATCH':
     case 'LOG_PRODUCTION_BATCH':
       return { ...state, batches: [...state.batches, action.payload] };
@@ -432,6 +474,7 @@ const serverAdminActions = new Set([
   'ADD_LOCATION',
   'UPDATE_LOCATION',
   'SET_CLIENT_PRICING',
+  'UPDATE_CUSTOMER_CONTACT',
   'UPDATE_USER',
   'UPDATE_QB_SETTINGS',
 ]);
@@ -496,15 +539,45 @@ export function AppProvider({ children }) {
     });
   }, []);
 
+  const loadCustomerPortalData = useCallback(async (user) => {
+    if (!supabase) return;
+
+    const data = await fetchCustomerPortalState(supabase, user);
+    baseDispatch({
+      type: 'INITIALIZE_CUSTOMER_PORTAL',
+      payload: {
+        data,
+        currentUserId: user.id,
+      },
+    });
+  }, []);
+
+  const loadAuthenticatedUser = useCallback(
+    async (user) => {
+      if (!supabase) return;
+
+      const identity = await fetchAuthIdentity(supabase, user.id);
+
+      if (identity === 'staff') {
+        await loadRemoteData(user.id);
+        return;
+      }
+
+      await loadCustomerPortalData(user);
+    },
+    [loadCustomerPortalData, loadRemoteData]
+  );
+
   const handleRemoteBootstrapError = useCallback((userId, fetchError) => {
     baseDispatch({
       type: 'SET_AUTH_STATUS',
       payload: {
         initialized: true,
         authLoading: false,
-        isAuthenticated: true,
+        isAuthenticated: false,
         authError: fetchError.message,
         currentUserId: userId,
+        authRole: null,
       },
     });
   }, []);
@@ -548,9 +621,9 @@ export function AppProvider({ children }) {
       }
 
       try {
-        await loadRemoteData(data.session.user.id);
+        await loadAuthenticatedUser(data.session.user);
       } catch (fetchError) {
-        handleRemoteBootstrapError(data.session.user.id, fetchError);
+          handleRemoteBootstrapError(data.session.user.id, fetchError);
       }
     }
 
@@ -572,6 +645,7 @@ export function AppProvider({ children }) {
             isAuthenticated: false,
             authError: null,
             currentUserId: null,
+            authRole: null,
             users: [],
             products: [],
             clients: [],
@@ -582,6 +656,8 @@ export function AppProvider({ children }) {
             auditLog: [],
             notificationDismissals: [],
             quickBooksJobs: [],
+            customerContacts: [],
+            customerPortal: null,
             quickBooks: QUICKBOOKS_SETTINGS,
             reportRows: [],
           },
@@ -592,7 +668,7 @@ export function AppProvider({ children }) {
       setTimeout(() => {
         if (!active) return;
 
-        loadRemoteData(session.user.id).catch((fetchError) => {
+        loadAuthenticatedUser(session.user).catch((fetchError) => {
           if (!active) return;
           handleRemoteBootstrapError(session.user.id, fetchError);
         });
@@ -603,7 +679,7 @@ export function AppProvider({ children }) {
       active = false;
       listener.subscription.unsubscribe();
     };
-  }, [handleRemoteBootstrapError, loadRemoteData]);
+  }, [handleRemoteBootstrapError, loadAuthenticatedUser]);
 
   const addToast = useCallback((message, type = 'success') => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -661,6 +737,70 @@ export function AppProvider({ children }) {
     if (error) return { ok: false, error: error.message };
     return { ok: true };
   }, []);
+
+  const signUpCustomer = useCallback(async ({ email, password, fullName }) => {
+    if (!supabase) {
+      return { ok: false, error: getSupabaseConfigError() };
+    }
+
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          account_type: 'customer',
+        },
+      },
+    });
+
+    if (error) return { ok: false, error: error.message };
+
+    if (!data.session) {
+      return {
+        ok: true,
+        needsEmailConfirmation: true,
+      };
+    }
+
+    const { error: registerError } = await registerCustomerProfile(supabase, fullName);
+    if (registerError) return { ok: false, error: registerError.message };
+
+    await loadCustomerPortalData(data.session.user);
+    return { ok: true };
+  }, [loadCustomerPortalData]);
+
+  const completeCustomerProfile = useCallback(async (fullName) => {
+    if (!supabase) {
+      return { ok: false, error: getSupabaseConfigError() };
+    }
+
+    const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) return { ok: false, error: sessionError.message };
+    if (!sessionResult.session) return { ok: false, error: 'No customer session is active.' };
+
+    const { error } = await registerCustomerProfile(supabase, fullName);
+    if (error) return { ok: false, error: error.message };
+
+    await loadCustomerPortalData(sessionResult.session.user);
+    return { ok: true };
+  }, [loadCustomerPortalData]);
+
+  const submitPortalOrder = useCallback(async ({ clientId, locationId, items }) => {
+    if (!supabase) {
+      return { ok: false, error: getSupabaseConfigError() };
+    }
+
+    const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) return { ok: false, error: sessionError.message };
+    if (!sessionResult.session) return { ok: false, error: 'No customer session is active.' };
+
+    const { error } = await submitCustomerOrder(supabase, { clientId, locationId, items });
+    if (error) return { ok: false, error: error.message };
+
+    await loadCustomerPortalData(sessionResult.session.user);
+    return { ok: true };
+  }, [loadCustomerPortalData]);
 
   const logout = useCallback(async () => {
     if (!supabase) return;
@@ -845,8 +985,25 @@ export function AppProvider({ children }) {
       logout,
       dismissNotification,
       clearNotifications,
+      signUpCustomer,
+      completeCustomerProfile,
+      submitPortalOrder,
     }),
-    [state, currentUser, notifications, dispatch, addToast, addAudit, login, logout, dismissNotification, clearNotifications]
+    [
+      state,
+      currentUser,
+      notifications,
+      dispatch,
+      addToast,
+      addAudit,
+      login,
+      logout,
+      dismissNotification,
+      clearNotifications,
+      signUpCustomer,
+      completeCustomerProfile,
+      submitPortalOrder,
+    ]
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

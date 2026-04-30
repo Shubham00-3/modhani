@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
-import { getProductDisplayName } from '../../data/phaseOneData';
+import { getProductDisplayName, getProductImageUrl } from '../../data/phaseOneData';
+import { isSupabaseConfigured, supabase } from '../../lib/supabaseClient';
 
 const PRODUCT_UNIT_OPTIONS = ['kg', 'grams', 'liters', 'ml'];
 
 export function ProductModal({ product, onClose }) {
   const { state, dispatch, addToast } = useApp();
   const initialUnit = parseUnitSize(product?.unitSize);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState(getProductImageUrl(product) || '');
   const [form, setForm] = useState(
     product
       ? {
@@ -22,6 +25,8 @@ export function ProductModal({ product, onClose }) {
           category: '',
           baseCataloguePrice: '',
           qbItemName: '',
+          imageUrl: '',
+          imagePath: '',
         }
   );
 
@@ -36,6 +41,9 @@ export function ProductModal({ product, onClose }) {
         const unitSize = `${form.unitQuantity} ${unitMeasure}`.trim();
         const qbItemName = (form.qbItemName || `${name} ${unitSize}`).trim();
         const baseCataloguePrice = Number(form.baseCataloguePrice);
+        const productId = product?.id ?? `prod-${Date.now()}`;
+        let imageUrl = form.imageUrl ?? '';
+        let imagePath = form.imagePath ?? '';
 
         if (!name) {
           addToast('Enter product name.', 'warning');
@@ -69,6 +77,30 @@ export function ProductModal({ product, onClose }) {
           return false;
         }
 
+        if (imageFile) {
+          if (!isSupabaseConfigured || !supabase) {
+            addToast('Image upload needs Supabase Storage. Save a public image URL instead for demo mode.', 'warning');
+            return false;
+          }
+
+          const extension = imageFile.name.split('.').pop()?.toLowerCase() || 'jpg';
+          imagePath = `${productId}/${Date.now()}.${extension}`;
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(imagePath, imageFile, {
+              cacheControl: '3600',
+              upsert: true,
+            });
+
+          if (uploadError) {
+            addToast(`Image upload failed: ${uploadError.message}`, 'warning');
+            return false;
+          }
+
+          const { data } = supabase.storage.from('product-images').getPublicUrl(imagePath);
+          imageUrl = data.publicUrl;
+        }
+
         const result = await dispatch({
           type: product ? 'UPDATE_PRODUCT' : 'ADD_PRODUCT',
           payload: {
@@ -76,10 +108,12 @@ export function ProductModal({ product, onClose }) {
             ...form,
             name,
             unitSize,
-            id: product?.id ?? `prod-${Date.now()}`,
+            id: productId,
             baseCataloguePrice,
             qbItemName,
             qbMappingStatus: qbItemName ? 'ready' : 'needs_mapping',
+            imageUrl,
+            imagePath,
           },
         });
 
@@ -106,6 +140,37 @@ export function ProductModal({ product, onClose }) {
       <FormInput label="Category" value={form.category} onChange={(value) => setForm((current) => ({ ...current, category: value }))} />
       <FormInput label="Base Catalogue Price" type="number" value={form.baseCataloguePrice} onChange={(value) => setForm((current) => ({ ...current, baseCataloguePrice: value }))} />
       <FormInput label="QuickBooks Item Name" value={form.qbItemName ?? ''} onChange={(value) => setForm((current) => ({ ...current, qbItemName: value }))} />
+      <div className="form-group">
+        <label className="form-label">Product Image</label>
+        <div className="product-image-editor">
+          <div className="product-image-preview">
+            {imagePreview ? <img src={imagePreview} alt={form.name || 'Product'} /> : <span>No image</span>}
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0 }}>
+            <input
+              className="form-input"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              onChange={(event) => {
+                const nextFile = event.target.files?.[0] ?? null;
+                setImageFile(nextFile);
+                if (nextFile) {
+                  setImagePreview(URL.createObjectURL(nextFile));
+                }
+              }}
+            />
+            <input
+              className="form-input"
+              value={form.imageUrl ?? ''}
+              onChange={(event) => {
+                setForm((current) => ({ ...current, imageUrl: event.target.value, imagePath: '' }));
+                setImagePreview(event.target.value);
+              }}
+              placeholder="Or paste a public image URL"
+            />
+          </div>
+        </div>
+      </div>
     </SimpleModal>
   );
 }
@@ -325,6 +390,7 @@ export function PricingModal({ clientId, onClose }) {
               clientId,
               productId,
               price: Number(price),
+              isActive: true,
             },
             })
           )

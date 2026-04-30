@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Package, Plus, Settings2 } from 'lucide-react';
+import { Package, Plus, Settings2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
-import { formatCurrency, getProductDisplayName } from '../data/phaseOneData';
+import { formatCurrency, getProductDisplayName, getProductImageUrl } from '../data/phaseOneData';
 import { ProductModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneProducts() {
@@ -9,6 +9,7 @@ export default function PhaseOneProducts() {
   const canManage = state.currentUser.permissions.manageSettings;
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
+  const [previewProduct, setPreviewProduct] = useState(null);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -44,6 +45,7 @@ export default function PhaseOneProducts() {
           <table className="data-table">
             <thead>
               <tr>
+                <th>Image</th>
                 <th>Product</th>
                 <th>Category</th>
                 <th>QuickBooks Item</th>
@@ -54,6 +56,9 @@ export default function PhaseOneProducts() {
             <tbody>
               {state.products.map((product) => (
                 <tr key={product.id}>
+                  <td>
+                    <ProductThumbnail product={product} onPreview={setPreviewProduct} />
+                  </td>
                   <td style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</td>
                   <td>{product.category || '-'}</td>
                   <td>{product.qbItemName || getProductDisplayName(product)}</td>
@@ -86,6 +91,56 @@ export default function PhaseOneProducts() {
           }}
         />
       ) : null}
+
+      {previewProduct ? (
+        <ProductImageLightbox product={previewProduct} onClose={() => setPreviewProduct(null)} />
+      ) : null}
+    </div>
+  );
+}
+
+function ProductThumbnail({ product, onPreview }) {
+  const imageUrl = getProductImageUrl(product);
+
+  if (!imageUrl) {
+    return (
+      <div className="product-thumb" title="No product image yet">
+        <Package size={18} />
+      </div>
+    );
+  }
+
+  return (
+    <button
+      className="product-thumb product-thumb-button"
+      type="button"
+      onClick={() => onPreview(product)}
+      aria-label={`Open ${getProductDisplayName(product)} image`}
+    >
+      <img src={imageUrl} alt={getProductDisplayName(product)} />
+    </button>
+  );
+}
+
+function ProductImageLightbox({ product, onClose }) {
+  const imageUrl = getProductImageUrl(product);
+
+  return (
+    <div className="modal-overlay product-image-lightbox-overlay" onClick={onClose}>
+      <div className="product-image-lightbox" onClick={(event) => event.stopPropagation()}>
+        <div className="product-image-lightbox-header">
+          <div>
+            <div className="product-image-lightbox-title">{getProductDisplayName(product)}</div>
+            <div className="product-image-lightbox-meta">{product.category || 'Product image'}</div>
+          </div>
+          <button className="btn btn-ghost" type="button" onClick={onClose} aria-label="Close product image">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="product-image-lightbox-body">
+          <img src={imageUrl} alt={getProductDisplayName(product)} />
+        </div>
+      </div>
     </div>
   );
 }
