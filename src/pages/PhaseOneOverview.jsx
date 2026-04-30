@@ -1,5 +1,5 @@
-import { createElement } from 'react';
-import { Link } from 'react-router-dom';
+import { createElement, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BarChart3, ClipboardList, Package, RefreshCw, ScrollText, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
@@ -11,36 +11,141 @@ import {
   getLocationName,
   getOrderOutstandingQty,
   getOrderValue,
+  getProductDisplayName,
 } from '../data/phaseOneData';
 
 export default function PhaseOneOverview() {
   const { state } = useApp();
+  const [searchParams] = useSearchParams();
+  const [selectedDashboardView, setSelectedDashboardView] = useState(null);
+  const dashboardSearchRaw = (searchParams.get('q') ?? '').trim();
+  const dashboardSearch = dashboardSearchRaw.toLowerCase();
   const todayKey = new Date().toISOString().slice(0, 10);
+  const orderMatchesDashboardSearch = (order) => {
+    if (!dashboardSearch) return true;
+
+    const itemSearchText = (order.items ?? [])
+      .map((item) => {
+        const product = state.products.find((catalogueProduct) => catalogueProduct.id === item.productId);
+        return [
+          product ? getProductDisplayName(product) : null,
+          item.productName,
+          item.productId,
+          item.qtyOrdered,
+          item.qtyFulfilled,
+        ]
+          .filter(Boolean)
+          .join(' ');
+      })
+      .join(' ');
+
+    return [
+      order.orderNumber,
+      order.status,
+      order.source,
+      order.invoiceNumber,
+      order.qbInvoiceNumber,
+      order.packingSlipNumber,
+      getClientName(state.clients, order.clientId),
+      getLocationName(state.locations, order.locationId),
+      itemSearchText,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(dashboardSearch);
+  };
   const activeOrders = state.orders.filter((order) =>
     ['pending', 'partial', 'fulfilled', 'invoiced'].includes(order.status)
   );
-  const outstandingUnits = state.orders.reduce((sum, order) => sum + getOrderOutstandingQty(order), 0);
-  const invoicesPendingQb = state.orders.filter((order) => order.invoiceNumber && !order.qbInvoiceNumber).length;
-  const shipmentsToday = state.orders.filter((order) => order.shippedAt?.slice(0, 10) === todayKey).length;
-  const recentOrders = [...state.orders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
+  const outstandingOrders = state.orders.filter((order) => getOrderOutstandingQty(order) > 0);
+  const outstandingUnits = outstandingOrders.reduce((sum, order) => sum + getOrderOutstandingQty(order), 0);
+  const invoicesPendingQbOrders = state.orders.filter((order) => order.invoiceNumber && !order.qbInvoiceNumber);
+  const shipmentsTodayOrders = state.orders.filter((order) => order.shippedAt?.slice(0, 10) === todayKey);
+  const dashboardViews = {
+    open: {
+      title: 'Open Orders',
+      description: 'Orders currently pending, partially fulfilled, fulfilled, or invoiced.',
+      orders: activeOrders,
+    },
+    outstanding: {
+      title: 'Outstanding Units',
+      description: 'Orders that still have remaining quantity to fulfil.',
+      orders: outstandingOrders,
+    },
+    'qb-pending': {
+      title: 'Pending QB Push',
+      description: 'Invoices created in ModhaniOS that still need a QuickBooks invoice number.',
+      orders: invoicesPendingQbOrders,
+    },
+    'shipments-today': {
+      title: 'Shipments Today',
+      description: 'Orders shipped today based on shipment confirmation time.',
+      orders: shipmentsTodayOrders,
+    },
+  };
+  const selectedDashboardConfig = selectedDashboardView ? dashboardViews[selectedDashboardView] : null;
+  const dashboardSearchOrders = state.orders.filter(orderMatchesDashboardSearch);
+  const visibleDashboardConfig = selectedDashboardConfig
+    ? {
+        ...selectedDashboardConfig,
+        description: dashboardSearchRaw
+          ? `${selectedDashboardConfig.description} Filtered by "${dashboardSearchRaw}".`
+          : selectedDashboardConfig.description,
+        orders: selectedDashboardConfig.orders.filter(orderMatchesDashboardSearch),
+      }
+    : dashboardSearchRaw
+      ? {
+          title: 'Dashboard Search Results',
+          description: `Orders matching "${dashboardSearchRaw}".`,
+          orders: dashboardSearchOrders,
+        }
+      : null;
+  const recentOrdersSource = dashboardSearchRaw ? dashboardSearchOrders : state.orders;
+  const recentOrders = [...recentOrdersSource].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
   const lowStockBatches = [...state.batches]
     .filter((batch) => batch.qtyRemaining > 0 && batch.qtyRemaining <= 150)
     .sort((a, b) => a.qtyRemaining - b.qtyRemaining);
   const topClients = state.clients
     .map((client) => {
       const clientOrders = state.orders.filter((order) => order.clientId === client.id);
+      const clientLocations = state.locations.filter((location) => location.clientId === client.id);
+      const searchableText = [
+        client.name,
+        client.qbCustomerName,
+        ...clientLocations.flatMap((location) => [
+          location.name,
+          location.city,
+          location.province,
+          location.postalCode,
+          location.addressLine1,
+          location.addressLine2,
+        ]),
+        ...clientOrders.flatMap((order) => [
+          order.orderNumber,
+          order.status,
+          order.invoiceNumber,
+          order.qbInvoiceNumber,
+        ]),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
       return {
         id: client.id,
         name: client.name,
         orders: clientOrders.length,
         value: clientOrders.reduce((sum, order) => sum + getOrderValue(order), 0),
-        locationCount: state.locations.filter((location) => location.clientId === client.id).length,
+        locationCount: clientLocations.length,
         locationLabel: formatClientLocationScale(
           client,
-          state.locations.filter((location) => location.clientId === client.id).length
+          clientLocations.length
         ),
+        searchableText,
       };
     })
+    .filter((client) => !dashboardSearch || client.searchableText.includes(dashboardSearch))
     .sort((a, b) => b.value - a.value || b.orders - a.orders)
     .slice(0, 5);
 
@@ -60,30 +165,44 @@ export default function PhaseOneOverview() {
           label="Open Orders"
           value={activeOrders.length}
           detail="Pending through invoiced"
-          to="/orders?view=open"
+          active={selectedDashboardView === 'open'}
+          onClick={() => setSelectedDashboardView((current) => (current === 'open' ? null : 'open'))}
         />
         <StatCard
           icon={Package}
           label="Outstanding Units"
           value={outstandingUnits.toLocaleString()}
           detail="Awaiting next batch or manual fulfilment"
-          to="/orders?view=outstanding"
+          active={selectedDashboardView === 'outstanding'}
+          onClick={() => setSelectedDashboardView((current) => (current === 'outstanding' ? null : 'outstanding'))}
         />
         <StatCard
           icon={RefreshCw}
           label="Pending QB Push"
-          value={invoicesPendingQb}
+          value={invoicesPendingQbOrders.length}
           detail={state.quickBooks.lastSyncAt ? `Last sync ${formatTime(state.quickBooks.lastSyncAt)}` : 'No sync recorded yet'}
-          to="/orders?view=qb-pending"
+          active={selectedDashboardView === 'qb-pending'}
+          onClick={() => setSelectedDashboardView((current) => (current === 'qb-pending' ? null : 'qb-pending'))}
         />
         <StatCard
           icon={Truck}
           label="Shipments Today"
-          value={shipmentsToday}
+          value={shipmentsTodayOrders.length}
           detail="Packing slips generated per shipment"
-          to="/orders?view=shipments-today"
+          active={selectedDashboardView === 'shipments-today'}
+          onClick={() => setSelectedDashboardView((current) => (current === 'shipments-today' ? null : 'shipments-today'))}
         />
       </div>
+
+      {visibleDashboardConfig ? (
+        <DashboardOrderPanel
+          title={visibleDashboardConfig.title}
+          description={visibleDashboardConfig.description}
+          orders={visibleDashboardConfig.orders}
+          clients={state.clients}
+          locations={state.locations}
+        />
+      ) : null}
 
       <div className="grid-2 section">
         <div className="card">
@@ -188,7 +307,7 @@ export default function PhaseOneOverview() {
   );
 }
 
-function StatCard({ icon, label, value, detail, to }) {
+function StatCard({ icon, label, value, detail, active, onClick }) {
   const content = (
     <>
       <div className="stat-card-header">
@@ -202,17 +321,67 @@ function StatCard({ icon, label, value, detail, to }) {
     </>
   );
 
-  if (to) {
-    return (
-      <Link className="stat-card stat-card-clickable" to={to} aria-label={`View ${label}`}>
-        {content}
-      </Link>
-    );
-  }
-
   return (
-    <div className="stat-card">
+    <button
+      className={`stat-card stat-card-clickable ${active ? 'stat-card-active' : ''}`}
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+    >
       {content}
+    </button>
+  );
+}
+
+function DashboardOrderPanel({ title, description, orders, clients, locations }) {
+  return (
+    <div className="card dashboard-order-panel section">
+      <div className="dashboard-order-panel-header">
+        <div>
+          <div className="card-title">{title}</div>
+          <div className="dashboard-order-panel-description">{description}</div>
+        </div>
+        <span className="badge badge-active">{orders.length.toLocaleString()} orders</span>
+      </div>
+      {orders.length ? (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Client</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th>Outstanding</th>
+              <th>Total Value</th>
+              <th>QB Invoice</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...orders]
+              .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+              .map((order) => (
+                <tr key={order.id}>
+                  <td className="cell-monospace">#{order.orderNumber}</td>
+                  <td style={{ fontWeight: 600 }}>{getClientName(clients, order.clientId)}</td>
+                  <td>{getLocationName(locations, order.locationId)}</td>
+                  <td><span className={`badge badge-${order.status}`}>{order.status}</span></td>
+                  <td className="cell-monospace">{getOrderOutstandingQty(order).toLocaleString()}</td>
+                  <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
+                  <td className="cell-monospace">{order.qbInvoiceNumber ?? order.invoiceNumber ?? '-'}</td>
+                  <td>{formatDate(order.createdAt)}</td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+          <div className="empty-state-title">No matching orders</div>
+          <div className="empty-state-description">
+            This dashboard category is currently empty.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

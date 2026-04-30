@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Check, DollarSign, Plus, Settings2, UserRoundCheck, Users } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Check, DollarSign, Plus, Search, Settings2, UserRoundCheck, Users } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatClientLocationScale } from '../data/phaseOneData';
 import { ClientModal, LocationModal, PricingModal } from '../components/settings/ManagementModals';
@@ -11,8 +11,33 @@ export default function PhaseOneClientsLocations() {
   const [editingLocation, setEditingLocation] = useState(null);
   const [pricingClientId, setPricingClientId] = useState(null);
   const [contactDrafts, setContactDrafts] = useState({});
+  const [clientSearch, setClientSearch] = useState('');
   const [showClientModal, setShowClientModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const filteredClients = useMemo(() => {
+    const query = clientSearch.trim().toLowerCase();
+    if (!query) return state.clients;
+
+    return state.clients.filter((client) => {
+      const clientLocations = state.locations.filter((location) => location.clientId === client.id);
+      const searchableText = [
+        client.name,
+        client.qbCustomerName,
+        ...clientLocations.flatMap((location) => [
+          location.name,
+          location.city,
+          location.addressLine1,
+          location.addressLine2,
+          location.postalCode,
+        ]),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+
+      return searchableText.includes(query);
+    });
+  }, [clientSearch, state.clients, state.locations]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -46,12 +71,28 @@ export default function PhaseOneClientsLocations() {
       ) : null}
 
       <div className="card">
-        <div className="card-title">
-          <Users size={18} /> Client Directory
+        <div className="client-directory-header">
+          <div>
+            <div className="card-title">
+              <Users size={18} /> Client Directory
+            </div>
+            <div className="client-directory-count">
+              Showing {filteredClients.length.toLocaleString()} of {state.clients.length.toLocaleString()} clients
+            </div>
+          </div>
+          <label className="client-directory-search">
+            <Search size={16} />
+            <input
+              type="search"
+              value={clientSearch}
+              onChange={(event) => setClientSearch(event.target.value)}
+              placeholder="Search clients or locations..."
+            />
+          </label>
         </div>
-        {state.clients.length ? (
+        {filteredClients.length ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-            {state.clients.map((client) => {
+            {filteredClients.map((client) => {
               const clientLocations = state.locations.filter((location) => location.clientId === client.id);
 
               return (
@@ -102,9 +143,11 @@ export default function PhaseOneClientsLocations() {
           </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
-            <div className="empty-state-title">No clients configured yet</div>
+            <div className="empty-state-title">{state.clients.length ? 'No clients match that search' : 'No clients configured yet'}</div>
             <div className="empty-state-description">
-              Add your first client to start building locations and negotiated pricing.
+              {state.clients.length
+                ? 'Try searching by customer name, location, city, address, or postal code.'
+                : 'Add your first client to start building locations and negotiated pricing.'}
             </div>
           </div>
         )}

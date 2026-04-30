@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Bell, Package, Search, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { formatTime } from '../../data/phaseOneData';
@@ -42,15 +42,33 @@ function getNotificationIcon(notification) {
 export default function PhaseOneTopBar() {
   const { state, dispatch, logout, dismissNotification, clearNotifications } = useApp();
   const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [notificationPanelPath, setNotificationPanelPath] = useState(null);
   const notificationPanelRef = useRef(null);
   const currentTitle = pageTitles[location.pathname] || 'ModhaniOS';
+  const isOverview = location.pathname === '/';
+  const dashboardSearchValue = isOverview ? searchParams.get('q') ?? '' : '';
   const qbHealthy = state.quickBooks.connected && state.quickBooks.status === 'connected';
   const currentUser = state.currentUser ?? { id: '', initials: '?', name: 'Staff user', role: 'staff' };
   const qbStatusLabel = qbHealthy ? 'Connected' : 'Not Configured Yet';
   const qbSyncLabel = state.quickBooks.lastSyncAt ? formatTime(state.quickBooks.lastSyncAt) : 'Not synced yet';
   const notificationCount = state.notifications.length;
   const notificationsOpen = notificationPanelPath === location.pathname;
+
+  function handleDashboardSearchChange(event) {
+    if (!isOverview) return;
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    const value = event.target.value;
+
+    if (value.trim()) {
+      nextSearchParams.set('q', value);
+    } else {
+      nextSearchParams.delete('q');
+    }
+
+    setSearchParams(nextSearchParams, { replace: true });
+  }
 
   useEffect(() => {
     if (!notificationsOpen) return undefined;
@@ -101,7 +119,13 @@ export default function PhaseOneTopBar() {
       <div className="topbar-right">
         <label className="topbar-search" style={{ minWidth: 0 }}>
           <Search size={16} />
-          <input type="text" placeholder="Search dashboard..." />
+          <input
+            type="search"
+            placeholder={isOverview ? 'Search dashboard...' : 'Dashboard search available on Overview'}
+            value={dashboardSearchValue}
+            disabled={!isOverview}
+            onChange={handleDashboardSearchChange}
+          />
         </label>
 
         {state.authConfigured ? (

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Package, Plus, Settings2, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Package, Plus, Search, Settings2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatCurrency, getProductDisplayName, getProductImageUrl } from '../data/phaseOneData';
 import { ProductModal } from '../components/settings/ManagementModals';
@@ -10,6 +10,28 @@ export default function PhaseOneProducts() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
+  const [productSearch, setProductSearch] = useState('');
+
+  const filteredProducts = useMemo(() => {
+    const query = productSearch.trim().toLowerCase();
+
+    if (!query) return state.products;
+
+    return state.products.filter((product) =>
+      [
+        getProductDisplayName(product),
+        product.name,
+        product.unitSize,
+        product.category,
+        product.qbItemName,
+        product.baseCataloguePrice,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [productSearch, state.products]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -38,8 +60,24 @@ export default function PhaseOneProducts() {
       ) : null}
 
       <div className="card">
-        <div className="card-title">
-          <Package size={18} /> Product Catalogue
+        <div className="catalogue-header">
+          <div>
+            <div className="card-title">
+              <Package size={18} /> Product Catalogue
+            </div>
+            <div className="catalogue-count">
+              Showing {filteredProducts.length.toLocaleString()} of {state.products.length.toLocaleString()} products
+            </div>
+          </div>
+          <label className="catalogue-search">
+            <Search size={16} />
+            <input
+              type="search"
+              placeholder="Search products..."
+              value={productSearch}
+              onChange={(event) => setProductSearch(event.target.value)}
+            />
+          </label>
         </div>
         {state.products.length ? (
           <table className="data-table">
@@ -54,22 +92,35 @@ export default function PhaseOneProducts() {
               </tr>
             </thead>
             <tbody>
-              {state.products.map((product) => (
-                <tr key={product.id}>
-                  <td>
-                    <ProductThumbnail product={product} onPreview={setPreviewProduct} />
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</td>
-                  <td>{product.category || '-'}</td>
-                  <td>{product.qbItemName || getProductDisplayName(product)}</td>
-                  <td className="cell-monospace">{formatCurrency(product.baseCataloguePrice)}</td>
-                  <td>
-                    <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingProduct(product)}>
-                      Edit
-                    </button>
+              {filteredProducts.length ? (
+                filteredProducts.map((product) => (
+                  <tr key={product.id}>
+                    <td>
+                      <ProductThumbnail product={product} onPreview={setPreviewProduct} />
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</td>
+                    <td>{product.category || '-'}</td>
+                    <td>{product.qbItemName || getProductDisplayName(product)}</td>
+                    <td className="cell-monospace">{formatCurrency(product.baseCataloguePrice)}</td>
+                    <td>
+                      <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingProduct(product)}>
+                        Edit
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="6" style={{ padding: 0 }}>
+                    <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+                      <div className="empty-state-title">No matching products</div>
+                      <div className="empty-state-description">
+                        Try searching by product name, category, item number, or price.
+                      </div>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         ) : (
