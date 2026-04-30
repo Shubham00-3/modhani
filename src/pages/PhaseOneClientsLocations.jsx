@@ -118,6 +118,8 @@ export default function PhaseOneClientsLocations() {
           <div className="customer-contact-list">
             {state.customerContacts.map((contact) => {
               const draft = contactDrafts[contact.userId] ?? contact;
+              const isDirty =
+                (draft.clientId ?? '') !== (contact.clientId ?? '') || draft.status !== contact.status;
 
               return (
                 <div className="customer-contact-row" key={contact.userId}>
@@ -132,7 +134,11 @@ export default function PhaseOneClientsLocations() {
                     onChange={(event) =>
                       setContactDrafts((current) => ({
                         ...current,
-                        [contact.userId]: { ...draft, clientId: event.target.value },
+                        [contact.userId]: {
+                          ...draft,
+                          clientId: event.target.value,
+                          status: event.target.value && draft.status === 'pending' ? 'active' : draft.status,
+                        },
                       }))
                     }
                   >
@@ -161,7 +167,7 @@ export default function PhaseOneClientsLocations() {
                   <button
                     className="btn btn-secondary btn-sm"
                     type="button"
-                    disabled={!canManage}
+                    disabled={!canManage || !isDirty}
                     onClick={async () => {
                       const payload = {
                         ...contact,
@@ -169,10 +175,17 @@ export default function PhaseOneClientsLocations() {
                         status: draft.clientId && draft.status === 'pending' ? 'active' : draft.status,
                       };
                       const result = await dispatch({ type: 'UPDATE_CUSTOMER_CONTACT', payload });
-                      if (result.ok) addToast('Customer contact updated.');
+                      if (result.ok) {
+                        setContactDrafts((current) => {
+                          const next = { ...current };
+                          delete next[contact.userId];
+                          return next;
+                        });
+                        addToast('Customer contact updated.');
+                      }
                     }}
                   >
-                    <Check size={14} /> Save
+                    <Check size={14} /> {isDirty ? 'Save' : 'Saved'}
                   </button>
                 </div>
               );
