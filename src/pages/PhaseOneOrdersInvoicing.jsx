@@ -45,6 +45,7 @@ export default function PhaseOneOrdersInvoicing() {
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [showFulfilment, setShowFulfilment] = useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
   const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || dashboardView);
 
@@ -95,6 +96,7 @@ export default function PhaseOneOrdersInvoicing() {
     setSelectedOrderId(orderId);
     setShowFulfilment(false);
     setShowInvoiceModal(false);
+    setShowEditInvoiceModal(false);
   }
 
   function updateFilters(updater) {
@@ -117,6 +119,7 @@ export default function PhaseOneOrdersInvoicing() {
 
     setShowFulfilment(false);
     setShowInvoiceModal(false);
+    setShowEditInvoiceModal(false);
     setSelectedOrderId(null);
   }
 
@@ -407,6 +410,7 @@ export default function PhaseOneOrdersInvoicing() {
                   order={selectedOrder}
                   onStartFulfilment={beginFulfilment}
                   onCreateInvoice={() => setShowInvoiceModal(true)}
+                  onEditInvoice={() => setShowEditInvoiceModal(true)}
                   onPushToQuickBooks={handleQueueQuickBooks}
                   onConfirmShipment={handleConfirmShipment}
                   onPrintPackingSlip={(currentOrder) =>
@@ -424,6 +428,7 @@ export default function PhaseOneOrdersInvoicing() {
                       clients: state.clients,
                       locations: state.locations,
                       products: state.products,
+                      batches: state.batches,
                     })
                   }
                 />
@@ -434,6 +439,7 @@ export default function PhaseOneOrdersInvoicing() {
       ) : null}
 
       {showInvoiceModal && selectedOrder ? <InvoiceModal order={selectedOrder} onClose={() => setShowInvoiceModal(false)} /> : null}
+      {showEditInvoiceModal && selectedOrder ? <EditInvoiceModal order={selectedOrder} onClose={() => setShowEditInvoiceModal(false)} /> : null}
       {showAddOrderModal ? <AddOrderModal onClose={() => setShowAddOrderModal(false)} /> : null}
     </div>
   );
@@ -454,6 +460,7 @@ function OrderDetailPanel({
   order,
   onStartFulfilment,
   onCreateInvoice,
+  onEditInvoice,
   onPushToQuickBooks,
   onConfirmShipment,
   onPrintPackingSlip,
@@ -467,6 +474,12 @@ function OrderDetailPanel({
     (job) => job.orderId === order.id && job.jobType === 'invoice' && job.status !== 'pushed'
   );
   const quickBooksStatus = getQuickBooksSyncLabel(order);
+  const canEditInvoice =
+    order.invoiceNumber &&
+    order.status === 'invoiced' &&
+    order.qbSyncStatus !== 'pushed' &&
+    order.qbSyncStatus !== 'syncing' &&
+    !quickBooksJob;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -575,6 +588,12 @@ function OrderDetailPanel({
         {order.status === 'invoiced' && order.qbSyncStatus !== 'pushed' && order.qbSyncStatus !== 'syncing' && !quickBooksJob ? (
           <button className="btn btn-secondary" type="button" onClick={() => onPushToQuickBooks(order)}>
             <FileText size={16} /> Queue for QuickBooks Sync
+          </button>
+        ) : null}
+
+        {canEditInvoice ? (
+          <button className="btn btn-secondary" type="button" onClick={() => onEditInvoice(order)}>
+            <FileText size={16} /> Edit Invoice
           </button>
         ) : null}
 
@@ -1045,6 +1064,214 @@ function InvoiceModal({ order, onClose }) {
           </button>
           <button className="btn btn-primary" type="button" onClick={saveInvoice}>
             Create Invoice
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditInvoiceModal({ order, onClose }) {
+  const { state, dispatch, addToast } = useApp();
+  const invoiceLines = order.items.filter((item) => item.fulfilledQty > 0);
+  const [revisionReason, setRevisionReason] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [lineDrafts, setLineDrafts] = useState(() =>
+    Object.fromEntries(
+      invoiceLines.map((item) => [
+        item.id,
+        {
+          quantity: String(item.invoiceQty ?? item.fulfilledQty),
+          price: String(item.overridePrice ?? item.clientPrice ?? item.basePrice),
+          reason: item.overrideReason ?? '',
+        },
+      ])
+    )
+  );
+
+  async function saveInvoiceRevision() {
+    try {
+      if (isSaving) return;
+
+      if (!revisionReason.trim()) {
+        throw new Error('Provide a reason for editing this invoice.');
+      }
+
+      const lines = invoiceLines.map((item) => {
+        const draft = lineDrafts[item.id];
+        const nextQuantity = Number(draft.quantity);
+        const nextPrice = Number(draft.price);
+        const defaultPrice = item.clientPrice ?? item.basePrice;
+        const maxQuantity = Math.max(0, Number(item.fulfilledQty));
+        const hasPriceOverride = Number(nextPrice.toFixed(2)) !== Number(defaultPrice.toFixed(2));
+
+        if (!Number.isFinite(nextQuantity) || nextQuantity < 0 || nextQuantity > maxQuantity) {
+          throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} quantity must be between 0 and ${maxQuantity}.`);
+        }
+
+        if (!Number.isFinite(nextPrice) || nextPrice < 0) {
+          throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} price is invalid.`);
+        }
+
+        if (hasPriceOverride && !state.currentUser.permissions.overridePrices) {
+          throw new Error('This user cannot override prices.');
+        }
+
+        if (hasPriceOverride && !draft.reason.trim()) {
+          throw new Error(`Provide a price override reason for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
+        }
+
+        return {
+          orderItemId: item.id,
+          invoiceQty: nextQuantity,
+          overridePrice: hasPriceOverride ? nextPrice : null,
+          overrideReason: hasPriceOverride ? draft.reason.trim() : null,
+        };
+      });
+
+      if (!lines.some((line) => line.invoiceQty > 0)) {
+        throw new Error('Invoice must keep at least one billed quantity.');
+      }
+
+      setIsSaving(true);
+      const result = await dispatch({
+        type: 'EDIT_INVOICE',
+        payload: {
+          orderId: order.id,
+          lines,
+          reason: revisionReason.trim(),
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      if (!result?.ok) return;
+
+      addToast(`Invoice ${order.invoiceNumber} updated.`);
+      onClose();
+    } catch (error) {
+      addToast(error.message, 'warning');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">Edit Invoice {order.invoiceNumber}</h3>
+          <button className="btn btn-ghost" type="button" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="alert alert-info">
+            <FileText size={18} />
+            <div className="alert-content">
+              <div className="alert-title">Editable before QuickBooks sync</div>
+              <div className="alert-description">
+                Changes update this ModhaniOS invoice before it is queued or pushed to QuickBooks.
+              </div>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Revision Reason</label>
+            <textarea
+              className="form-input"
+              rows="3"
+              value={revisionReason}
+              onChange={(event) => setRevisionReason(event.target.value)}
+              placeholder="Example: customer changed quantity before pickup"
+            />
+          </div>
+
+          {invoiceLines.map((item) => {
+            const product = getProduct(state.products, item.productId);
+            const defaultPrice = item.clientPrice ?? item.basePrice;
+            const draft = lineDrafts[item.id];
+            const quantity = Number(draft.quantity) || 0;
+            const draftPrice = Number(draft.price);
+            const price = Number.isFinite(draftPrice) ? draftPrice : defaultPrice;
+            const maxQuantity = Math.max(0, Number(item.fulfilledQty));
+
+            return (
+              <div key={item.id} className="card" style={{ padding: 'var(--space-4)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', minWidth: 0 }}>
+                    <ProductThumbnail product={product} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700 }}>{getProductDisplayName(product)}</div>
+                      <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                        Fulfilled {item.fulfilledQty.toLocaleString()} | Max invoice qty {maxQuantity.toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="cell-monospace">{formatCurrency(quantity * price)}</div>
+                </div>
+
+                <div className="grid-2" style={{ marginTop: 'var(--space-4)' }}>
+                  <div className="form-group">
+                    <label className="form-label">Invoice Quantity</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min="0"
+                      max={maxQuantity}
+                      step="1"
+                      value={draft.quantity}
+                      onChange={(event) =>
+                        setLineDrafts((current) => ({
+                          ...current,
+                          [item.id]: { ...current[item.id], quantity: event.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Invoice Price</label>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      disabled={!state.currentUser.permissions.overridePrices}
+                      value={draft.price}
+                      onChange={(event) =>
+                        setLineDrafts((current) => ({
+                          ...current,
+                          [item.id]: { ...current[item.id], price: event.target.value },
+                        }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
+                  <label className="form-label">Price Override Reason</label>
+                  <input
+                    className="form-input"
+                    disabled={!state.currentUser.permissions.overridePrices}
+                    value={draft.reason}
+                    onChange={(event) =>
+                      setLineDrafts((current) => ({
+                        ...current,
+                        [item.id]: { ...current[item.id], reason: event.target.value },
+                      }))
+                    }
+                    placeholder="Required only if invoice price differs from client rate"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" type="button" disabled={isSaving} onClick={saveInvoiceRevision}>
+            {isSaving ? 'Saving...' : 'Save Invoice Changes'}
           </button>
         </div>
       </div>

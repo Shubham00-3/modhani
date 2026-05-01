@@ -163,6 +163,7 @@ function reportLineToUi(row) {
     batchNumbers: row.batch_numbers ?? '',
     orderedQty: Number(row.ordered_qty),
     fulfilledQty: Number(row.fulfilled_qty),
+    invoiceQty: row.invoice_qty == null ? null : Number(row.invoice_qty),
     declinedQty: Number(row.declined_qty ?? 0),
     outstandingQty: Number(row.outstanding_qty),
     basePrice: Number(row.base_price),
@@ -302,6 +303,7 @@ function orderItemToDb(orderId, item) {
     product_id: item.productId,
     quantity: Number(item.quantity),
     fulfilled_qty: Number(item.fulfilledQty),
+    invoice_qty: item.invoiceQty == null ? null : Number(item.invoiceQty),
     declined_qty: Number(item.declinedQty ?? 0),
     base_price: Number(item.basePrice),
     client_price: Number(item.clientPrice),
@@ -435,6 +437,7 @@ export async function fetchRemoteState(supabase, userId) {
       productId: item.product_id,
       quantity: Number(item.quantity),
       fulfilledQty: Number(item.fulfilled_qty),
+      invoiceQty: item.invoice_qty == null ? null : Number(item.invoice_qty),
       declinedQty: Number(item.declined_qty ?? 0),
       basePrice: Number(item.base_price),
       clientPrice: Number(item.client_price),
@@ -588,6 +591,7 @@ export async function fetchCustomerPortalState(supabase, user) {
       productId: item.product_id,
       quantity: Number(item.quantity),
       fulfilledQty: Number(item.fulfilled_qty),
+      invoiceQty: item.invoice_qty == null ? null : Number(item.invoice_qty),
       declinedQty: Number(item.declined_qty ?? 0),
       basePrice: Number(item.base_price),
       clientPrice: Number(item.client_price),
@@ -690,6 +694,13 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_invoice_number: action.payload.invoiceNumber,
         p_overrides: action.payload.overrides,
         p_invoice_email_sent_at: action.payload.invoiceEmailSentAt,
+      });
+    case 'EDIT_INVOICE':
+      return callRpc(supabase, 'modhanios_update_invoice', {
+        p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+        p_lines: action.payload.lines,
+        p_reason: action.payload.reason,
       });
     case 'PUSH_QB_INVOICE':
       return callRpc(supabase, 'modhanios_push_qb_invoice', {
@@ -857,6 +868,7 @@ export async function persistAction(supabase, action, previousState, nextState) 
     case 'UNLOCK_ORDER':
     case 'DECLINE_ORDER':
     case 'CREATE_INVOICE':
+    case 'EDIT_INVOICE':
     case 'PUSH_QB_INVOICE':
     case 'QUEUE_QB_INVOICE':
     case 'CONFIRM_SHIPMENT': {

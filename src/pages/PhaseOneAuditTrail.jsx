@@ -13,6 +13,7 @@ const ACTION_LABELS = {
   production_logged: 'Production Logged',
   price_override: 'Price Override',
   invoice_created: 'Invoice Created',
+  invoice_updated: 'Invoice Updated',
   invoice_sent: 'Invoice Sent',
   qb_sync: 'QB Sync',
   packing_slip_created: 'Packing Slip Created',

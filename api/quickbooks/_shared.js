@@ -324,7 +324,7 @@ async function buildInvoicePayload(supabase, orderId) {
   return {
     order,
     lines: (items ?? [])
-      .filter((item) => Number(item.fulfilled_qty) > 0)
+      .filter((item) => Number(item.invoice_qty ?? item.fulfilled_qty) > 0)
       .map((item) => ({
         item,
         product: item.products,
@@ -480,7 +480,7 @@ function buildInvoiceLine({ item, product, batches }) {
             <FullName>${escapeXml(product.qb_item_name || `${product.name} ${product.unit_size}`.trim())}</FullName>
           </ItemRef>
           <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Batches: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
-          <Quantity>${Number(item.fulfilled_qty)}</Quantity>
+          <Quantity>${Number(item.invoice_qty ?? item.fulfilled_qty)}</Quantity>
           <Rate>${Number(unitPrice).toFixed(2)}</Rate>
         </InvoiceLineAdd>`;
 }

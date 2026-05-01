@@ -180,9 +180,32 @@ export default function PhaseOneProductionBatches() {
 function LogProductionModal({ onClose, onSave }) {
   const { state, addToast } = useApp();
   const [productId, setProductId] = useState('');
+  const [productSearch, setProductSearch] = useState('');
   const [quantity, setQuantity] = useState('');
   const [productionDate, setProductionDate] = useState(new Date().toISOString().slice(0, 10));
-  const [batchNumber, setBatchNumber] = useState(`B-${3020 + state.batches.length}`);
+  const [batchNumber, setBatchNumber] = useState(() => getNextBatchNumber(state.batches));
+  const [isSaving, setIsSaving] = useState(false);
+  const selectedProduct = getProduct(state.products, productId);
+  const filteredProducts = useMemo(() => {
+    const search = productSearch.trim().toLowerCase();
+    if (!search) return state.products;
+
+    return state.products
+      .filter((product) => {
+        const haystack = [
+          product.name,
+          product.unitSize,
+          product.category,
+          product.qbItemName,
+          getProductDisplayName(product),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+
+        return haystack.includes(search);
+      });
+  }, [productSearch, state.products]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -199,14 +222,34 @@ function LogProductionModal({ onClose, onSave }) {
         <div className="modal-body">
           <div className="form-group">
             <label className="form-label">Product</label>
+            <input
+              className="form-input"
+              value={productSearch}
+              onChange={(event) => {
+                setProductSearch(event.target.value);
+                setProductId('');
+              }}
+              placeholder="Search products..."
+              style={{ marginBottom: 'var(--space-2)' }}
+            />
             <select className="form-select" value={productId} onChange={(event) => setProductId(event.target.value)}>
               <option value="">Select product</option>
-              {state.products.map((product) => (
+              {filteredProducts.map((product) => (
                 <option key={product.id} value={product.id}>
                   {getProductDisplayName(product)}
                 </option>
               ))}
             </select>
+            {!filteredProducts.length ? (
+              <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                No products match this search.
+              </div>
+            ) : null}
+            {selectedProduct ? (
+              <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                Selected: <strong style={{ color: 'var(--color-text-primary)' }}>{getProductDisplayName(selectedProduct)}</strong>
+              </div>
+            ) : null}
           </div>
           <div className="grid-2">
             <div className="form-group">
@@ -230,7 +273,10 @@ function LogProductionModal({ onClose, onSave }) {
           <button
             className="btn btn-primary"
             type="button"
-            onClick={() => {
+            disabled={isSaving}
+            onClick={async () => {
+              if (isSaving) return;
+
               if (!productId || Number(quantity) <= 0 || !batchNumber.trim()) {
                 addToast('Complete all production fields.', 'warning');
                 return;
@@ -246,21 +292,35 @@ function LogProductionModal({ onClose, onSave }) {
                 return;
               }
 
-              onSave({
-                id: `batch-${Date.now()}`,
-                batchNumber: batchNumber.trim(),
-                productId,
-                productionDate,
-                qtyProduced: Number(quantity),
-                qtyRemaining: Number(quantity),
-                status: 'active',
-              });
+              setIsSaving(true);
+              try {
+                await onSave({
+                  id: `batch-${Date.now()}`,
+                  batchNumber: batchNumber.trim(),
+                  productId,
+                  productionDate,
+                  qtyProduced: Number(quantity),
+                  qtyRemaining: Number(quantity),
+                  status: 'active',
+                });
+              } finally {
+                setIsSaving(false);
+              }
             }}
           >
-            Log Production
+            {isSaving ? 'Logging...' : 'Log Production'}
           </button>
         </div>
       </div>
     </div>
   );
+}
+
+function getNextBatchNumber(batches) {
+  const nextNumber = batches.reduce((max, batch) => {
+    const match = /^B-(\d+)$/i.exec(batch.batchNumber?.trim() ?? '');
+    return match ? Math.max(max, Number(match[1])) : max;
+  }, 3019) + 1;
+
+  return `B-${nextNumber}`;
 }

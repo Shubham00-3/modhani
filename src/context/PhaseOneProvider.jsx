@@ -344,15 +344,21 @@ function reducer(state, action) {
 
           const nextItems = order.items.map((item) => {
             const override = action.payload.overrides.find((entry) => entry.orderItemId === item.id);
-            if (!override) return item;
+            if (!override) {
+              return {
+                ...item,
+                invoiceQty: item.fulfilledQty,
+              };
+            }
             return {
               ...item,
+              invoiceQty: item.fulfilledQty,
               overridePrice: override.overridePrice,
               overrideReason: override.overrideReason,
             };
           });
 
-          const invoiceTotal = nextItems.reduce((sum, item) => sum + item.fulfilledQty * getEffectiveItemPrice(item), 0);
+          const invoiceTotal = nextItems.reduce((sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item), 0);
 
           return {
             ...order,
@@ -364,6 +370,47 @@ function reducer(state, action) {
             invoiceEmailSentAt: action.payload.invoiceEmailSentAt,
           };
         }),
+      };
+    case 'EDIT_INVOICE':
+      return {
+        ...state,
+        orders: state.orders.map((order) => {
+          if (order.id !== action.payload.orderId) return order;
+
+          const nextItems = order.items.map((item) => {
+            const line = action.payload.lines.find((entry) => entry.orderItemId === item.id);
+            if (!line) return item;
+
+            return {
+              ...item,
+              invoiceQty: line.invoiceQty,
+              overridePrice: line.overridePrice,
+              overrideReason: line.overrideReason,
+            };
+          });
+          const invoiceTotal = nextItems.reduce((sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item), 0);
+
+          return {
+            ...order,
+            items: nextItems,
+            invoiceTotal,
+          };
+        }),
+        auditLog: [
+          {
+            id: `audit-${Date.now()}`,
+            timestamp: action.payload.timestamp,
+            action: 'invoice_updated',
+            orderId: action.payload.orderId,
+            clientId: state.orders.find((order) => order.id === action.payload.orderId)?.clientId ?? null,
+            userId: state.currentUserId,
+            userName: state.users.find((user) => user.id === state.currentUserId)?.name ?? 'Staff user',
+            details: `Invoice updated: ${action.payload.reason}`,
+            previousValue: null,
+            newValue: 'Invoice revised',
+          },
+          ...state.auditLog,
+        ],
       };
     case 'PUSH_QB_INVOICE':
       return {
@@ -461,6 +508,7 @@ const serverWorkflowActions = new Set([
   'APPLY_FULFILMENT_AND_DECLINE_REMAINING',
   'DECLINE_ORDER',
   'CREATE_INVOICE',
+  'EDIT_INVOICE',
   'PUSH_QB_INVOICE',
   'QUEUE_QB_INVOICE',
   'CONFIRM_SHIPMENT',
