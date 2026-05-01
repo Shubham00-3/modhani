@@ -181,6 +181,7 @@ function LogProductionModal({ onClose, onSave }) {
   const { state, addToast } = useApp();
   const [productId, setProductId] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [isProductSearchFocused, setIsProductSearchFocused] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [productionDate, setProductionDate] = useState(new Date().toISOString().slice(0, 10));
   const [batchNumber, setBatchNumber] = useState(() => getNextBatchNumber(state.batches));
@@ -206,6 +207,8 @@ function LogProductionModal({ onClose, onSave }) {
         return haystack.includes(search);
       });
   }, [productSearch, state.products]);
+  const productSuggestions = productSearch.trim() ? filteredProducts.slice(0, 8) : [];
+  const showProductSuggestions = isProductSearchFocused && productSearch.trim() && !productId;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -229,10 +232,67 @@ function LogProductionModal({ onClose, onSave }) {
                 setProductSearch(event.target.value);
                 setProductId('');
               }}
+              onFocus={() => setIsProductSearchFocused(true)}
+              onBlur={() => window.setTimeout(() => setIsProductSearchFocused(false), 120)}
               placeholder="Search products..."
               style={{ marginBottom: 'var(--space-2)' }}
             />
-            <select className="form-select" value={productId} onChange={(event) => setProductId(event.target.value)}>
+            {showProductSuggestions ? (
+              <div
+                style={{
+                  marginTop: 'calc(var(--space-2) * -1)',
+                  marginBottom: 'var(--space-2)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  background: 'var(--color-surface)',
+                  boxShadow: 'var(--shadow-sm)',
+                  overflow: 'hidden',
+                }}
+              >
+                {productSuggestions.length ? (
+                  productSuggestions.map((product) => (
+                    <button
+                      key={product.id}
+                      className="btn btn-ghost"
+                      type="button"
+                      style={{
+                        width: '100%',
+                        justifyContent: 'space-between',
+                        borderRadius: 0,
+                        padding: '8px 12px',
+                        minHeight: 36,
+                      }}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        setProductId(product.id);
+                        setProductSearch(getProductDisplayName(product));
+                        setIsProductSearchFocused(false);
+                      }}
+                    >
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {getProductDisplayName(product)}
+                      </span>
+                      <span className="cell-monospace" style={{ color: 'var(--color-text-muted)', marginLeft: 'var(--space-3)' }}>
+                        {product.qbItemName ?? ''}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <div style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                    No products match this search.
+                  </div>
+                )}
+              </div>
+            ) : null}
+            <select
+              className="form-select"
+              value={productId}
+              onChange={(event) => {
+                const nextProduct = getProduct(state.products, event.target.value);
+                setProductId(event.target.value);
+                setProductSearch(nextProduct ? getProductDisplayName(nextProduct) : productSearch);
+              }}
+            >
               <option value="">Select product</option>
               {filteredProducts.map((product) => (
                 <option key={product.id} value={product.id}>
