@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { BarChart3, RotateCcw, X } from 'lucide-react';
 import {
   Bar,
@@ -73,6 +74,7 @@ function formatBucket(date, period) {
 
 export default function PhaseOneReports() {
   const { state } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({
     clientId: '',
     locationId: '',
@@ -84,8 +86,9 @@ export default function PhaseOneReports() {
     period: 'daily',
   });
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
   const hasActiveFilters = Boolean(
-    filters.clientId || filters.locationId || filters.productId || filters.status || filters.batchNumber || filters.from || filters.to || filters.period !== 'daily'
+    filters.clientId || filters.locationId || filters.productId || filters.status || filters.batchNumber || filters.from || filters.to || filters.period !== 'daily' || dashboardSearch
   );
 
   const filteredReportRows = useMemo(() => {
@@ -100,10 +103,28 @@ export default function PhaseOneReports() {
       const matchesBatch = filters.batchNumber
         ? row.batchNumbers.toLowerCase().includes(filters.batchNumber.toLowerCase())
         : true;
+      const matchesSearch = dashboardSearch
+        ? [
+            row.orderNumber,
+            row.clientName,
+            row.locationName,
+            row.productDisplayName,
+            row.category,
+            row.status,
+            row.source,
+            row.batchNumbers,
+            row.invoiceNumber,
+            row.qbInvoiceNumber,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(dashboardSearch)
+        : true;
 
-      return matchesClient && matchesLocation && matchesStatus && matchesFrom && matchesTo && matchesProduct && matchesBatch;
+      return matchesClient && matchesLocation && matchesStatus && matchesFrom && matchesTo && matchesProduct && matchesBatch && matchesSearch;
     });
-  }, [filters, state.reportRows]);
+  }, [dashboardSearch, filters, state.reportRows]);
 
   const filteredOrders = useMemo(() => {
     const matchedIds = new Set(filteredReportRows.map((row) => row.orderId));
@@ -223,7 +244,11 @@ export default function PhaseOneReports() {
           type="button"
           disabled={!hasActiveFilters}
           onClick={() =>
-            setFilters({
+            {
+              const nextSearchParams = new URLSearchParams(searchParams);
+              nextSearchParams.delete('q');
+              setSearchParams(nextSearchParams);
+              setFilters({
               clientId: '',
               locationId: '',
               productId: '',
@@ -232,7 +257,8 @@ export default function PhaseOneReports() {
               from: '',
               to: '',
               period: 'daily',
-            })
+              });
+            }
           }
         >
           <RotateCcw size={14} /> Reset Filters

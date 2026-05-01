@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Package, Plus, Search, Settings2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatCurrency, getProductDisplayName, getProductImageUrl } from '../data/phaseOneData';
@@ -6,14 +7,16 @@ import { ProductModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneProducts() {
   const { state } = useApp();
+  const [searchParams] = useSearchParams();
   const canManage = state.currentUser.permissions.manageSettings;
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [productSearch, setProductSearch] = useState('');
+  const dashboardSearch = searchParams.get('q') ?? '';
 
   const filteredProducts = useMemo(() => {
-    const query = productSearch.trim().toLowerCase();
+    const query = (productSearch || dashboardSearch).trim().toLowerCase();
 
     if (!query) return state.products;
 
@@ -31,7 +34,7 @@ export default function PhaseOneProducts() {
         .toLowerCase()
         .includes(query)
     );
-  }, [productSearch, state.products]);
+  }, [dashboardSearch, productSearch, state.products]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>

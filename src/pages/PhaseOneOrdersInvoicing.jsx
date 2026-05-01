@@ -35,6 +35,7 @@ export default function PhaseOneOrdersInvoicing() {
   const { state, dispatch, addToast } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const dashboardView = searchParams.get('view') ?? '';
+  const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
   const canCreateOrders = state.clients.length > 0 && state.locations.length > 0 && state.products.length > 0;
   const [filters, setFilters] = useState({
     clientId: '',
@@ -47,7 +48,7 @@ export default function PhaseOneOrdersInvoicing() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
-  const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || dashboardView);
+  const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || dashboardView || dashboardSearch);
 
   const selectedOrder = state.orders.find((order) => order.id === selectedOrderId) ?? null;
 
@@ -78,8 +79,33 @@ export default function PhaseOneOrdersInvoicing() {
       .filter((order) => (filters.locationId ? order.locationId === filters.locationId : true))
       .filter((order) => (filters.status ? order.status === filters.status : true))
       .filter((order) => (filters.source ? order.source === filters.source : true))
+      .filter((order) => {
+        if (!dashboardSearch) return true;
+        const itemText = order.items
+          .map((item) => {
+            const product = getProduct(state.products, item.productId);
+            return [product ? getProductDisplayName(product) : '', product?.qbItemName, item.quantity, item.fulfilledQty]
+              .filter(Boolean)
+              .join(' ');
+          })
+          .join(' ');
+        return [
+          order.orderNumber,
+          order.status,
+          order.source,
+          order.invoiceNumber,
+          order.qbInvoiceNumber,
+          getClientName(state.clients, order.clientId),
+          getLocationName(state.locations, order.locationId),
+          itemText,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(dashboardSearch);
+      })
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [dashboardView, filters, state.orders]);
+  }, [dashboardSearch, dashboardView, filters, state.clients, state.locations, state.orders, state.products]);
 
   const dashboardViewLabel = {
     open: 'Open Orders',
@@ -100,12 +126,17 @@ export default function PhaseOneOrdersInvoicing() {
   }
 
   function updateFilters(updater) {
-    setSearchParams({});
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('view');
+    setSearchParams(nextSearchParams);
     setFilters(updater);
   }
 
   function resetFilters() {
-    setSearchParams({});
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('view');
+    nextSearchParams.delete('q');
+    setSearchParams(nextSearchParams);
     setFilters({ clientId: '', locationId: '', status: '', source: '' });
   }
 

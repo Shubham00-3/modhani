@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, FlaskConical, Plus, RotateCcw, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
@@ -10,18 +11,38 @@ import {
 
 export default function PhaseOneProductionBatches() {
   const { state, dispatch, addToast } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const canLogProduction = state.products.length > 0;
   const [showModal, setShowModal] = useState(false);
   const [productFilter, setProductFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
 
   const filteredBatches = useMemo(() => {
     return [...state.batches]
       .filter((batch) => (productFilter ? batch.productId === productFilter : true))
       .filter((batch) => (statusFilter ? batch.status === statusFilter : true))
+      .filter((batch) => {
+        if (!dashboardSearch) return true;
+        const product = getProduct(state.products, batch.productId);
+        return [
+          batch.batchNumber,
+          batch.status,
+          batch.productionDate,
+          batch.qtyProduced,
+          batch.qtyRemaining,
+          product ? getProductDisplayName(product) : '',
+          product?.qbItemName,
+          product?.category,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(dashboardSearch);
+      })
       .sort((a, b) => new Date(b.productionDate) - new Date(a.productionDate));
-  }, [productFilter, state.batches, statusFilter]);
-  const hasActiveFilters = Boolean(productFilter || statusFilter);
+  }, [dashboardSearch, productFilter, state.batches, state.products, statusFilter]);
+  const hasActiveFilters = Boolean(productFilter || statusFilter || dashboardSearch);
 
   const oldestActive = [...state.batches]
     .filter((batch) => batch.qtyRemaining > 0)
@@ -121,6 +142,9 @@ export default function PhaseOneProductionBatches() {
             onClick={() => {
               setProductFilter('');
               setStatusFilter('');
+              const nextSearchParams = new URLSearchParams(searchParams);
+              nextSearchParams.delete('q');
+              setSearchParams(nextSearchParams);
             }}
           >
             <RotateCcw size={14} /> Reset Filters

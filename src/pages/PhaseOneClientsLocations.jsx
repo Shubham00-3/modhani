@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Check, DollarSign, Plus, Search, Settings2, UserRoundCheck, Users } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatClientLocationScale } from '../data/phaseOneData';
@@ -6,16 +7,18 @@ import { ClientModal, LocationModal, PricingModal } from '../components/settings
 
 export default function PhaseOneClientsLocations() {
   const { state, dispatch, addToast } = useApp();
+  const [searchParams] = useSearchParams();
   const canManage = state.currentUser.permissions.manageSettings;
   const [editingClient, setEditingClient] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
   const [pricingClientId, setPricingClientId] = useState(null);
   const [contactDrafts, setContactDrafts] = useState({});
   const [clientSearch, setClientSearch] = useState('');
+  const dashboardSearch = searchParams.get('q') ?? '';
   const [showClientModal, setShowClientModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const filteredClients = useMemo(() => {
-    const query = clientSearch.trim().toLowerCase();
+    const query = (clientSearch || dashboardSearch).trim().toLowerCase();
     if (!query) return state.clients;
 
     return state.clients.filter((client) => {
@@ -37,7 +40,7 @@ export default function PhaseOneClientsLocations() {
 
       return searchableText.includes(query);
     });
-  }, [clientSearch, state.clients, state.locations]);
+  }, [clientSearch, dashboardSearch, state.clients, state.locations]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>

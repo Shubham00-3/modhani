@@ -1,11 +1,46 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Mail, Settings2, Users } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatDateTime } from '../data/phaseOneData';
 
 export default function PhaseOneSettings() {
   const { state, dispatch, addToast } = useApp();
+  const [searchParams] = useSearchParams();
   const canManage = state.currentUser.permissions.manageSettings;
+  const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
+  const settingSearchMatches = (values) => {
+    if (!dashboardSearch) return true;
+    return values
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+      .includes(dashboardSearch);
+  };
+  const visibleUsers = state.users.filter((user) =>
+    settingSearchMatches([
+      'user roles staff permissions fulfil orders override prices manage settings',
+      user.name,
+      user.role,
+      user.email,
+    ])
+  );
+  const visibleEmailClients = state.clients.filter((client) =>
+    settingSearchMatches([
+      'client email preferences packing slip invoice delivery method',
+      client.name,
+      client.qbCustomerName,
+      client.invoiceEmail,
+      client.packingSlipEmail,
+      client.deliveryMethod,
+    ])
+  );
+  const showQuickBooksSettings = settingSearchMatches([
+    'quickbooks connection connector company sync desktop settings',
+    state.quickBooks.companyName,
+    state.quickBooks.connectorName,
+    state.quickBooks.status,
+  ]);
   const staffSummary = {
     fulfilment: state.users.filter((user) => user.permissions.fulfilOrders).length,
     pricing: state.users.filter((user) => user.permissions.overridePrices).length,
@@ -59,7 +94,7 @@ export default function PhaseOneSettings() {
               </tr>
             </thead>
             <tbody>
-              {state.users.map((user) => (
+              {visibleUsers.map((user) => (
                 <tr key={user.id}>
                   <td style={{ fontWeight: 600 }}>{user.name}</td>
                   <td>
@@ -107,13 +142,15 @@ export default function PhaseOneSettings() {
           </table>
         </div>
 
-        <QuickBooksSettingsCard
-          key={`${state.quickBooks.companyName}:${state.quickBooks.connectorName}`}
-          canManage={canManage}
-          quickBooks={state.quickBooks}
-          dispatch={dispatch}
-          addToast={addToast}
-        />
+        {showQuickBooksSettings ? (
+          <QuickBooksSettingsCard
+            key={`${state.quickBooks.companyName}:${state.quickBooks.connectorName}`}
+            canManage={canManage}
+            quickBooks={state.quickBooks}
+            dispatch={dispatch}
+            addToast={addToast}
+          />
+        ) : null}
       </div>
 
       <div className="card">
@@ -130,7 +167,7 @@ export default function PhaseOneSettings() {
             </tr>
           </thead>
           <tbody>
-            {state.clients.map((client) => (
+              {visibleEmailClients.map((client) => (
               <tr key={client.id}>
                 <td style={{ fontWeight: 600 }}>{client.name}</td>
                 <td>

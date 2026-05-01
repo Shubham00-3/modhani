@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RotateCcw, ScrollText } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatDateTime, getClientName } from '../data/phaseOneData';
@@ -29,12 +30,14 @@ const ACTION_LABELS = {
 
 export default function PhaseOneAuditTrail() {
   const { state } = useApp();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filters, setFilters] = useState({
     action: '',
     order: '',
     user: '',
     clientId: '',
   });
+  const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
 
   const filteredLog = useMemo(() => {
     return state.auditLog
@@ -46,8 +49,26 @@ export default function PhaseOneAuditTrail() {
         return order ? String(order.orderNumber).includes(filters.order) : false;
       })
       .filter((entry) => (filters.clientId ? entry.clientId === filters.clientId : true))
+      .filter((entry) => {
+        if (!dashboardSearch) return true;
+        const order = entry.orderId ? state.orders.find((item) => item.id === entry.orderId) : null;
+        return [
+          ACTION_LABELS[entry.action] ?? entry.action,
+          entry.details,
+          entry.userName,
+          entry.previousValue,
+          entry.newValue,
+          entry.timestamp,
+          entry.clientId ? getClientName(state.clients, entry.clientId) : '',
+          order ? order.orderNumber : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(dashboardSearch);
+      })
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-  }, [filters, state.auditLog, state.orders]);
+  }, [dashboardSearch, filters, state.auditLog, state.clients, state.orders]);
 
   const actions = [...new Set(state.auditLog.map((entry) => entry.action))];
   const summary = useMemo(() => {
@@ -62,7 +83,7 @@ export default function PhaseOneAuditTrail() {
       todayEvents: filteredLog.filter((entry) => entry.timestamp.slice(0, 10) === today).length,
     };
   }, [filteredLog]);
-  const hasActiveFilters = Boolean(filters.action || filters.order || filters.user || filters.clientId);
+  const hasActiveFilters = Boolean(filters.action || filters.order || filters.user || filters.clientId || dashboardSearch);
 
   return (
     <div>
@@ -103,7 +124,12 @@ export default function PhaseOneAuditTrail() {
           className="btn btn-secondary"
           type="button"
           disabled={!hasActiveFilters}
-          onClick={() => setFilters({ action: '', order: '', user: '', clientId: '' })}
+          onClick={() => {
+            const nextSearchParams = new URLSearchParams(searchParams);
+            nextSearchParams.delete('q');
+            setSearchParams(nextSearchParams);
+            setFilters({ action: '', order: '', user: '', clientId: '' });
+          }}
         >
           <RotateCcw size={14} /> Reset Filters
         </button>

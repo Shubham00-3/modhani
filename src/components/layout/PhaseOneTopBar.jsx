@@ -46,8 +46,7 @@ export default function PhaseOneTopBar() {
   const [notificationPanelPath, setNotificationPanelPath] = useState(null);
   const notificationPanelRef = useRef(null);
   const currentTitle = pageTitles[location.pathname] || 'ModhaniOS';
-  const isOverview = location.pathname === '/';
-  const dashboardSearchValue = isOverview ? searchParams.get('q') ?? '' : '';
+  const dashboardSearchValue = searchParams.get('q') ?? '';
   const qbHealthy = state.quickBooks.connected && state.quickBooks.status === 'connected';
   const currentUser = state.currentUser ?? { id: '', initials: '?', name: 'Staff user', role: 'staff' };
   const qbStatusLabel = qbHealthy ? 'Connected' : 'Not Configured Yet';
@@ -56,8 +55,6 @@ export default function PhaseOneTopBar() {
   const notificationsOpen = notificationPanelPath === location.pathname;
 
   function handleDashboardSearchChange(event) {
-    if (!isOverview) return;
-
     const nextSearchParams = new URLSearchParams(searchParams);
     const value = event.target.value;
 
@@ -121,9 +118,8 @@ export default function PhaseOneTopBar() {
           <Search size={16} />
           <input
             type="search"
-            placeholder={isOverview ? 'Search dashboard...' : 'Dashboard search available on Overview'}
+            placeholder="Search dashboard..."
             value={dashboardSearchValue}
-            disabled={!isOverview}
             onChange={handleDashboardSearchChange}
           />
         </label>
