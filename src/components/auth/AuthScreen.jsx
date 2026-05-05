@@ -48,11 +48,31 @@ export default function AuthScreen() {
           </div>
 
           <div className="auth-product-stage" aria-hidden="true">
-            <img className="auth-product auth-product-ghee" src="/product-images/desi-ghee-800gms.jpg" alt="" />
-            <img className="auth-product auth-product-yogurt" src="/product-images/balkan-yogurt-750g-6.jpg" alt="" />
-            <img className="auth-product auth-product-milk" src="/product-images/a2-milk-4l-2.jpg" alt="" />
-            <img className="auth-product auth-product-lassi" src="/product-images/3-mango-lassi-350ml.jpg" alt="" />
-            <img className="auth-product auth-product-jam" src="/product-images/clarite-strawberry-fruit-jam-500g.jpg" alt="" />
+            <div className="auth-product-card auth-product-ghee">
+              <div className="auth-product-card-visual">
+                <img className="auth-product" src="/product-images/desi-ghee-800gms.jpg" alt="" />
+              </div>
+            </div>
+            <div className="auth-product-card auth-product-yogurt">
+              <div className="auth-product-card-visual">
+                <img className="auth-product" src="/product-images/balkan-yogurt-750g-6.jpg" alt="" />
+              </div>
+            </div>
+            <div className="auth-product-card auth-product-milk">
+              <div className="auth-product-card-visual">
+                <img className="auth-product" src="/product-images/a2-milk-4l-2.jpg" alt="" />
+              </div>
+            </div>
+            <div className="auth-product-card auth-product-lassi">
+              <div className="auth-product-card-visual">
+                <img className="auth-product" src="/product-images/3-mango-lassi-350ml.jpg" alt="" />
+              </div>
+            </div>
+            <div className="auth-product-card auth-product-jam">
+              <div className="auth-product-card-visual">
+                <img className="auth-product" src="/product-images/clarite-strawberry-fruit-jam-500g.jpg" alt="" />
+              </div>
+            </div>
           </div>
         </section>
 
