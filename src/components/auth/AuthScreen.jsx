@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Building2, LockKeyhole, UserRoundPlus } from 'lucide-react';
+import { ArrowRight, Building2, LockKeyhole, Mail, ShoppingCart, UserRoundPlus } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 
 export default function AuthScreen() {
@@ -34,50 +34,33 @@ export default function AuthScreen() {
   }
 
   return (
-    <div
-      className="auth-screen"
-      style={{
-        minHeight: '100vh',
-        display: 'grid',
-        placeItems: 'center',
-        padding: '32px',
-        background:
-          'radial-gradient(circle at top left, rgba(209,161,78,0.14), transparent 28%), linear-gradient(180deg, #f4f7f4 0%, #eef2ef 100%)',
-      }}
-    >
-      <div
-        className="auth-shell"
-        style={{
-          width: 'min(960px, 100%)',
-          display: 'grid',
-          gridTemplateColumns: 'minmax(0, 1.2fr) minmax(0, 1fr)',
-          gap: '24px',
-        }}
-      >
-        <section
-          className="card"
-          style={{
-            padding: '32px',
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'space-between',
-            gap: '24px',
-          }}
-        >
-          <div>
-            <h1 className="auth-title" style={{ fontSize: '40px', lineHeight: 1.05, margin: '18px 0 10px' }}>
-              {accountType === 'staff' ? 'Staff Sign In' : 'Customer Portal'}
+    <div className="auth-screen">
+      <div className="auth-shell auth-portal-shell">
+        <section className="auth-market-panel">
+          <div className="auth-market-copy">
+            <div className="auth-kicker">Welcome</div>
+            <h1 className="auth-title">
+              Wholesome Dairy & Jams, Delivered <span>Fresh.</span>
             </h1>
-            <p style={{ color: 'var(--color-text-secondary)', fontSize: '16px', maxWidth: '40ch' }}>
-              {accountType === 'staff'
-                ? 'Sign in with your internal staff account to access ModhaniOS.'
-                : 'Customers can sign in or request access to place portal orders.'}
+            <p>
+              Access Modhani portals for staff operations and customer order placement.
             </p>
+          </div>
+
+          <div className="auth-product-stage" aria-hidden="true">
+            <img className="auth-product auth-product-ghee" src="/product-images/desi-ghee-800gms.jpg" alt="" />
+            <img className="auth-product auth-product-yogurt" src="/product-images/balkan-yogurt-750g-6.jpg" alt="" />
+            <img className="auth-product auth-product-milk" src="/product-images/a2-milk-4l-2.jpg" alt="" />
+            <img className="auth-product auth-product-lassi" src="/product-images/3-mango-lassi-350ml.jpg" alt="" />
+            <img className="auth-product auth-product-jam" src="/product-images/clarite-strawberry-fruit-jam-500g.jpg" alt="" />
           </div>
         </section>
 
-        <section className="card" style={{ padding: '32px' }}>
-          <div className="auth-choice-tabs" style={{ marginBottom: '20px' }}>
+        <section className="auth-form-card auth-portal-card">
+          <img className="auth-card-logo" src="/modhani-logo.svg" alt="Modhani" />
+          <div className="auth-card-title">LOGIN / SIGNUP</div>
+
+          <div className="auth-choice-tabs">
             <button
               className={`auth-choice-tab ${accountType === 'staff' ? 'active' : ''}`}
               type="button"
@@ -87,7 +70,7 @@ export default function AuthScreen() {
                 setNotice('');
               }}
             >
-              <LockKeyhole size={16} /> Staff Login
+              <LockKeyhole size={16} /> Staff Portal
             </button>
             <button
               className={`auth-choice-tab ${accountType === 'customer' ? 'active' : ''}`}
@@ -98,35 +81,25 @@ export default function AuthScreen() {
                 setNotice('');
               }}
             >
-              <Building2 size={16} /> Customer Login
+              <Building2 size={16} /> Customer Portal
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
-            <div
-              style={{
-                width: '42px',
-                height: '42px',
-                borderRadius: '12px',
-                display: 'grid',
-                placeItems: 'center',
-                background: 'rgba(26,48,33,0.1)',
-                color: 'var(--color-primary)',
-              }}
-            >
+          <div className="auth-form-heading">
+            <div className="auth-form-icon">
               {accountType === 'staff' ? <LockKeyhole size={18} /> : <UserRoundPlus size={18} />}
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: '18px' }}>
+              <div className="auth-form-title">
                 {accountType === 'staff' ? 'Login' : customerMode === 'signin' ? 'Customer Sign In' : 'Customer Sign Up'}
               </div>
-              <div style={{ color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-                {accountType === 'staff' ? 'Internal staff access only' : 'Order portal access'}
+              <div className="auth-form-subtitle">
+                {accountType === 'staff' ? 'Internal access only' : 'Order portal access'}
               </div>
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form className="auth-form" onSubmit={handleSubmit}>
             {accountType === 'customer' ? (
               <div className="auth-mode-switch">
                 <button
@@ -157,18 +130,27 @@ export default function AuthScreen() {
             {accountType === 'customer' && customerMode === 'signup' ? (
               <div className="form-group">
                 <label className="form-label">Full Name</label>
-                <input className="form-input" value={fullName} onChange={(event) => setFullName(event.target.value)} required />
+                <div className="auth-input-wrap">
+                  <UserRoundPlus size={16} />
+                  <input className="form-input" placeholder="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} required />
+                </div>
               </div>
             ) : null}
 
             <div className="form-group">
               <label className="form-label">Email</label>
-              <input className="form-input" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+              <div className="auth-input-wrap">
+                <Mail size={16} />
+                <input className="form-input" type="email" placeholder="Email address" value={email} onChange={(event) => setEmail(event.target.value)} required />
+              </div>
             </div>
 
             <div className="form-group">
               <label className="form-label">Password</label>
-              <input className="form-input" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+              <div className="auth-input-wrap">
+                <LockKeyhole size={16} />
+                <input className="form-input" type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+              </div>
             </div>
 
             {error ? (
@@ -199,10 +181,24 @@ export default function AuthScreen() {
                   : 'Sign In'}
               {!submitting ? <ArrowRight size={16} /> : null}
             </button>
+
+            <div className="auth-card-footer">
+              {accountType === 'customer' ? (
+                <>
+                  <ShoppingCart size={15} />
+                  <span>Customer accounts need staff approval before ordering.</span>
+                </>
+              ) : (
+                <>
+                  <LockKeyhole size={15} />
+                  <span>Staff accounts are managed by Modhani admins.</span>
+                </>
+              )}
+            </div>
           </form>
 
           {state.authError ? (
-            <div style={{ marginTop: '16px', color: 'var(--color-text-secondary)', fontSize: '13px' }}>
+            <div className="auth-config-note">
               {state.authError}
             </div>
           ) : null}
