@@ -10,7 +10,7 @@ export function ProductModal({ product, onClose }) {
   const { state, dispatch, addToast } = useApp();
   const initialUnit = parseUnitSize(product?.unitSize);
   const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(getProductImageUrl(product) || '');
+  const [imagePreview, setImagePreview] = useState(getProductImageUrl(product, { fallback: true }));
   const [form, setForm] = useState(
     product
       ? {
@@ -144,7 +144,11 @@ export function ProductModal({ product, onClose }) {
         <label className="form-label">Product Image</label>
         <div className="product-image-editor">
           <div className="product-image-preview">
-            {imagePreview ? <img src={imagePreview} alt={form.name || 'Product'} /> : <span>No image</span>}
+            <img
+              className={!form.imageUrl && !form.imagePath && !imageFile ? 'product-image-fallback' : ''}
+              src={imagePreview || getProductImageUrl(null, { fallback: true })}
+              alt={form.name || 'Modhani logo placeholder'}
+            />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', minWidth: 0 }}>
             <input
@@ -164,7 +168,7 @@ export function ProductModal({ product, onClose }) {
               value={form.imageUrl ?? ''}
               onChange={(event) => {
                 setForm((current) => ({ ...current, imageUrl: event.target.value, imagePath: '' }));
-                setImagePreview(event.target.value);
+                setImagePreview(event.target.value || getProductImageUrl(null, { fallback: true }));
               }}
               placeholder="Or paste a public image URL"
             />

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Package, Plus, Search, Settings2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
-import { formatCurrency, getProductDisplayName, getProductImageUrl } from '../data/phaseOneData';
+import { formatCurrency, getProductDisplayName, getProductImageUrl, hasProductImage } from '../data/phaseOneData';
 import { ProductModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneProducts() {
@@ -154,30 +154,25 @@ export default function PhaseOneProducts() {
 }
 
 function ProductThumbnail({ product, onPreview }) {
-  const imageUrl = getProductImageUrl(product);
-
-  if (!imageUrl) {
-    return (
-      <div className="product-thumb" title="No product image yet">
-        <Package size={18} />
-      </div>
-    );
-  }
+  const imageUrl = getProductImageUrl(product, { fallback: true });
+  const usesFallback = !hasProductImage(product);
 
   return (
     <button
-      className="product-thumb product-thumb-button"
+      className={`product-thumb product-thumb-button ${usesFallback ? 'product-thumb-fallback' : ''}`}
       type="button"
       onClick={() => onPreview(product)}
-      aria-label={`Open ${getProductDisplayName(product)} image`}
+      aria-label={`Open ${usesFallback ? 'Modhani logo placeholder for' : ''} ${getProductDisplayName(product)} image`}
+      title={usesFallback ? 'No product image yet. Showing Modhani logo.' : `Open ${getProductDisplayName(product)} image`}
     >
-      <img src={imageUrl} alt={getProductDisplayName(product)} />
+      <img src={imageUrl} alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)} />
     </button>
   );
 }
 
 function ProductImageLightbox({ product, onClose }) {
-  const imageUrl = getProductImageUrl(product);
+  const imageUrl = getProductImageUrl(product, { fallback: true });
+  const usesFallback = !hasProductImage(product);
 
   return (
     <div className="modal-overlay product-image-lightbox-overlay" onClick={onClose}>
@@ -185,7 +180,9 @@ function ProductImageLightbox({ product, onClose }) {
         <div className="product-image-lightbox-header">
           <div>
             <div className="product-image-lightbox-title">{getProductDisplayName(product)}</div>
-            <div className="product-image-lightbox-meta">{product.category || 'Product image'}</div>
+            <div className="product-image-lightbox-meta">
+              {usesFallback ? 'No product photo yet. Showing Modhani logo placeholder.' : product.category || 'Product image'}
+            </div>
           </div>
           <button className="btn btn-ghost" type="button" onClick={onClose} aria-label="Close product image">
             <X size={18} />

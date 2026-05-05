@@ -123,8 +123,15 @@ export function getProductDisplayName(product) {
   return `${product.name} ${product.unitSize}`;
 }
 
-export function getProductImageUrl(product) {
-  return product?.imageUrl || product?.imagePath || '';
+export const PRODUCT_IMAGE_FALLBACK_URL = '/modhani-logo.svg';
+
+export function hasProductImage(product) {
+  return Boolean((product?.imageUrl || product?.imagePath || '').trim());
+}
+
+export function getProductImageUrl(product, options = {}) {
+  const imageUrl = (product?.imageUrl || product?.imagePath || '').trim();
+  return imageUrl || (options.fallback ? PRODUCT_IMAGE_FALLBACK_URL : '');
 }
 
 export function getClientName(clients, clientId) {

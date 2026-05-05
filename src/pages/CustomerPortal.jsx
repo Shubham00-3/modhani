@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Building2, CheckCircle2, LogOut, Package, Send, ShoppingCart } from 'lucide-react';
 import { useApp } from '../context/useApp';
-import { formatCurrency, formatDateTime, getProductDisplayName, getProductImageUrl } from '../data/phaseOneData';
+import { formatCurrency, formatDateTime, getProductDisplayName, getProductImageUrl, hasProductImage } from '../data/phaseOneData';
 
 export default function CustomerPortal() {
   const { state, logout, completeCustomerProfile, submitPortalOrder } = useApp();
@@ -171,14 +171,19 @@ export default function CustomerPortal() {
         <section className="customer-products-list">
           {portal.products.length ? (
             portal.products.map((product) => {
-              const imageUrl = getProductImageUrl(product);
+              const imageUrl = getProductImageUrl(product, { fallback: true });
+              const usesFallback = !hasProductImage(product);
               const quantity = quantities[product.id] ?? '';
               const lineTotal = Number(quantity || 0) * product.clientPrice;
 
               return (
                 <article className="customer-product-row" key={product.id}>
                   <div className="customer-product-image">
-                    {imageUrl ? <img src={imageUrl} alt={getProductDisplayName(product)} /> : <Package size={22} />}
+                    <img
+                      className={usesFallback ? 'product-image-fallback' : ''}
+                      src={imageUrl}
+                      alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)}
+                    />
                   </div>
                   <div className="customer-product-info">
                     <h3>{getProductDisplayName(product)}</h3>

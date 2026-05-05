@@ -1566,6 +1566,18 @@ input[type='checkbox']:disabled {
   display: block;
 }
 
+.product-thumb-fallback,
+.product-image-preview:has(.product-image-fallback),
+.customer-product-image:has(.product-image-fallback) {
+  background: #eef6f1;
+}
+
+.product-thumb-fallback img,
+.product-image-fallback {
+  padding: var(--space-2);
+  opacity: 0.9;
+}
+
 .product-image-editor {
   display: grid;
   grid-template-columns: 112px minmax(0, 1fr);
@@ -1852,6 +1864,10 @@ input[type='checkbox']:disabled {
   width: 100%;
   height: 100%;
   object-fit: contain;
+}
+
+.customer-product-image .product-image-fallback {
+  padding: var(--space-4);
 }
 
 .customer-product-info h3 {

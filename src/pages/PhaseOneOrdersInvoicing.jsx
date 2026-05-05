@@ -27,6 +27,7 @@ import {
   getProduct,
   getProductDisplayName,
   getProductImageUrl,
+  hasProductImage,
   isLocationShipToReady,
 } from '../data/phaseOneData';
 import { printInvoice, printPackingSlip } from '../utils/printDocuments';
@@ -1565,11 +1566,15 @@ function AddOrderModal({ onClose }) {
 }
 
 function ProductThumbnail({ product }) {
-  const imageUrl = getProductImageUrl(product);
+  const imageUrl = getProductImageUrl(product, { fallback: true });
+  const usesFallback = !hasProductImage(product);
 
   return (
-    <div className="product-thumb product-thumb-sm">
-      {imageUrl ? <img src={imageUrl} alt={getProductDisplayName(product)} /> : <Package size={16} />}
+    <div
+      className={`product-thumb product-thumb-sm ${usesFallback ? 'product-thumb-fallback' : ''}`}
+      title={usesFallback ? 'No product image yet. Showing Modhani logo.' : getProductDisplayName(product)}
+    >
+      <img src={imageUrl} alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)} />
     </div>
   );
 }
