@@ -1174,7 +1174,7 @@ function EditInvoiceModal({ order, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
+      <div className="modal modal-order" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Edit Invoice {order.invoiceNumber}</h3>
           <button className="btn btn-ghost" type="button" onClick={onClose}>
@@ -1299,34 +1299,23 @@ function EditInvoiceModal({ order, onClose }) {
 function AddOrderModal({ onClose }) {
   const { state, dispatch, addToast, addAudit } = useApp();
   const [clientId, setClientId] = useState(state.clients[0]?.id ?? '');
-  const [clientSearch, setClientSearch] = useState(state.clients[0]?.name ?? '');
-  const [isClientSearchFocused, setIsClientSearchFocused] = useState(false);
   const [locationId, setLocationId] = useState(
     () => state.locations.find((location) => location.clientId === (state.clients[0]?.id ?? ''))?.id ?? ''
   );
   const [source, setSource] = useState('portal');
-  const [lines, setLines] = useState([{ id: 'line-1', productId: '', productSearch: '', quantity: '' }]);
+  const [lines, setLines] = useState([{ id: 'line-1', productId: '', quantity: '' }]);
 
   const locationOptions = state.locations.filter((location) => location.clientId === clientId);
-  const filteredClients = useMemo(() => {
-    const search = clientSearch.trim().toLowerCase();
-    if (!search || clientId) return state.clients;
-
-    return state.clients.filter((client) => client.name.toLowerCase().includes(search));
-  }, [clientId, clientSearch, state.clients]);
-  const clientSuggestions = clientSearch.trim() && !clientId ? filteredClients.slice(0, 8) : [];
-  const showClientSuggestions = isClientSearchFocused && clientSearch.trim() && !clientId;
 
   function selectClient(nextClientId) {
     const nextClient = state.clients.find((client) => client.id === nextClientId);
     const nextLocationId = state.locations.find((location) => location.clientId === nextClientId)?.id ?? '';
-    setClientId(nextClientId);
-    setClientSearch(nextClient?.name ?? '');
+    setClientId(nextClient?.id ?? '');
     setLocationId(nextLocationId);
   }
 
   function addLine() {
-    setLines((current) => [...current, { id: `line-${Date.now()}`, productId: '', productSearch: '', quantity: '' }]);
+    setLines((current) => [...current, { id: `line-${Date.now()}`, productId: '', quantity: '' }]);
   }
 
   function removeLine(lineId) {
@@ -1428,7 +1417,7 @@ function AddOrderModal({ onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
+      <div className="modal modal-order" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Add Incoming Order</h3>
           <button className="btn btn-ghost" type="button" onClick={onClose}>
@@ -1439,58 +1428,16 @@ function AddOrderModal({ onClose }) {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Client</label>
-              <input
-                className="form-input"
-                value={clientSearch}
-                onChange={(event) => {
-                  setClientSearch(event.target.value);
-                  setClientId('');
-                  setLocationId('');
-                }}
-                onFocus={() => setIsClientSearchFocused(true)}
-                onBlur={() => window.setTimeout(() => setIsClientSearchFocused(false), 120)}
-                placeholder="Search client..."
-                style={{ marginBottom: 'var(--space-2)' }}
-              />
-              {showClientSuggestions ? (
-                <SearchSuggestionList emptyMessage="No clients match this search.">
-                  {clientSuggestions.map((client) => (
-                    <button
-                      key={client.id}
-                      className="btn btn-ghost"
-                      type="button"
-                      style={suggestionButtonStyle}
-                      onMouseDown={(event) => {
-                        event.preventDefault();
-                        selectClient(client.id);
-                        setIsClientSearchFocused(false);
-                      }}
-                    >
-                      <span style={suggestionTextStyle}>{client.name}</span>
-                      <span className="cell-monospace" style={suggestionMetaStyle}>
-                        {client.locationCount ?? 0} loc
-                      </span>
-                    </button>
-                  ))}
-                </SearchSuggestionList>
-              ) : null}
-              <select
-                className="form-select"
+              <SearchableSelect
                 value={clientId}
-                onChange={(event) => selectClient(event.target.value)}
-              >
-                <option value="">Select client</option>
-                {filteredClients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-              {!filteredClients.length ? (
-                <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                  No clients match this search.
-                </div>
-              ) : null}
+                options={state.clients}
+                placeholder="Search or select client"
+                emptyMessage="No clients match this search."
+                getOptionValue={(client) => client.id}
+                getOptionLabel={(client) => client.name}
+                getOptionMeta={(client) => `${client.locationCount ?? 0} loc`}
+                onChange={selectClient}
+              />
             </div>
 
             <div className="form-group">
@@ -1558,143 +1505,34 @@ function AddOrderModal({ onClose }) {
   );
 }
 
-const suggestionButtonStyle = {
-  width: '100%',
-  justifyContent: 'space-between',
-  borderRadius: 0,
-  padding: '8px 12px',
-  minHeight: 36,
-};
-
-const suggestionTextStyle = {
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-};
-
-const suggestionMetaStyle = {
-  color: 'var(--color-text-muted)',
-  marginLeft: 'var(--space-3)',
-};
-
-function SearchSuggestionList({ children, emptyMessage }) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
-
-  return (
-    <div
-      style={{
-        marginTop: 'calc(var(--space-2) * -1)',
-        marginBottom: 'var(--space-2)',
-        border: '1px solid var(--color-border)',
-        borderRadius: 'var(--radius-md)',
-        background: 'var(--color-surface)',
-        boxShadow: 'var(--shadow-sm)',
-        overflow: 'hidden',
-      }}
-    >
-      {hasChildren ? (
-        children
-      ) : (
-        <div style={{ padding: 'var(--space-3)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-          {emptyMessage}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) {
-  const [isProductSearchFocused, setIsProductSearchFocused] = useState(false);
-  const filteredProducts = useMemo(() => {
-    const search = (line.productSearch ?? '').trim().toLowerCase();
-    if (!search || line.productId) return products;
-
-    return products.filter((product) =>
-      [
-        product.name,
-        product.unitSize,
-        product.category,
-        product.qbItemName,
-        getProductDisplayName(product),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(search)
-    );
-  }, [line.productId, line.productSearch, products]);
-  const productSuggestions = (line.productSearch ?? '').trim() && !line.productId ? filteredProducts.slice(0, 8) : [];
-  const showProductSuggestions = isProductSearchFocused && (line.productSearch ?? '').trim() && !line.productId;
-
-  function selectProduct(productId) {
-    const nextProduct = getProduct(products, productId);
-    onUpdateLine({
-      productId,
-      productSearch: nextProduct ? getProductDisplayName(nextProduct) : line.productSearch,
-    });
-  }
-
   return (
     <div className="order-line-editor">
       <div className="form-group">
         <label className="form-label">Product</label>
         <div className="product-select-with-thumb">
           <ProductThumbnail product={getProduct(products, line.productId)} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <input
-              className="form-input"
-              value={line.productSearch ?? ''}
-              onChange={(event) =>
-                onUpdateLine({
-                  productSearch: event.target.value,
-                  productId: '',
-                })
-              }
-              onFocus={() => setIsProductSearchFocused(true)}
-              onBlur={() => window.setTimeout(() => setIsProductSearchFocused(false), 120)}
-              placeholder="Search product..."
-              style={{ marginBottom: 'var(--space-2)' }}
-            />
-            {showProductSuggestions ? (
-              <SearchSuggestionList emptyMessage="No products match this search.">
-                {productSuggestions.map((product) => (
-                  <button
-                    key={product.id}
-                    className="btn btn-ghost"
-                    type="button"
-                    style={suggestionButtonStyle}
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      selectProduct(product.id);
-                      setIsProductSearchFocused(false);
-                    }}
-                  >
-                    <span style={suggestionTextStyle}>{getProductDisplayName(product)}</span>
-                    <span className="cell-monospace" style={suggestionMetaStyle}>
-                      {product.qbItemName ?? ''}
-                    </span>
-                  </button>
-                ))}
-              </SearchSuggestionList>
-            ) : null}
-            <select
-              className="form-select"
-              value={line.productId}
-              onChange={(event) => selectProduct(event.target.value)}
-            >
-              <option value="">Select product</option>
-              {filteredProducts.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {getProductDisplayName(product)}
-                </option>
-              ))}
-            </select>
-            {!filteredProducts.length ? (
-              <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                No products match this search.
-              </div>
-            ) : null}
-          </div>
+          <SearchableSelect
+            value={line.productId}
+            options={products}
+            placeholder="Search or select product"
+            emptyMessage="No products match this search."
+            getOptionValue={(product) => product.id}
+            getOptionLabel={getProductDisplayName}
+            getOptionMeta={(product) => product.qbItemName ?? ''}
+            getSearchText={(product) =>
+              [
+                product.name,
+                product.unitSize,
+                product.category,
+                product.qbItemName,
+                getProductDisplayName(product),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            onChange={(productId) => onUpdateLine({ productId })}
+          />
         </div>
       </div>
 
@@ -1718,6 +1556,85 @@ function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) 
           Remove Line
         </button>
       </div>
+    </div>
+  );
+}
+
+function SearchableSelect({
+  value,
+  options,
+  placeholder,
+  emptyMessage,
+  getOptionValue,
+  getOptionLabel,
+  getOptionMeta,
+  getSearchText,
+  onChange,
+}) {
+  const selectedOption = options.find((option) => getOptionValue(option) === value);
+  const selectedLabel = selectedOption ? getOptionLabel(selectedOption) : '';
+  const [query, setQuery] = useState(selectedLabel);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const filteredOptions = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const selectedQuery = selectedLabel.trim().toLowerCase();
+    const showAll = !normalizedQuery || (selectedOption && normalizedQuery === selectedQuery);
+
+    if (showAll) return options;
+
+    return options.filter((option) => {
+      const searchableText = (getSearchText ? getSearchText(option) : getOptionLabel(option)).toLowerCase();
+      return searchableText.includes(normalizedQuery);
+    });
+  }, [getOptionLabel, getSearchText, options, query, selectedLabel, selectedOption]);
+  function handleQueryChange(nextQuery) {
+    setQuery(nextQuery);
+    if (selectedOption && nextQuery !== selectedLabel) {
+      onChange('');
+    }
+  }
+
+  function selectOption(option) {
+    const nextValue = getOptionValue(option);
+    onChange(nextValue);
+    setQuery(getOptionLabel(option));
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="searchable-select">
+      <input
+        className="form-input searchable-select-input"
+        value={query}
+        placeholder={placeholder}
+        onChange={(event) => handleQueryChange(event.target.value)}
+        onFocus={() => setIsOpen(true)}
+        onBlur={() => window.setTimeout(() => setIsOpen(false), 150)}
+      />
+      <span className="searchable-select-caret">v</span>
+      {isOpen ? (
+        <div className="searchable-select-menu">
+          {filteredOptions.length ? (
+            filteredOptions.map((option) => (
+              <button
+                key={getOptionValue(option)}
+                className="searchable-select-option"
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  selectOption(option);
+                }}
+              >
+                <span>{getOptionLabel(option)}</span>
+                {getOptionMeta ? <span className="cell-monospace">{getOptionMeta(option)}</span> : null}
+              </button>
+            ))
+          ) : (
+            <div className="searchable-select-empty">{emptyMessage}</div>
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }

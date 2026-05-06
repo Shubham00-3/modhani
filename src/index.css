@@ -2115,6 +2115,11 @@ input[type='checkbox']:disabled {
   animation: slideUp var(--transition-slow);
 }
 
+.modal-order {
+  max-width: 760px;
+  overflow: visible;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -2285,7 +2290,7 @@ input[type='checkbox']:disabled {
 
 .order-line-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(140px, 1fr) auto;
+  grid-template-columns: minmax(0, 1.5fr) minmax(140px, 160px) auto;
   gap: var(--space-4);
   align-items: end;
 }
@@ -2295,6 +2300,86 @@ input[type='checkbox']:disabled {
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-3);
   align-items: center;
+}
+
+.searchable-select {
+  position: relative;
+  min-width: 0;
+  width: 100%;
+}
+
+.searchable-select-input {
+  padding-right: 34px;
+}
+
+.searchable-select-caret {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  pointer-events: none;
+  color: var(--color-text-muted);
+  font-size: 18px;
+  line-height: 1;
+  transform: translateY(-50%);
+}
+
+.searchable-select-menu {
+  position: absolute;
+  z-index: 210;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  box-shadow: var(--shadow-lg);
+}
+
+.searchable-select-option {
+  width: 100%;
+  min-height: 42px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  background: transparent;
+  color: var(--color-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.searchable-select-option:last-child {
+  border-bottom: 0;
+}
+
+.searchable-select-option:hover,
+.searchable-select-option:focus {
+  background: var(--color-bg);
+}
+
+.searchable-select-option span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchable-select-option .cell-monospace {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+}
+
+.searchable-select-empty {
+  padding: 10px 12px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
 }
 
 .product-image-lightbox-overlay {
