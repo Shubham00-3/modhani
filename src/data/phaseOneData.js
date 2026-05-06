@@ -151,12 +151,7 @@ export function getQuickBooksSyncLabel(order) {
 }
 
 export function isLocationShipToReady(location) {
-  return Boolean(
-    location?.addressLine1?.trim() &&
-      location?.city?.trim() &&
-      location?.province?.trim() &&
-      location?.postalCode?.trim()
-  );
+  return Boolean((location?.qbShipToName || location?.name)?.trim());
 }
 
 export function formatClientLocationScale(client, configuredCount = 0) {

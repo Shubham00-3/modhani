@@ -1,6 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
 const APP_NAME = 'ModhaniOS QuickBooks Connector';
+const QB_CUSTOMER_NAME_LIMIT = 41;
+const QB_ITEM_NAME_LIMIT = 31;
 const QB_ADDRESS_LINE_LIMIT = 41;
 
 export function getAdminClient() {
@@ -41,8 +43,19 @@ function qbAddressLine(value) {
   return compactText(value).slice(0, QB_ADDRESS_LINE_LIMIT);
 }
 
+function qbListName(value, limit) {
+  return compactText(value).slice(0, limit);
+}
+
 function getQuickBooksCustomerName(client, location) {
-  return compactText(location?.qb_ship_to_name || location?.name || client?.qb_customer_name || client?.name);
+  return qbListName(
+    location?.qb_ship_to_name || location?.name || client?.qb_customer_name || client?.name,
+    QB_CUSTOMER_NAME_LIMIT
+  );
+}
+
+function getQuickBooksItemName(product) {
+  return qbListName(product?.qb_item_name || `${product?.name ?? ''} ${product?.unit_size ?? ''}`, QB_ITEM_NAME_LIMIT);
 }
 
 function buildQuickBooksAddressXml(location, fallbackName) {
@@ -197,7 +210,7 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
   if (qbStatus.statusCode && qbStatus.statusCode !== '0') {
     if (isAlreadyExistsStatus(job, qbStatus)) {
       await markJobPushed(supabase, job, responseXml, null, getReferenceNumber(job));
-      return 100;
+      return getCompletionPercentage(supabase);
     }
 
     await failInvoiceJob(supabase, ticket, qbStatus.message || `QuickBooks rejected the ${job.job_type} job with status ${qbStatus.statusCode}.`);
@@ -206,7 +219,7 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
 
   if (job.job_type !== 'invoice') {
     await markJobPushed(supabase, job, responseXml, getTagValue(responseXml, 'ListID'), getReferenceNumber(job));
-    return 100;
+    return getCompletionPercentage(supabase);
   }
 
   const qbTxnId = getTagValue(responseXml, 'TxnID');
@@ -217,7 +230,11 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
   }
 
   await markJobPushed(supabase, job, responseXml, qbTxnId, qbRefNumber || `QB-${job.order_id}`);
-  return 100;
+  return getCompletionPercentage(supabase);
+}
+
+async function getCompletionPercentage(supabase) {
+  return (await hasPendingQuickBooksWork(supabase)) ? 50 : 100;
 }
 
 async function markJobPushed(supabase, job, responseXml, qbId, qbReference) {
@@ -364,7 +381,7 @@ async function buildInvoicePayload(supabase, orderId) {
 
 async function buildQuickBooksRequest(supabase, job) {
   if (job.job_type === 'customer') {
-    const payload = await buildCustomerPayload(supabase, job.entity_id);
+    const payload = await buildCustomerPayload(supabase, job);
     return buildCustomerAddRequest(payload);
   }
 
@@ -377,11 +394,24 @@ async function buildQuickBooksRequest(supabase, job) {
   return buildInvoiceAddRequest(payload);
 }
 
-async function buildCustomerPayload(supabase, clientId) {
+async function buildCustomerPayload(supabase, job) {
+  if (job.entity_type === 'location') {
+    const { data: location, error: locationError } = await supabase
+      .from('locations')
+      .select('*, clients(*)')
+      .eq('id', job.entity_id)
+      .single();
+
+    if (locationError) throw locationError;
+
+    const { clients, ...locationRecord } = location;
+    return { client: clients, location: locationRecord };
+  }
+
   const { data: client, error: clientError } = await supabase
     .from('clients')
     .select('*')
-    .eq('id', clientId)
+    .eq('id', job.entity_id)
     .single();
 
   if (clientError) throw clientError;
@@ -389,7 +419,7 @@ async function buildCustomerPayload(supabase, clientId) {
   const { data: location, error: locationError } = await supabase
     .from('locations')
     .select('*')
-    .eq('client_id', clientId)
+    .eq('client_id', job.entity_id)
     .order('created_at')
     .limit(1)
     .maybeSingle();
@@ -416,10 +446,10 @@ function buildCustomerAddRequest({ client, location }) {
 <?qbxml version="16.0"?>
 <QBXML>
   <QBXMLMsgsRq onError="stopOnError">
-    <CustomerAddRq requestID="${escapeXml(client.id)}">
+    <CustomerAddRq requestID="${escapeXml(location?.id || client.id)}">
       <CustomerAdd>
         <Name>${escapeXml(fullName)}</Name>
-        <CompanyName>${escapeXml(client.name)}</CompanyName>
+        <CompanyName>${escapeXml(qbAddressLine(client.name || fullName))}</CompanyName>
         <BillAddress>
           ${buildQuickBooksAddressXml(location, fullName)}
         </BillAddress>
@@ -433,7 +463,7 @@ function buildCustomerAddRequest({ client, location }) {
 }
 
 function buildItemAddRequest(product) {
-  const itemName = product.qb_item_name || `${product.name} ${product.unit_size}`.trim();
+  const itemName = getQuickBooksItemName(product);
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <?qbxml version="16.0"?>
@@ -490,7 +520,7 @@ function buildInvoiceLine({ item, product, batches }) {
 
   return `<InvoiceLineAdd>
           <ItemRef>
-            <FullName>${escapeXml(product.qb_item_name || `${product.name} ${product.unit_size}`.trim())}</FullName>
+            <FullName>${escapeXml(getQuickBooksItemName(product))}</FullName>
           </ItemRef>
           <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Batches: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
           <Quantity>${Number(item.invoice_qty ?? item.fulfilled_qty)}</Quantity>

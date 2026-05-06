@@ -185,30 +185,15 @@ export default function PhaseOneOrdersInvoicing() {
   }
 
   async function handleQueueQuickBooks(order) {
-    const client = state.clients.find((entry) => entry.id === order.clientId);
     const location = state.locations.find((entry) => entry.id === order.locationId);
-    const missingProduct = order.items
-      .filter((item) => item.fulfilledQty > 0)
-      .map((item) => state.products.find((product) => product.id === item.productId))
-      .find((product) => !product?.qbItemName?.trim());
 
     if (!order.invoiceNumber) {
       addToast('Create the ModhaniOS invoice before queueing QuickBooks sync.', 'warning');
       return;
     }
 
-    if (!client?.qbCustomerName?.trim()) {
-      addToast('Add the QuickBooks customer name on the client before syncing.', 'warning');
-      return;
-    }
-
     if (!isLocationShipToReady(location)) {
-      addToast('Add the full Ship-To address on the location before syncing.', 'warning');
-      return;
-    }
-
-    if (missingProduct) {
-      addToast(`Add the QuickBooks item name for ${getProductDisplayName(missingProduct)}.`, 'warning');
+      addToast('Add the QuickBooks customer/store name on the location before syncing.', 'warning');
       return;
     }
 

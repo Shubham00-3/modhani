@@ -981,7 +981,8 @@ export function AppProvider({ children }) {
           : await executeAdminAction(supabase, action, currentUser, previousState);
 
         if (error) {
-          addToast(`Save failed: ${error.message}`, 'warning');
+          const actionErrorPrefix = action.type === 'QUEUE_QB_INVOICE' ? 'QuickBooks queue failed' : 'Save failed';
+          addToast(`${actionErrorPrefix}: ${error.message}`, 'warning');
           return { ok: false, error };
         }
 
