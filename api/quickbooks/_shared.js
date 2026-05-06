@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const APP_NAME = 'ModhaniOS QuickBooks Connector';
+const QB_ADDRESS_LINE_LIMIT = 41;
 
 export function getAdminClient() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -30,6 +31,34 @@ export function getPublicBaseUrl(req) {
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   const proto = req.headers['x-forwarded-proto'] || 'https';
   return `${proto}://${host}`;
+}
+
+function compactText(value) {
+  return String(value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+function qbAddressLine(value) {
+  return compactText(value).slice(0, QB_ADDRESS_LINE_LIMIT);
+}
+
+function getQuickBooksCustomerName(client, location) {
+  return compactText(location?.qb_ship_to_name || location?.name || client?.qb_customer_name || client?.name);
+}
+
+function buildQuickBooksAddressXml(location, fallbackName) {
+  const address = location || {};
+  const addr1 = qbAddressLine(address.qb_ship_to_name || address.name || fallbackName);
+  const addr2 = qbAddressLine(address.address_line1);
+  const addr3 = qbAddressLine(address.address_line2);
+
+  return `
+          <Addr1>${escapeXml(addr1)}</Addr1>
+          <Addr2>${escapeXml(addr2)}</Addr2>
+          ${addr3 ? `<Addr3>${escapeXml(addr3)}</Addr3>` : ''}
+          <City>${escapeXml(compactText(address.city))}</City>
+          <State>${escapeXml(compactText(address.province))}</State>
+          <PostalCode>${escapeXml(compactText(address.postal_code))}</PostalCode>
+          <Country>${escapeXml(compactText(address.country) || 'Canada')}</Country>`;
 }
 
 export function soapEnvelope(body) {
@@ -381,8 +410,7 @@ async function buildItemPayload(supabase, productId) {
 }
 
 function buildCustomerAddRequest({ client, location }) {
-  const fullName = client.qb_customer_name || client.name;
-  const address = location || {};
+  const fullName = getQuickBooksCustomerName(client, location);
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <?qbxml version="16.0"?>
@@ -393,20 +421,10 @@ function buildCustomerAddRequest({ client, location }) {
         <Name>${escapeXml(fullName)}</Name>
         <CompanyName>${escapeXml(client.name)}</CompanyName>
         <BillAddress>
-          <Addr1>${escapeXml(fullName)}</Addr1>
-          <Addr2>${escapeXml(address.address_line1 || '')}</Addr2>
-          <City>${escapeXml(address.city || '')}</City>
-          <State>${escapeXml(address.province || '')}</State>
-          <PostalCode>${escapeXml(address.postal_code || '')}</PostalCode>
-          <Country>${escapeXml(address.country || 'Canada')}</Country>
+          ${buildQuickBooksAddressXml(location, fullName)}
         </BillAddress>
         <ShipAddress>
-          <Addr1>${escapeXml(address.qb_ship_to_name || address.name || fullName)}</Addr1>
-          <Addr2>${escapeXml(address.address_line1 || '')}</Addr2>
-          <City>${escapeXml(address.city || '')}</City>
-          <State>${escapeXml(address.province || '')}</State>
-          <PostalCode>${escapeXml(address.postal_code || '')}</PostalCode>
-          <Country>${escapeXml(address.country || 'Canada')}</Country>
+          ${buildQuickBooksAddressXml(location, fullName)}
         </ShipAddress>
       </CustomerAdd>
     </CustomerAddRq>
@@ -440,6 +458,7 @@ function buildItemAddRequest(product) {
 function buildInvoiceAddRequest({ order, lines }) {
   const client = order.clients;
   const location = order.locations;
+  const quickBooksCustomerName = getQuickBooksCustomerName(client, location);
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <?qbxml version="16.0"?>
@@ -448,18 +467,12 @@ function buildInvoiceAddRequest({ order, lines }) {
     <InvoiceAddRq requestID="${escapeXml(order.id)}">
       <InvoiceAdd>
         <CustomerRef>
-          <FullName>${escapeXml(client.qb_customer_name || client.name)}</FullName>
+          <FullName>${escapeXml(quickBooksCustomerName)}</FullName>
         </CustomerRef>
         <TxnDate>${escapeXml(toDate(order.invoiced_at || order.created_at))}</TxnDate>
         <RefNumber>${escapeXml(order.invoice_number)}</RefNumber>
         <ShipAddress>
-          <Addr1>${escapeXml(location.qb_ship_to_name || location.name)}</Addr1>
-          <Addr2>${escapeXml(location.address_line1 || '')}</Addr2>
-          ${location.address_line2 ? `<Addr3>${escapeXml(location.address_line2)}</Addr3>` : ''}
-          <City>${escapeXml(location.city || '')}</City>
-          <State>${escapeXml(location.province || '')}</State>
-          <PostalCode>${escapeXml(location.postal_code || '')}</PostalCode>
-          <Country>${escapeXml(location.country || 'Canada')}</Country>
+          ${buildQuickBooksAddressXml(location, quickBooksCustomerName)}
         </ShipAddress>
         <Memo>${escapeXml(`ModhaniOS Order #${order.order_number}`)}</Memo>
         ${lines.map(buildInvoiceLine).join('')}
