@@ -2764,6 +2764,72 @@ input[type='checkbox']:disabled {
   width: min(680px, 95vw);
 }
 
+/* ---------- Danger Buttons ---------- */
+
+.btn-danger {
+  background: var(--color-error);
+  color: var(--color-text-inverse);
+  border-color: var(--color-error);
+}
+
+.btn-danger:hover {
+  background: #DC2626;
+  border-color: #DC2626;
+}
+
+.btn-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-danger-ghost {
+  background: transparent;
+  color: var(--color-error);
+  border: 1px solid var(--color-error);
+}
+
+.btn-danger-ghost:hover {
+  background: var(--color-error-bg);
+}
+
+.btn-danger-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---------- Delete Confirmation ---------- */
+
+.customer-delete-confirm {
+  margin-top: var(--space-3);
+  padding: var(--space-5);
+  border: 1px solid var(--color-error);
+  border-radius: var(--radius-md);
+  background: var(--color-error-bg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  animation: slideUp 0.2s ease;
+}
+
+.customer-delete-confirm-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-error);
+  font-size: var(--font-size-base);
+}
+
+.customer-delete-confirm p {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.customer-delete-confirm .form-group {
+  margin: 0;
+}
+
 .modal-description {
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);

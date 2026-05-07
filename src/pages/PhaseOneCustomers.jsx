@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   Building2,
   Check,
   ChevronDown,
@@ -9,6 +10,7 @@ import {
   Plus,
   Search,
   Settings2,
+  Trash2,
   UserPlus,
   UserRoundCheck,
   X,
@@ -259,6 +261,9 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
   const [selectedLocationIds, setSelectedLocationIds] = useState(initialLocationIds);
   const [status, setStatus] = useState(contact.status);
   const [saving, setSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteConfirmEmail, setDeleteConfirmEmail] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const filteredLocations = useMemo(
     () => locations.filter((loc) => selectedClientIds.includes(loc.clientId)),
@@ -342,6 +347,50 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
     setSaving(false);
   }
 
+  async function handleDelete() {
+    setDeleting(true);
+
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError || !sessionData.session) {
+        addToast('You must be signed in to remove customers.', 'warning');
+        setDeleting(false);
+        return;
+      }
+
+      const response = await fetch('/api/delete-customer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({ customerUserId: contact.userId }),
+      });
+
+      const data = await response.json();
+
+      if (!data.ok && !data.warning) {
+        addToast(data.error || 'Failed to remove customer.', 'warning');
+        setDeleting(false);
+        return;
+      }
+
+      if (data.warning) {
+        addToast(data.warning, 'warning');
+      } else {
+        addToast(`Customer ${contact.email} has been permanently removed.`);
+      }
+
+      // Reload to reflect the deletion.
+      setTimeout(() => {
+        window.location.reload();
+      }, 800);
+    } catch (fetchError) {
+      addToast(fetchError.message || 'Network error.', 'warning');
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="customer-detail-panel" onClick={(e) => e.stopPropagation()}>
       <div className="customer-detail-section">
@@ -404,15 +453,69 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
             <option value="disabled">Disabled</option>
           </select>
         </div>
-        <button
-          className="btn btn-primary btn-sm"
-          type="button"
-          disabled={!canManage || !isDirty || saving}
-          onClick={handleSave}
-        >
-          <Check size={14} /> {saving ? 'Saving...' : isDirty ? 'Save Changes' : 'Saved'}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <button
+            className="btn btn-danger-ghost btn-sm"
+            type="button"
+            disabled={!canManage || saving || deleting}
+            onClick={() => setShowDeleteConfirm(true)}
+          >
+            <Trash2 size={14} /> Remove
+          </button>
+          <button
+            className="btn btn-primary btn-sm"
+            type="button"
+            disabled={!canManage || !isDirty || saving}
+            onClick={handleSave}
+          >
+            <Check size={14} /> {saving ? 'Saving...' : isDirty ? 'Save Changes' : 'Saved'}
+          </button>
+        </div>
       </div>
+
+      {showDeleteConfirm ? (
+        <div className="customer-delete-confirm">
+          <div className="customer-delete-confirm-header">
+            <AlertTriangle size={18} />
+            <strong>Permanently Remove Customer</strong>
+          </div>
+          <p>
+            This will permanently delete <strong>{contact.fullName || contact.email}</strong>'s account,
+            all company and location assignments, and their Supabase auth user.
+            This action cannot be undone.
+          </p>
+          <div className="form-group">
+            <label className="form-label">
+              Type <strong>{contact.email}</strong> to confirm:
+            </label>
+            <input
+              className="form-input"
+              value={deleteConfirmEmail}
+              onChange={(e) => setDeleteConfirmEmail(e.target.value)}
+              placeholder={contact.email}
+              autoFocus
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-3)', justifyContent: 'flex-end' }}>
+            <button
+              className="btn btn-ghost btn-sm"
+              type="button"
+              onClick={() => { setShowDeleteConfirm(false); setDeleteConfirmEmail(''); }}
+              disabled={deleting}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn btn-danger btn-sm"
+              type="button"
+              disabled={deleteConfirmEmail.trim().toLowerCase() !== contact.email.toLowerCase() || deleting}
+              onClick={handleDelete}
+            >
+              <Trash2 size={14} /> {deleting ? 'Removing...' : 'Remove Permanently'}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
