@@ -41,8 +41,8 @@ export default function App() {
     return <AuthScreen />;
   }
 
-  // Show "Set Password" screen when user arrived via invite or password-reset link.
-  if (state.needsPasswordSetup) {
+  // Only customer temp-password accounts should ever see this screen.
+  if (state.authRole === 'customer' && state.needsPasswordSetup) {
     return (
       <SetPasswordScreen
         onComplete={() => dispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } })}

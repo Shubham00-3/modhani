@@ -621,6 +621,8 @@ export function AppProvider({ children }) {
     // If the customer was created with a temp password, force them to set a new one.
     if (user.user_metadata?.must_change_password) {
       baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: true } });
+    } else {
+      baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } });
     }
   }, []);
 
@@ -631,6 +633,7 @@ export function AppProvider({ children }) {
       const identity = await fetchAuthIdentity(supabase, user.id);
 
       if (identity === 'staff') {
+        baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } });
         await loadRemoteData(user.id);
         return;
       }
@@ -693,16 +696,6 @@ export function AppProvider({ children }) {
       }
 
       try {
-        // Detect if the user arrived via an invite or recovery link.
-        const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-        const tokenType = hashParams.get('type');
-        const isInviteOrRecovery = tokenType === 'invite' || tokenType === 'recovery';
-
-        if (isInviteOrRecovery) {
-          // Set the flag immediately so the UI knows to show 'Set Password'.
-          baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: true } });
-        }
-
         await loadAuthenticatedUser(data.session.user);
       } catch (fetchError) {
           handleRemoteBootstrapError(data.session.user.id, fetchError);
