@@ -618,7 +618,7 @@ export function AppProvider({ children }) {
       },
     });
 
-    if (options.needsPasswordSetup) {
+    if (options.needsPasswordSetup || user.user_metadata?.must_change_password === true) {
       baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: true } });
     } else {
       baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } });

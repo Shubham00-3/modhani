@@ -38,6 +38,7 @@ export default function SetPasswordScreen({ onComplete }) {
 
     const { error: updateError } = await supabase.auth.updateUser({
       password,
+      data: { must_change_password: false },
     });
 
     if (updateError) {

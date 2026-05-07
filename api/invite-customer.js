@@ -102,6 +102,7 @@ export default async function handler(req, res) {
       data: {
         full_name: trimmedName,
         account_type: 'customer',
+        must_change_password: true,
       },
       redirectTo,
     }
