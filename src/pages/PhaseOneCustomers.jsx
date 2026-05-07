@@ -191,6 +191,66 @@ export default function PhaseOneCustomers() {
 }
 
 // ============================================================================
+// Searchable Multi-Select
+// ============================================================================
+
+function SearchableChipList({ items, selectedIds, onToggle, disabled, searchPlaceholder, renderLabel }) {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((item) => {
+      const label = renderLabel ? renderLabel(item) : item.name || item.id;
+      return label.toLowerCase().includes(q);
+    });
+  }, [items, search, renderLabel]);
+
+  const selectedCount = items.filter((item) => selectedIds.includes(item.id)).length;
+
+  return (
+    <div className="searchable-chip-list">
+      <div className="searchable-chip-search">
+        <Search size={14} />
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={searchPlaceholder || 'Search...'}
+          onClick={(e) => e.stopPropagation()}
+        />
+        {selectedCount > 0 ? (
+          <span className="searchable-chip-badge">{selectedCount} selected</span>
+        ) : null}
+      </div>
+      <div className="customer-multi-select">
+        {filtered.map((item) => {
+          const checked = selectedIds.includes(item.id);
+          const label = renderLabel ? renderLabel(item) : item.name;
+          return (
+            <label key={item.id} className={`multi-select-chip ${checked ? 'multi-select-chip-active' : ''}`}>
+              <input
+                type="checkbox"
+                checked={checked}
+                disabled={disabled}
+                onChange={() => onToggle(item.id)}
+              />
+              <span>{label}</span>
+            </label>
+          );
+        })}
+        {filtered.length === 0 && search ? (
+          <span className="form-hint" style={{ marginTop: 0 }}>No results for "{search}"</span>
+        ) : null}
+        {items.length === 0 ? (
+          <span className="form-hint" style={{ marginTop: 0 }}>None available</span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
 // Customer Detail Panel (expandable)
 // ============================================================================
 
@@ -263,21 +323,19 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
       return;
     }
 
-    // 2. Save status if changed.
-    if (status !== contact.status) {
-      const contactResult = await dispatch({
-        type: 'UPDATE_CUSTOMER_CONTACT',
-        payload: {
-          ...contact,
-          clientId: selectedClientIds[0] || null,
-          status,
-        },
-      });
+    // 2. Always sync the contact (status + backward-compat clientId).
+    const contactResult = await dispatch({
+      type: 'UPDATE_CUSTOMER_CONTACT',
+      payload: {
+        ...contact,
+        clientId: selectedClientIds[0] || null,
+        status,
+      },
+    });
 
-      if (!contactResult.ok) {
-        setSaving(false);
-        return;
-      }
+    if (!contactResult.ok) {
+      setSaving(false);
+      return;
     }
 
     addToast('Customer updated successfully.');
@@ -285,26 +343,16 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
   }
 
   return (
-    <div className="customer-detail-panel">
+    <div className="customer-detail-panel" onClick={(e) => e.stopPropagation()}>
       <div className="customer-detail-section">
         <h4><Building2 size={16} /> Assigned Companies</h4>
-        <div className="customer-multi-select">
-          {clients.map((client) => {
-            const checked = selectedClientIds.includes(client.id);
-            return (
-              <label key={client.id} className={`multi-select-chip ${checked ? 'multi-select-chip-active' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  disabled={!canManage}
-                  onChange={() => handleToggleClient(client.id)}
-                />
-                <span>{client.name}</span>
-              </label>
-            );
-          })}
-          {clients.length === 0 ? <span className="form-hint">No companies available</span> : null}
-        </div>
+        <SearchableChipList
+          items={clients}
+          selectedIds={selectedClientIds}
+          onToggle={handleToggleClient}
+          disabled={!canManage}
+          searchPlaceholder="Search companies..."
+        />
       </div>
 
       {selectedClientIds.length > 0 ? (
@@ -328,23 +376,14 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
                     {allSelected ? 'Deselect All' : 'Select All'}
                   </button>
                 </div>
-                <div className="customer-multi-select">
-                  {clientLocs.map((loc) => {
-                    const checked = selectedLocationIds.includes(loc.id);
-                    return (
-                      <label key={loc.id} className={`multi-select-chip ${checked ? 'multi-select-chip-active' : ''}`}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={!canManage}
-                          onChange={() => handleToggleLocation(loc.id)}
-                        />
-                        <span>{loc.name}{loc.city ? ` (${loc.city})` : ''}</span>
-                      </label>
-                    );
-                  })}
-                  {clientLocs.length === 0 ? <span className="form-hint">No locations for this company</span> : null}
-                </div>
+                <SearchableChipList
+                  items={clientLocs}
+                  selectedIds={selectedLocationIds}
+                  onToggle={handleToggleLocation}
+                  disabled={!canManage}
+                  searchPlaceholder={`Search ${client?.name ?? 'company'} locations...`}
+                  renderLabel={(loc) => `${loc.name}${loc.city ? ` (${loc.city})` : ''}`}
+                />
               </div>
             );
           })}
@@ -528,21 +567,12 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
 
             <div className="form-group">
               <label className="form-label"><Building2 size={14} /> Assign to Companies (optional)</label>
-              <div className="customer-multi-select">
-                {clients.map((client) => {
-                  const checked = selectedClientIds.includes(client.id);
-                  return (
-                    <label key={client.id} className={`multi-select-chip ${checked ? 'multi-select-chip-active' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => handleToggleClient(client.id)}
-                      />
-                      <span>{client.name}</span>
-                    </label>
-                  );
-                })}
-              </div>
+              <SearchableChipList
+                items={clients}
+                selectedIds={selectedClientIds}
+                onToggle={handleToggleClient}
+                searchPlaceholder="Search companies..."
+              />
               <div className="form-hint">
                 Selected companies will be linked immediately. If none are selected, the customer will start as "pending."
               </div>
@@ -568,22 +598,13 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
                           {allSelected ? 'Deselect All' : 'Select All'}
                         </button>
                       </div>
-                      <div className="customer-multi-select">
-                        {clientLocs.map((loc) => {
-                          const checked = selectedLocationIds.includes(loc.id);
-                          return (
-                            <label key={loc.id} className={`multi-select-chip ${checked ? 'multi-select-chip-active' : ''}`}>
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => handleToggleLocation(loc.id)}
-                              />
-                              <span>{loc.name}{loc.city ? ` (${loc.city})` : ''}</span>
-                            </label>
-                          );
-                        })}
-                        {clientLocs.length === 0 ? <span className="form-hint">No locations for this company</span> : null}
-                      </div>
+                      <SearchableChipList
+                        items={clientLocs}
+                        selectedIds={selectedLocationIds}
+                        onToggle={handleToggleLocation}
+                        searchPlaceholder={`Search ${client?.name ?? 'company'} locations...`}
+                        renderLabel={(loc) => `${loc.name}${loc.city ? ` (${loc.city})` : ''}`}
+                      />
                     </div>
                   );
                 })}
