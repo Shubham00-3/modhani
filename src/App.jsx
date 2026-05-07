@@ -10,6 +10,7 @@ import PhaseOneSettings from './pages/PhaseOneSettings';
 import PhaseOneAuditTrail from './pages/PhaseOneAuditTrail';
 import PhaseOneClientsLocations from './pages/PhaseOneClientsLocations';
 import PhaseOneProducts from './pages/PhaseOneProducts';
+import PhaseOneCustomers from './pages/PhaseOneCustomers';
 import CustomerPortal from './pages/CustomerPortal';
 
 export default function App() {
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="/reports" element={<PhaseOneReports />} />
         <Route path="/audit" element={<PhaseOneAuditTrail />} />
         <Route path="/clients-locations" element={<PhaseOneClientsLocations />} />
+        <Route path="/customers" element={<PhaseOneCustomers />} />
         <Route path="/products" element={<PhaseOneProducts />} />
         <Route path="/settings" element={<PhaseOneSettings />} />
       </Routes>

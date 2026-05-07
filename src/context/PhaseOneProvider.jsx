@@ -786,37 +786,7 @@ export function AppProvider({ children }) {
     return { ok: true };
   }, []);
 
-  const signUpCustomer = useCallback(async ({ email, password, fullName }) => {
-    if (!supabase) {
-      return { ok: false, error: getSupabaseConfigError() };
-    }
 
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          account_type: 'customer',
-        },
-      },
-    });
-
-    if (error) return { ok: false, error: error.message };
-
-    if (!data.session) {
-      return {
-        ok: true,
-        needsEmailConfirmation: true,
-      };
-    }
-
-    const { error: registerError } = await registerCustomerProfile(supabase, fullName);
-    if (registerError) return { ok: false, error: registerError.message };
-
-    await loadCustomerPortalData(data.session.user);
-    return { ok: true };
-  }, [loadCustomerPortalData]);
 
   const completeCustomerProfile = useCallback(async (fullName) => {
     if (!supabase) {
@@ -1034,7 +1004,7 @@ export function AppProvider({ children }) {
       logout,
       dismissNotification,
       clearNotifications,
-      signUpCustomer,
+
       completeCustomerProfile,
       submitPortalOrder,
     }),
@@ -1049,7 +1019,7 @@ export function AppProvider({ children }) {
       logout,
       dismissNotification,
       clearNotifications,
-      signUpCustomer,
+
       completeCustomerProfile,
       submitPortalOrder,
     ]

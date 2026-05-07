@@ -1,18 +1,17 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Check, DollarSign, Plus, Search, Settings2, UserRoundCheck, Users } from 'lucide-react';
+import { DollarSign, Plus, Search, Settings2, Users } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatClientLocationScale } from '../data/phaseOneData';
 import { ClientModal, LocationModal, PricingModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneClientsLocations() {
-  const { state, dispatch, addToast } = useApp();
+  const { state } = useApp();
   const [searchParams] = useSearchParams();
   const canManage = state.currentUser.permissions.manageSettings;
   const [editingClient, setEditingClient] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
   const [pricingClientId, setPricingClientId] = useState(null);
-  const [contactDrafts, setContactDrafts] = useState({});
   const [clientSearch, setClientSearch] = useState('');
   const dashboardSearch = searchParams.get('q') ?? '';
   const [showClientModal, setShowClientModal] = useState(false);
@@ -151,97 +150,6 @@ export default function PhaseOneClientsLocations() {
               {state.clients.length
                 ? 'Try searching by customer name, location, city, address, or postal code.'
                 : 'Add your first client to start building locations and negotiated pricing.'}
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="card">
-        <div className="card-title">
-          <UserRoundCheck size={18} /> Customer Portal Contacts
-        </div>
-        {(state.customerContacts ?? []).length ? (
-          <div className="customer-contact-list">
-            {state.customerContacts.map((contact) => {
-              const draft = contactDrafts[contact.userId] ?? contact;
-              const isDirty =
-                (draft.clientId ?? '') !== (contact.clientId ?? '') || draft.status !== contact.status;
-
-              return (
-                <div className="customer-contact-row" key={contact.userId}>
-                  <div>
-                    <strong>{contact.fullName || contact.email}</strong>
-                    <p>{contact.email}</p>
-                  </div>
-                  <select
-                    className="form-select"
-                    value={draft.clientId ?? ''}
-                    disabled={!canManage}
-                    onChange={(event) =>
-                      setContactDrafts((current) => ({
-                        ...current,
-                        [contact.userId]: {
-                          ...draft,
-                          clientId: event.target.value,
-                          status: event.target.value && draft.status === 'pending' ? 'active' : draft.status,
-                        },
-                      }))
-                    }
-                  >
-                    <option value="">Select company</option>
-                    {state.clients.map((client) => (
-                      <option key={client.id} value={client.id}>
-                        {client.name}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    className="form-select"
-                    value={draft.status}
-                    disabled={!canManage}
-                    onChange={(event) =>
-                      setContactDrafts((current) => ({
-                        ...current,
-                        [contact.userId]: { ...draft, status: event.target.value },
-                      }))
-                    }
-                  >
-                    <option value="pending">Pending</option>
-                    <option value="active">Active</option>
-                    <option value="disabled">Disabled</option>
-                  </select>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    type="button"
-                    disabled={!canManage || !isDirty}
-                    onClick={async () => {
-                      const payload = {
-                        ...contact,
-                        ...draft,
-                        status: draft.clientId && draft.status === 'pending' ? 'active' : draft.status,
-                      };
-                      const result = await dispatch({ type: 'UPDATE_CUSTOMER_CONTACT', payload });
-                      if (result.ok) {
-                        setContactDrafts((current) => {
-                          const next = { ...current };
-                          delete next[contact.userId];
-                          return next;
-                        });
-                        addToast('Customer contact updated.');
-                      }
-                    }}
-                  >
-                    <Check size={14} /> {isDirty ? 'Save' : 'Saved'}
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
-            <div className="empty-state-title">No customer signups yet</div>
-            <div className="empty-state-description">
-              Customer self-signups will appear here for company linking and approval.
             </div>
           </div>
         )}

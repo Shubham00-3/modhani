@@ -11,6 +11,7 @@ import {
   ScrollText,
   Settings,
   ShoppingCart,
+  UserRoundCheck,
 } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 
@@ -21,6 +22,7 @@ const navItems = [
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/audit', label: 'Audit Trail', icon: ScrollText },
   { to: '/clients-locations', label: 'Clients & Locations', icon: Building2 },
+  { to: '/customers', label: 'Customers', icon: UserRoundCheck },
   { to: '/products', label: 'Products', icon: Package },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

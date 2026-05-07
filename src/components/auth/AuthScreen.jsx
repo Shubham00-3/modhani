@@ -1,33 +1,24 @@
 import { useState } from 'react';
-import { ArrowRight, Building2, LockKeyhole, Mail, ShoppingCart, UserRoundPlus } from 'lucide-react';
+import { ArrowRight, Building2, LockKeyhole, Mail, ShoppingCart } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 
 export default function AuthScreen() {
-  const { state, login, signUpCustomer } = useApp();
+  const { state, login } = useApp();
   const [accountType, setAccountType] = useState('staff');
-  const [customerMode, setCustomerMode] = useState('signin');
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
 
   async function handleSubmit(event) {
     event.preventDefault();
     setSubmitting(true);
     setError('');
-    setNotice('');
 
-    const result =
-      accountType === 'customer' && customerMode === 'signup'
-        ? await signUpCustomer({ email, password, fullName })
-        : await login({ email, password });
+    const result = await login({ email, password });
 
     if (!result.ok) {
       setError(result.error ?? 'Unable to sign in.');
-    } else if (result.needsEmailConfirmation) {
-      setNotice('Account created. Check your email to confirm your login before signing in.');
     }
 
     setSubmitting(false);
@@ -78,7 +69,7 @@ export default function AuthScreen() {
 
         <section className="auth-form-card auth-portal-card">
           <img className="auth-card-logo" src="/modhani-logo.svg" alt="Modhani" />
-          <div className="auth-card-title">LOGIN / SIGNUP</div>
+          <div className="auth-card-title">LOGIN</div>
 
           <div className="auth-choice-tabs">
             <button
@@ -87,7 +78,6 @@ export default function AuthScreen() {
               onClick={() => {
                 setAccountType('staff');
                 setError('');
-                setNotice('');
               }}
             >
               <LockKeyhole size={16} /> Staff Portal
@@ -98,7 +88,6 @@ export default function AuthScreen() {
               onClick={() => {
                 setAccountType('customer');
                 setError('');
-                setNotice('');
               }}
             >
               <Building2 size={16} /> Customer Portal
@@ -107,11 +96,11 @@ export default function AuthScreen() {
 
           <div className="auth-form-heading">
             <div className="auth-form-icon">
-              {accountType === 'staff' ? <LockKeyhole size={18} /> : <UserRoundPlus size={18} />}
+              <LockKeyhole size={18} />
             </div>
             <div>
               <div className="auth-form-title">
-                {accountType === 'staff' ? 'Login' : customerMode === 'signin' ? 'Customer Sign In' : 'Customer Sign Up'}
+                {accountType === 'staff' ? 'Staff Login' : 'Customer Sign In'}
               </div>
               <div className="auth-form-subtitle">
                 {accountType === 'staff' ? 'Internal access only' : 'Order portal access'}
@@ -120,43 +109,6 @@ export default function AuthScreen() {
           </div>
 
           <form className="auth-form" onSubmit={handleSubmit}>
-            {accountType === 'customer' ? (
-              <div className="auth-mode-switch">
-                <button
-                  className={customerMode === 'signin' ? 'active' : ''}
-                  type="button"
-                  onClick={() => {
-                    setCustomerMode('signin');
-                    setError('');
-                    setNotice('');
-                  }}
-                >
-                  Sign In
-                </button>
-                <button
-                  className={customerMode === 'signup' ? 'active' : ''}
-                  type="button"
-                  onClick={() => {
-                    setCustomerMode('signup');
-                    setError('');
-                    setNotice('');
-                  }}
-                >
-                  Sign Up
-                </button>
-              </div>
-            ) : null}
-
-            {accountType === 'customer' && customerMode === 'signup' ? (
-              <div className="form-group">
-                <label className="form-label">Full Name</label>
-                <div className="auth-input-wrap">
-                  <UserRoundPlus size={16} />
-                  <input className="form-input" placeholder="Full name" value={fullName} onChange={(event) => setFullName(event.target.value)} required />
-                </div>
-              </div>
-            ) : null}
-
             <div className="form-group">
               <label className="form-label">Email</label>
               <div className="auth-input-wrap">
@@ -182,23 +134,8 @@ export default function AuthScreen() {
               </div>
             ) : null}
 
-            {notice ? (
-              <div className="alert alert-success">
-                <div className="alert-content">
-                  <div className="alert-title">Check your inbox</div>
-                  <div className="alert-description">{notice}</div>
-                </div>
-              </div>
-            ) : null}
-
             <button className="btn btn-primary" type="submit" disabled={submitting}>
-              {submitting
-                ? customerMode === 'signup' && accountType === 'customer'
-                  ? 'Creating Account...'
-                  : 'Signing In...'
-                : customerMode === 'signup' && accountType === 'customer'
-                  ? 'Create Account'
-                  : 'Sign In'}
+              {submitting ? 'Signing In...' : 'Sign In'}
               {!submitting ? <ArrowRight size={16} /> : null}
             </button>
 
@@ -206,7 +143,7 @@ export default function AuthScreen() {
               {accountType === 'customer' ? (
                 <>
                   <ShoppingCart size={15} />
-                  <span>Customer accounts need staff approval before ordering.</span>
+                  <span>Customer accounts are created by Modhani admins.</span>
                 </>
               ) : (
                 <>
