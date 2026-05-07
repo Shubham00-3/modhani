@@ -381,9 +381,9 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
         addToast(`Customer ${contact.email} has been permanently removed.`);
       }
 
-      // Reload to reflect the deletion.
+      // Navigate to root to reflect the deletion.
       setTimeout(() => {
-        window.location.reload();
+        window.location.href = '/';
       }, 800);
     } catch (fetchError) {
       addToast(fetchError.message || 'Network error.', 'warning');

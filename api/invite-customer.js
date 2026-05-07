@@ -90,8 +90,10 @@ export default async function handler(req, res) {
   }
 
   // Determine the redirect URL (the app root).
+  // VERCEL_PROJECT_PRODUCTION_URL is the most reliable for production deployments.
   const appUrl = process.env.NEXT_PUBLIC_APP_URL
     || process.env.VITE_APP_URL
+    || normalizePublicUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL)
     || normalizePublicUrl(process.env.VERCEL_URL)
     || (req.headers['x-forwarded-host']
       ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}`

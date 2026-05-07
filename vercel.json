@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/((?!api/|assets/|product-images/|favicon.svg|icons.svg|modhani-logo.svg).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
