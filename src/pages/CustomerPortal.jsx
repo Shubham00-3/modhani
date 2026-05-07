@@ -13,16 +13,50 @@ export default function CustomerPortal() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
 
-  const activeLocationId = locationId || portal?.locations?.[0]?.id || '';
+  // Multi-client support: if customer has multiple clients, show a company selector.
+  const portalClients = useMemo(() => portal?.clients ?? [], [portal?.clients]);
+  const portalProducts = useMemo(() => portal?.products ?? [], [portal?.products]);
+  const portalClientCount = portalClients.length;
+  const hasMultipleClients = portalClients.length > 1;
+  const [selectedClientId, setSelectedClientId] = useState('');
+
+  // Determine the active client.
+  const activeClient = useMemo(() => {
+    if (!portal) return null;
+    if (hasMultipleClients) {
+      return portalClients.find((c) => c.id === selectedClientId) || portalClients[0] || null;
+    }
+    // Single client or backward compat.
+    return portal.client ?? portalClients[0] ?? null;
+  }, [portal, hasMultipleClients, portalClients, selectedClientId]);
+
+  const activeClientId = activeClient?.id ?? '';
+
+  // Filter locations to the active client.
+  const activeLocations = useMemo(
+    () => (portal?.locations ?? []).filter((loc) => loc.clientId === activeClientId),
+    [portal?.locations, activeClientId]
+  );
+
+  const activeLocationId = locationId || activeLocations[0]?.id || '';
+
+  // Filter products to those priced for the active client.
+  const activeProducts = useMemo(() => {
+    if (!portalProducts.length || !activeClientId) return [];
+    return portalProducts.filter(
+      (p) => p.pricingClientId === activeClientId || (!p.pricingClientId && portalClientCount <= 1)
+    );
+  }, [portalProducts, activeClientId, portalClientCount]);
+
   const selectedLines = useMemo(
     () =>
-      (portal?.products ?? [])
+      activeProducts
         .map((product) => ({
           product,
           quantity: Number(quantities[product.id] ?? 0),
         }))
         .filter((line) => line.quantity > 0),
-    [portal?.products, quantities]
+    [activeProducts, quantities]
   );
   const orderTotal = selectedLines.reduce((total, line) => total + line.quantity * line.product.clientPrice, 0);
 
@@ -63,7 +97,7 @@ export default function CustomerPortal() {
     }
 
     const result = await submitPortalOrder({
-      clientId: portal.client.id,
+      clientId: activeClientId,
       locationId: activeLocationId,
       items: selectedLines.map((line) => ({
         productId: line.product.id,
@@ -79,6 +113,14 @@ export default function CustomerPortal() {
     }
 
     setSubmitting(false);
+  }
+
+  function handleClientChange(newClientId) {
+    setSelectedClientId(newClientId);
+    setLocationId('');
+    setQuantities({});
+    setError('');
+    setMessage('');
   }
 
   if (!portal) {
@@ -111,7 +153,7 @@ export default function CustomerPortal() {
     );
   }
 
-  if (portal.contact.status !== 'active' || !portal.client) {
+  if (portal.contact.status !== 'active' || (!portal.client && portalClients.length === 0)) {
     return (
       <PortalShell onLogout={logout}>
         <section className="customer-portal-panel customer-pending-panel">
@@ -131,7 +173,7 @@ export default function CustomerPortal() {
       <section className="customer-portal-header">
         <div>
           <p className="eyebrow">Customer Portal</p>
-          <h1>{portal.client.name}</h1>
+          <h1>{activeClient?.name ?? 'Customer Portal'}</h1>
           <p>Choose your delivery location, enter quantities, and submit your order to Modhani.</p>
         </div>
         <div className="customer-total-card">
@@ -150,27 +192,45 @@ export default function CustomerPortal() {
             </div>
           </div>
 
+          {hasMultipleClients ? (
+            <div className="form-group">
+              <label className="form-label">Company</label>
+              <select
+                className="form-select"
+                value={activeClientId}
+                onChange={(event) => handleClientChange(event.target.value)}
+              >
+                {portalClients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+
           <div className="form-group">
             <label className="form-label">Location</label>
             <select className="form-select" value={activeLocationId} onChange={(event) => setLocationId(event.target.value)}>
-              {portal.locations.map((location) => (
+              {activeLocations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.name}
                 </option>
               ))}
+              {activeLocations.length === 0 ? <option value="">No locations available</option> : null}
             </select>
           </div>
 
           <PortalMessages error={error} message={message} />
 
-          <button className="btn btn-primary" type="submit" disabled={submitting || !portal.products.length}>
+          <button className="btn btn-primary" type="submit" disabled={submitting || !activeProducts.length}>
             <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Order'}
           </button>
         </section>
 
         <section className="customer-products-list">
-          {portal.products.length ? (
-            portal.products.map((product) => {
+          {activeProducts.length ? (
+            activeProducts.map((product) => {
               const imageUrl = getProductImageUrl(product, { fallback: true });
               const usesFallback = !hasProductImage(product);
               const quantity = quantities[product.id] ?? '';

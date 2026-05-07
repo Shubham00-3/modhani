@@ -41,6 +41,8 @@ const demoState = {
   notificationDismissals: [],
   quickBooksJobs: [],
   customerContacts: [],
+  customerClientAssignments: [],
+  customerLocationAssignments: [],
   customerPortal: null,
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: buildReportRowsFromOrders({
@@ -73,6 +75,8 @@ const remoteBootState = {
   notificationDismissals: [],
   quickBooksJobs: [],
   customerContacts: [],
+  customerClientAssignments: [],
+  customerLocationAssignments: [],
   customerPortal: null,
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: [],
@@ -256,6 +260,20 @@ function reducer(state, action) {
           contact.userId === action.payload.userId ? { ...contact, ...action.payload } : contact
         ),
       };
+    case 'UPDATE_CUSTOMER_ASSIGNMENTS': {
+      const { customerUserId, clientIds, locationIds } = action.payload;
+      return {
+        ...state,
+        customerClientAssignments: [
+          ...state.customerClientAssignments.filter((a) => a.customerUserId !== customerUserId),
+          ...clientIds.map((clientId) => ({ customerUserId, clientId })),
+        ],
+        customerLocationAssignments: [
+          ...state.customerLocationAssignments.filter((a) => a.customerUserId !== customerUserId),
+          ...locationIds.map((locationId) => ({ customerUserId, locationId })),
+        ],
+      };
+    }
     case 'ADD_BATCH':
     case 'LOG_PRODUCTION_BATCH':
       return { ...state, batches: [...state.batches, action.payload] };
@@ -523,6 +541,7 @@ const serverAdminActions = new Set([
   'UPDATE_LOCATION',
   'SET_CLIENT_PRICING',
   'UPDATE_CUSTOMER_CONTACT',
+  'UPDATE_CUSTOMER_ASSIGNMENTS',
   'UPDATE_USER',
   'UPDATE_QB_SETTINGS',
 ]);
@@ -705,6 +724,8 @@ export function AppProvider({ children }) {
             notificationDismissals: [],
             quickBooksJobs: [],
             customerContacts: [],
+            customerClientAssignments: [],
+            customerLocationAssignments: [],
             customerPortal: null,
             quickBooks: QUICKBOOKS_SETTINGS,
             reportRows: [],

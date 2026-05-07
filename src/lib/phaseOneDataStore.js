@@ -257,6 +257,20 @@ function customerContactToUi(contact) {
   };
 }
 
+function customerClientAssignmentToUi(row) {
+  return {
+    customerUserId: row.customer_user_id,
+    clientId: row.client_id,
+  };
+}
+
+function customerLocationAssignmentToUi(row) {
+  return {
+    customerUserId: row.customer_user_id,
+    locationId: row.location_id,
+  };
+}
+
 function batchToDb(batch) {
   return {
     id: batch.id,
@@ -367,6 +381,8 @@ export async function fetchRemoteState(supabase, userId) {
     reportRowsResult,
     notificationDismissalsResult,
     customerContactsResult,
+    customerClientAssignmentsResult,
+    customerLocationAssignmentsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('clients').select('*').order('name'),
@@ -389,6 +405,8 @@ export async function fetchRemoteState(supabase, userId) {
           .order('dismissed_at', { ascending: false })
       : Promise.resolve({ data: [], error: null }),
     supabase.from('customer_contacts').select('*').order('created_at', { ascending: false }),
+    supabase.from('customer_client_assignments').select('*'),
+    supabase.from('customer_location_assignments').select('*'),
   ]);
 
   const results = [
@@ -407,6 +425,8 @@ export async function fetchRemoteState(supabase, userId) {
     reportRowsResult,
     notificationDismissalsResult,
     customerContactsResult,
+    customerClientAssignmentsResult,
+    customerLocationAssignmentsResult,
   ];
 
   const firstError = results
@@ -415,7 +435,9 @@ export async function fetchRemoteState(supabase, userId) {
         result !== reportRowsResult &&
         result !== notificationDismissalsResult &&
         result !== quickBooksJobsResult &&
-        result !== customerContactsResult
+        result !== customerContactsResult &&
+        result !== customerClientAssignmentsResult &&
+        result !== customerLocationAssignmentsResult
     )
     .find((result) => result.error)?.error;
   if (firstError) {
@@ -500,6 +522,8 @@ export async function fetchRemoteState(supabase, userId) {
     quickBooksJobs: quickBooksJobsResult.error ? [] : (quickBooksJobsResult.data ?? []).map(quickBooksJobToUi),
     reportRows,
     customerContacts: customerContactsResult.error ? [] : (customerContactsResult.data ?? []).map(customerContactToUi),
+    customerClientAssignments: customerClientAssignmentsResult.error ? [] : (customerClientAssignmentsResult.data ?? []).map(customerClientAssignmentToUi),
+    customerLocationAssignments: customerLocationAssignmentsResult.error ? [] : (customerLocationAssignmentsResult.data ?? []).map(customerLocationAssignmentToUi),
   };
 }
 
@@ -527,59 +551,90 @@ export async function fetchCustomerPortalState(supabase, user) {
   if (!contact) {
     return {
       contact: null,
-      client: null,
+      clients: [],
       locations: [],
       products: [],
       recentOrders: [],
+      assignedClientIds: [],
+      assignedLocationIds: [],
     };
   }
 
-  if (contact.status !== 'active' || !contact.client_id) {
+  // Fetch junction-table assignments for this customer.
+  const [clientAssignResult, locationAssignResult] = await Promise.all([
+    supabase.from('customer_client_assignments').select('client_id').eq('customer_user_id', user.id),
+    supabase.from('customer_location_assignments').select('location_id').eq('customer_user_id', user.id),
+  ]);
+
+  const assignedClientIds = (clientAssignResult.data ?? []).map((r) => r.client_id);
+  const assignedLocationIds = (locationAssignResult.data ?? []).map((r) => r.location_id);
+
+  if (contact.status !== 'active' || assignedClientIds.length === 0) {
     return {
       contact: customerContactToUi(contact),
-      client: null,
+      clients: [],
       locations: [],
       products: [],
       recentOrders: [],
+      assignedClientIds,
+      assignedLocationIds,
     };
   }
 
+  // Fetch data for ALL assigned clients.
   const [
-    clientResult,
+    clientsResult,
     locationsResult,
     productsResult,
     pricingResult,
     ordersResult,
     orderItemsResult,
   ] = await Promise.all([
-    supabase.from('clients').select('*').eq('id', contact.client_id).maybeSingle(),
-    supabase.from('locations').select('*').eq('client_id', contact.client_id).order('name'),
+    supabase.from('clients').select('*').in('id', assignedClientIds).order('name'),
+    assignedLocationIds.length > 0
+      ? supabase.from('locations').select('*').in('id', assignedLocationIds).order('name')
+      : Promise.resolve({ data: [], error: null }),
     supabase.from('products').select('*').order('name'),
-    supabase.from('client_product_prices').select('*').eq('client_id', contact.client_id),
+    supabase.from('client_product_prices').select('*').in('client_id', assignedClientIds),
     supabase
       .from('orders')
       .select('*')
-      .eq('client_id', contact.client_id)
+      .in('client_id', assignedClientIds)
       .eq('source', 'portal')
       .order('created_at', { ascending: false })
-      .limit(10),
+      .limit(20),
     supabase.from('order_items').select('*'),
   ]);
 
-  const firstError = [clientResult, locationsResult, productsResult, pricingResult, ordersResult, orderItemsResult].find(
+  const firstError = [clientsResult, locationsResult, productsResult, pricingResult, ordersResult, orderItemsResult].find(
     (result) => result.error
   )?.error;
   if (firstError) throw firstError;
 
-  const pricingByProductId = new Map((pricingResult.data ?? []).map((pricing) => [pricing.product_id, pricing]));
+  // Build pricing map keyed by "clientId:productId".
+  const pricingMap = new Map();
+  (pricingResult.data ?? []).forEach((pricing) => {
+    const key = `${pricing.client_id}:${pricing.product_id}`;
+    pricingMap.set(key, pricing);
+  });
+
   const products = (productsResult.data ?? []).map((product) => {
     const productUi = productToUi(product);
-    const pricing = pricingByProductId.get(product.id);
+    // Find the first active pricing across assigned clients.
+    let bestPricing = null;
+    for (const cid of assignedClientIds) {
+      const pricing = pricingMap.get(`${cid}:${product.id}`);
+      if (pricing && pricing.is_active && Number(pricing.price) > 0) {
+        bestPricing = pricing;
+        break;
+      }
+    }
 
     return {
       ...productUi,
-      clientPrice: pricing ? Number(pricing.price) : productUi.baseCataloguePrice,
-      pricingId: pricing?.id ?? null,
+      clientPrice: bestPricing ? Number(bestPricing.price) : productUi.baseCataloguePrice,
+      pricingId: bestPricing?.id ?? null,
+      pricingClientId: bestPricing?.client_id ?? null,
     };
   });
 
@@ -615,10 +670,14 @@ export async function fetchCustomerPortalState(supabase, user) {
 
   return {
     contact: customerContactToUi(contact),
-    client: clientResult.data ? clientToUi(clientResult.data) : null,
+    clients: (clientsResult.data ?? []).map(clientToUi),
+    // Backward compat: keep single `client` as first assigned client.
+    client: clientsResult.data?.length ? clientToUi(clientsResult.data[0]) : null,
     locations: (locationsResult.data ?? []).map(locationToUi),
     products,
     recentOrders,
+    assignedClientIds,
+    assignedLocationIds,
   };
 }
 
@@ -813,6 +872,54 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_client_id: contact.clientId || null,
         p_status: contact.status,
       });
+    }
+    case 'UPDATE_CUSTOMER_ASSIGNMENTS': {
+      const { customerUserId, clientIds, locationIds } = action.payload;
+
+      // Delete existing assignments, then insert new ones.
+      // Using service_role via staff RLS, so staff can do all operations.
+      const { error: delClientErr } = await supabase
+        .from('customer_client_assignments')
+        .delete()
+        .eq('customer_user_id', customerUserId);
+      if (delClientErr) return { error: delClientErr };
+
+      const { error: delLocErr } = await supabase
+        .from('customer_location_assignments')
+        .delete()
+        .eq('customer_user_id', customerUserId);
+      if (delLocErr) return { error: delLocErr };
+
+      if (clientIds.length > 0) {
+        const clientRows = clientIds.map((cid) => ({
+          customer_user_id: customerUserId,
+          client_id: cid,
+        }));
+        const { error: insClientErr } = await supabase
+          .from('customer_client_assignments')
+          .insert(clientRows);
+        if (insClientErr) return { error: insClientErr };
+      }
+
+      if (locationIds.length > 0) {
+        const locationRows = locationIds.map((lid) => ({
+          customer_user_id: customerUserId,
+          location_id: lid,
+        }));
+        const { error: insLocErr } = await supabase
+          .from('customer_location_assignments')
+          .insert(locationRows);
+        if (insLocErr) return { error: insLocErr };
+      }
+
+      // Also update the legacy client_id on customer_contacts for backward compat.
+      const { error: contactUpdateErr } = await supabase
+        .from('customer_contacts')
+        .update({ client_id: clientIds[0] || null })
+        .eq('user_id', customerUserId);
+      if (contactUpdateErr) return { error: contactUpdateErr };
+
+      return { error: null };
     }
     case 'UPDATE_USER': {
       const targetUser = currentState.users.find((user) => user.id === action.payload.id);

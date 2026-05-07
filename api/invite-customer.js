@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method not allowed.' });
   }
 
-  const { email, fullName, clientId } = req.body ?? {};
+  const { email, fullName, clientId, clientIds, locationIds } = req.body ?? {};
 
   if (!email || typeof email !== 'string') {
     return res.status(400).json({ ok: false, error: 'Email is required.' });
@@ -37,6 +37,10 @@ export default async function handler(req, res) {
   if (!trimmedEmail || !trimmedName) {
     return res.status(400).json({ ok: false, error: 'Email and full name must not be empty.' });
   }
+
+  // Normalize client IDs: support both old single `clientId` and new `clientIds` array.
+  const resolvedClientIds = normalizeIdArray(clientIds, clientId);
+  const resolvedLocationIds = normalizeIdArray(locationIds);
 
   let supabase;
 
@@ -125,14 +129,14 @@ export default async function handler(req, res) {
   }
 
   // Create the customer_contacts row (using service_role, bypasses RLS).
-  const contactStatus = clientId ? 'active' : 'pending';
+  const contactStatus = resolvedClientIds.length > 0 ? 'active' : 'pending';
   const { error: insertError } = await supabase
     .from('customer_contacts')
     .insert({
       user_id: userId,
       email: trimmedEmail,
       full_name: trimmedName,
-      client_id: clientId || null,
+      client_id: resolvedClientIds[0] || null,  // backward compat: keep first client in old column
       status: contactStatus,
     });
 
@@ -146,12 +150,54 @@ export default async function handler(req, res) {
     });
   }
 
+  // Insert client assignments into the junction table.
+  if (resolvedClientIds.length > 0) {
+    const clientRows = resolvedClientIds.map((cid) => ({
+      customer_user_id: userId,
+      client_id: cid,
+    }));
+
+    const { error: clientAssignError } = await supabase
+      .from('customer_client_assignments')
+      .insert(clientRows);
+
+    if (clientAssignError) {
+      return res.status(207).json({
+        ok: true,
+        userId,
+        warning: `Invite sent and contact created, but company assignments failed: ${clientAssignError.message}. Assign companies manually from the Customers page.`,
+      });
+    }
+  }
+
+  // Insert location assignments into the junction table.
+  if (resolvedLocationIds.length > 0) {
+    const locationRows = resolvedLocationIds.map((lid) => ({
+      customer_user_id: userId,
+      location_id: lid,
+    }));
+
+    const { error: locationAssignError } = await supabase
+      .from('customer_location_assignments')
+      .insert(locationRows);
+
+    if (locationAssignError) {
+      return res.status(207).json({
+        ok: true,
+        userId,
+        warning: `Invite sent and companies assigned, but location assignments failed: ${locationAssignError.message}. Assign locations manually from the Customers page.`,
+      });
+    }
+  }
+
   return res.status(200).json({
     ok: true,
     userId,
     email: trimmedEmail,
     fullName: trimmedName,
     status: contactStatus,
+    clientIds: resolvedClientIds,
+    locationIds: resolvedLocationIds,
   });
 }
 
@@ -160,4 +206,23 @@ function normalizePublicUrl(value) {
   const trimmed = value.trim().replace(/\/$/, '');
   if (!trimmed) return null;
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
+/**
+ * Normalize an array of IDs, optionally including a single legacy ID.
+ * Deduplicates and filters empty values.
+ */
+function normalizeIdArray(arrayValue, legacySingleValue) {
+  const combined = [];
+
+  if (Array.isArray(arrayValue)) {
+    combined.push(...arrayValue);
+  }
+
+  if (legacySingleValue && typeof legacySingleValue === 'string') {
+    combined.push(legacySingleValue);
+  }
+
+  // Deduplicate and filter empties.
+  return [...new Set(combined.map((id) => String(id).trim()).filter(Boolean))];
 }
