@@ -606,7 +606,7 @@ export function AppProvider({ children }) {
     });
   }, []);
 
-  const loadCustomerPortalData = useCallback(async (user) => {
+  const loadCustomerPortalData = useCallback(async (user, options = {}) => {
     if (!supabase) return;
 
     const data = await fetchCustomerPortalState(supabase, user);
@@ -618,8 +618,7 @@ export function AppProvider({ children }) {
       },
     });
 
-    // If the customer was created with a temp password, force them to set a new one.
-    if (user.user_metadata?.must_change_password) {
+    if (options.needsPasswordSetup) {
       baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: true } });
     } else {
       baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } });
@@ -631,6 +630,9 @@ export function AppProvider({ children }) {
       if (!supabase) return;
 
       const identity = await fetchAuthIdentity(supabase, user.id);
+      const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
+      const tokenType = hashParams.get('type');
+      const needsPasswordSetup = tokenType === 'invite' || tokenType === 'recovery';
 
       if (identity === 'staff') {
         baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } });
@@ -638,7 +640,7 @@ export function AppProvider({ children }) {
         return;
       }
 
-      await loadCustomerPortalData(user);
+      await loadCustomerPortalData(user, { needsPasswordSetup });
     },
     [loadCustomerPortalData, loadRemoteData]
   );

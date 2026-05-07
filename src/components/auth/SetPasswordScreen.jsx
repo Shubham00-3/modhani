@@ -25,10 +25,19 @@ export default function SetPasswordScreen({ onComplete }) {
 
     setSubmitting(true);
 
-    // Update the password and clear the must_change_password flag.
+    const { data: userResult, error: userError } = await supabase.auth.getUser();
+    const user = userResult?.user;
+    const isCustomerPasswordSetupSession = user?.user_metadata?.account_type === 'customer';
+
+    if (userError || !user || !isCustomerPasswordSetupSession) {
+      await supabase.auth.signOut();
+      setError('Password setup is only available for customer invite or password-reset sessions. Open the customer email link and try again.');
+      setSubmitting(false);
+      return;
+    }
+
     const { error: updateError } = await supabase.auth.updateUser({
       password,
-      data: { must_change_password: false },
     });
 
     if (updateError) {

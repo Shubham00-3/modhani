@@ -5,7 +5,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  LockKeyhole,
   Mail,
   MapPin,
   Plus,
@@ -186,7 +185,7 @@ export default function PhaseOneCustomers() {
           clients={state.clients}
           locations={state.locations}
           onClose={() => setShowAddModal(false)}
-          onSuccess={() => addToast('Customer account created! Share the temporary password with the customer so they can sign in.')}
+          onSuccess={() => addToast('Customer invited successfully. They will receive an email link to set their password.')}
         />
       ) : null}
     </div>
@@ -528,7 +527,6 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
 function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [tempPassword, setTempPassword] = useState('');
   const [selectedClientIds, setSelectedClientIds] = useState([]);
   const [selectedLocationIds, setSelectedLocationIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -595,7 +593,6 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
         body: JSON.stringify({
           email: email.trim(),
           fullName: fullName.trim(),
-          tempPassword,
           clientIds: selectedClientIds,
           locationIds: selectedLocationIds,
         }),
@@ -604,7 +601,7 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
       const data = await response.json();
 
       if (!data.ok && !data.warning) {
-        setError(data.error || 'Failed to create customer account.');
+        setError(data.error || 'Failed to invite customer.');
         setSubmitting(false);
         return;
       }
@@ -641,7 +638,7 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             <p className="modal-description">
-              Create a customer account with a temporary password. Share the password with the customer so they can sign in. They will be asked to change it on first login.
+              Enter the customer's details below. They will receive an email link to set their password and sign in to the Customer Portal.
             </p>
 
             <div className="form-group">
@@ -668,25 +665,6 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
                   onChange={(event) => setEmail(event.target.value)}
                   required
                 />
-              </div>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Temporary Password *</label>
-              <div className="auth-input-wrap" style={{ background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-                <LockKeyhole size={16} />
-                <input
-                  className="form-input"
-                  type="text"
-                  placeholder="At least 6 characters"
-                  value={tempPassword}
-                  onChange={(event) => setTempPassword(event.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
-              <div className="form-hint">
-                Share this password with the customer. They'll be prompted to change it on first sign-in.
               </div>
             </div>
 
@@ -739,7 +717,7 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
             {error ? (
               <div className="alert alert-warning">
                 <div className="alert-content">
-                  <div className="alert-title">Could not create account</div>
+                  <div className="alert-title">Could not invite</div>
                   <div className="alert-description">{error}</div>
                 </div>
               </div>
@@ -751,8 +729,8 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
               Cancel
             </button>
             <button className="btn btn-primary" type="submit" disabled={submitting}>
-              <UserPlus size={16} />
-              {submitting ? 'Creating Account...' : 'Create Customer Account'}
+              <Mail size={16} />
+              {submitting ? 'Sending Invite...' : 'Send Invitation'}
             </button>
           </div>
         </form>

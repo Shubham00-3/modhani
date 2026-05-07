@@ -21,7 +21,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method not allowed.' });
   }
 
-  const { email, fullName, tempPassword, clientId, clientIds, locationIds } = req.body ?? {};
+  const { email, fullName, clientId, clientIds, locationIds } = req.body ?? {};
 
   if (!email || typeof email !== 'string') {
     return res.status(400).json({ ok: false, error: 'Email is required.' });
@@ -31,10 +31,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'Full name is required.' });
   }
 
-  if (!tempPassword || typeof tempPassword !== 'string' || tempPassword.length < 6) {
-    return res.status(400).json({ ok: false, error: 'A temporary password of at least 6 characters is required.' });
-  }
-
   const trimmedEmail = email.trim().toLowerCase();
   const trimmedName = fullName.trim();
 
@@ -42,7 +38,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ ok: false, error: 'Email and full name must not be empty.' });
   }
 
-  // Normalize client IDs: support both old single `clientId` and new `clientIds` array.
   const resolvedClientIds = normalizeIdArray(clientIds, clientId);
   const resolvedLocationIds = normalizeIdArray(locationIds);
 
@@ -54,7 +49,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: configError.message });
   }
 
-  // Verify that the caller is an authenticated staff member with manage_settings.
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return res.status(401).json({ ok: false, error: 'Authorization header is required.' });
@@ -81,7 +75,6 @@ export default async function handler(req, res) {
     return res.status(403).json({ ok: false, error: 'You need settings-management permission to add customers.' });
   }
 
-  // Check for existing customer_contacts with this email.
   const { data: existingContact } = await supabase
     .from('customer_contacts')
     .select('user_id')
@@ -92,33 +85,42 @@ export default async function handler(req, res) {
     return res.status(409).json({ ok: false, error: 'A customer with that email already exists.' });
   }
 
-  // Create the user directly with admin.createUser() — no email sent, no rate limit.
-  const { data: createData, error: createError } = await supabase.auth.admin.createUser({
-    email: trimmedEmail,
-    password: tempPassword,
-    email_confirm: true, // Auto-confirm email so they can log in immediately.
-    user_metadata: {
-      full_name: trimmedName,
-      account_type: 'customer',
-      must_change_password: true, // Flag to force password change on first login.
-    },
-  });
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+    || process.env.VITE_APP_URL
+    || normalizePublicUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL)
+    || normalizePublicUrl(process.env.VERCEL_URL)
+    || (req.headers['x-forwarded-host']
+      ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}`
+      : null)
+    || 'http://localhost:5173';
 
-  if (createError) {
-    if (createError.message?.toLowerCase().includes('already registered') || createError.message?.toLowerCase().includes('already been registered')) {
+  const redirectTo = normalizePublicUrl(appUrl);
+
+  const { data: inviteData, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(
+    trimmedEmail,
+    {
+      data: {
+        full_name: trimmedName,
+        account_type: 'customer',
+      },
+      redirectTo,
+    }
+  );
+
+  if (inviteError) {
+    if (inviteError.message?.toLowerCase().includes('already registered') || inviteError.message?.toLowerCase().includes('already been registered')) {
       return res.status(409).json({ ok: false, error: 'An account with this email already exists in the auth system. Try updating their status instead.' });
     }
 
-    return res.status(500).json({ ok: false, error: createError.message || 'Failed to create customer account.' });
+    return res.status(500).json({ ok: false, error: inviteError.message || 'Failed to send customer invite.' });
   }
 
-  const userId = createData.user?.id;
+  const userId = inviteData.user?.id;
 
   if (!userId) {
-    return res.status(500).json({ ok: false, error: 'User created but no user ID was returned.' });
+    return res.status(500).json({ ok: false, error: 'Invite sent but no user ID was returned.' });
   }
 
-  // Create the customer_contacts row (using service_role, bypasses RLS).
   const contactStatus = resolvedClientIds.length > 0 ? 'active' : 'pending';
   const { error: insertError } = await supabase
     .from('customer_contacts')
@@ -126,7 +128,7 @@ export default async function handler(req, res) {
       user_id: userId,
       email: trimmedEmail,
       full_name: trimmedName,
-      client_id: resolvedClientIds[0] || null,  // backward compat: keep first client in old column
+      client_id: resolvedClientIds[0] || null,
       status: contactStatus,
     });
 
@@ -134,11 +136,10 @@ export default async function handler(req, res) {
     return res.status(207).json({
       ok: true,
       userId,
-      warning: `Customer account created, but contact record failed: ${insertError.message}. Link them manually from the Customers page.`,
+      warning: `Invite email sent, but contact record failed: ${insertError.message}. Link them manually from the Customers page.`,
     });
   }
 
-  // Insert client assignments into the junction table.
   if (resolvedClientIds.length > 0) {
     const clientRows = resolvedClientIds.map((cid) => ({
       customer_user_id: userId,
@@ -153,12 +154,11 @@ export default async function handler(req, res) {
       return res.status(207).json({
         ok: true,
         userId,
-        warning: `Account created and contact saved, but company assignments failed: ${clientAssignError.message}. Assign companies manually from the Customers page.`,
+        warning: `Invite sent and contact saved, but company assignments failed: ${clientAssignError.message}. Assign companies manually from the Customers page.`,
       });
     }
   }
 
-  // Insert location assignments into the junction table.
   if (resolvedLocationIds.length > 0) {
     const locationRows = resolvedLocationIds.map((lid) => ({
       customer_user_id: userId,
@@ -173,7 +173,7 @@ export default async function handler(req, res) {
       return res.status(207).json({
         ok: true,
         userId,
-        warning: `Account created and companies assigned, but location assignments failed: ${locationAssignError.message}. Assign locations manually from the Customers page.`,
+        warning: `Invite sent and companies assigned, but location assignments failed: ${locationAssignError.message}. Assign locations manually from the Customers page.`,
       });
     }
   }
@@ -189,10 +189,13 @@ export default async function handler(req, res) {
   });
 }
 
-/**
- * Normalize an array of IDs, optionally including a single legacy ID.
- * Deduplicates and filters empty values.
- */
+function normalizePublicUrl(value) {
+  if (!value) return null;
+  const trimmed = value.trim().replace(/\/$/, '');
+  if (!trimmed) return null;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+}
+
 function normalizeIdArray(arrayValue, legacySingleValue) {
   const combined = [];
 
@@ -204,6 +207,5 @@ function normalizeIdArray(arrayValue, legacySingleValue) {
     combined.push(legacySingleValue);
   }
 
-  // Deduplicate and filter empties.
   return [...new Set(combined.map((id) => String(id).trim()).filter(Boolean))];
 }
