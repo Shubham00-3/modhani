@@ -1,6 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import AuthScreen from './components/auth/AuthScreen';
+import SetPasswordScreen from './components/auth/SetPasswordScreen';
 import { useApp } from './context/useApp';
 import PhaseOneOverview from './pages/PhaseOneOverview';
 import PhaseOneOrdersInvoicing from './pages/PhaseOneOrdersInvoicing';
@@ -14,7 +15,7 @@ import PhaseOneCustomers from './pages/PhaseOneCustomers';
 import CustomerPortal from './pages/CustomerPortal';
 
 export default function App() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
 
   if (!state.initialized || state.authLoading) {
     return (
@@ -38,6 +39,15 @@ export default function App() {
 
   if (state.authConfigured && !state.isAuthenticated) {
     return <AuthScreen />;
+  }
+
+  // Show "Set Password" screen when user arrived via invite or password-reset link.
+  if (state.needsPasswordSetup) {
+    return (
+      <SetPasswordScreen
+        onComplete={() => dispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } })}
+      />
+    );
   }
 
   if (state.authConfigured && state.authRole === 'customer') {
