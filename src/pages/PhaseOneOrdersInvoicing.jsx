@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
-  ChevronDown,
   FileText,
   Lock,
   Package,
@@ -1443,7 +1442,7 @@ function AddOrderModal({ onClose }) {
 
             <div className="form-group">
               <label className="form-label">Location</label>
-              <select className="form-select" value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+              <select className="form-select form-select-no-caret" value={locationId} onChange={(event) => setLocationId(event.target.value)}>
                 <option value="">Select location</option>
                 {locationOptions.map((location) => (
                   <option key={location.id} value={location.id}>
@@ -1468,7 +1467,7 @@ function AddOrderModal({ onClose }) {
 
           <div className="form-group">
             <label className="form-label">Source</label>
-            <select className="form-select" value={source} onChange={(event) => setSource(event.target.value)}>
+            <select className="form-select form-select-no-caret" value={source} onChange={(event) => setSource(event.target.value)}>
               <option value="portal">Portal</option>
               <option value="edi">EDI</option>
             </select>
@@ -1613,7 +1612,6 @@ function SearchableSelect({
         onFocus={() => setIsOpen(true)}
         onBlur={() => window.setTimeout(() => setIsOpen(false), 150)}
       />
-      <span className="searchable-select-caret"><ChevronDown size={16} /></span>
       {isOpen ? (
         <div className="searchable-select-menu">
           {filteredOptions.length ? (

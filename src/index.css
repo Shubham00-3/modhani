@@ -2106,6 +2106,11 @@ input[type='checkbox']:disabled {
   transition: border-color var(--transition-fast);
 }
 
+.form-select-no-caret {
+  background-image: none;
+  padding-right: var(--space-3);
+}
+
 .form-select:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(26, 48, 33, 0.1);
@@ -2326,21 +2331,6 @@ input[type='checkbox']:disabled {
   position: relative;
   min-width: 0;
   width: 100%;
-}
-
-.searchable-select-input {
-  padding-right: 34px;
-}
-
-.searchable-select-caret {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  pointer-events: none;
-  color: var(--color-text-muted);
-  font-size: 18px;
-  line-height: 1;
-  transform: translateY(-50%);
 }
 
 .searchable-select-menu {
