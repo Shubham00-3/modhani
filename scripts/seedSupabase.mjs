@@ -31,7 +31,7 @@ async function main() {
   const userIdMap = await ensureAuthUsers();
   await resetTables();
   await seedCoreTables(userIdMap);
-  console.log('Supabase Phase 1 seed completed successfully.');
+  console.log('Supabase seed completed successfully.');
 }
 
 async function ensureAuthUsers() {

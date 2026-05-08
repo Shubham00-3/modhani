@@ -66,7 +66,7 @@ export default function PhaseOneSettings() {
           <div className="alert-content">
             <div className="alert-title">Read-only for this user</div>
             <div className="alert-description">
-              Switch to an admin user from the top bar to change Phase 1 settings.
+              Switch to an admin user from the top bar to change system settings.
             </div>
           </div>
         </div>

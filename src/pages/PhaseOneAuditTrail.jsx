@@ -92,7 +92,7 @@ export default function PhaseOneAuditTrail() {
           <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
             <ScrollText size={28} /> Audit Trail
           </h1>
-          <p className="page-subtitle">Phase 1 immutable activity log for orders, pricing, production, and shipment actions.</p>
+          <p className="page-subtitle">Immutable activity log for orders, pricing, production, and shipment actions.</p>
         </div>
       </div>
 

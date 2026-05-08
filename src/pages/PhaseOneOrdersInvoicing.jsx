@@ -252,7 +252,7 @@ export default function PhaseOneOrdersInvoicing() {
         <div>
           <h1 className="page-title">Orders & Invoicing</h1>
           <p className="page-subtitle">
-            Manual Phase 1 fulfilment, invoicing, QuickBooks sync, and packing slip control.
+            Manual fulfilment, invoicing, QuickBooks sync, and packing slip control.
           </p>
         </div>
         <button className="btn btn-primary" type="button" disabled={!canCreateOrders} onClick={() => setShowAddOrderModal(true)}>
