@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
+  ChevronDown,
   FileText,
   Lock,
   Package,
@@ -1612,7 +1613,7 @@ function SearchableSelect({
         onFocus={() => setIsOpen(true)}
         onBlur={() => window.setTimeout(() => setIsOpen(false), 150)}
       />
-      <span className="searchable-select-caret">v</span>
+      <span className="searchable-select-caret"><ChevronDown size={16} /></span>
       {isOpen ? (
         <div className="searchable-select-menu">
           {filteredOptions.length ? (
