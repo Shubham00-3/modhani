@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, FlaskConical, Plus, RotateCcw, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
@@ -209,9 +209,14 @@ function LogProductionModal({ onClose, onSave }) {
   const [isProductSearchFocused, setIsProductSearchFocused] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [productionDate, setProductionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [lotCode, setLotCode] = useState(() => getNextLotCode(state.batches, productionDate));
   const [isSaving, setIsSaving] = useState(false);
   const selectedProduct = getProduct(state.products, productId);
-  const lotCode = useMemo(() => getNextLotCode(state.batches, productionDate), [productionDate, state.batches]);
+
+  useEffect(() => {
+    setLotCode(getNextLotCode(state.batches, productionDate));
+  }, [productionDate, state.batches]);
+
   const filteredProducts = useMemo(() => {
     const search = productSearch.trim().toLowerCase();
     if (!search) return state.products;
@@ -339,7 +344,10 @@ function LogProductionModal({ onClose, onSave }) {
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Lot Code</label>
-              <input className="form-input" value={lotCode} disabled />
+              <input className="form-input" value={lotCode} onChange={(event) => setLotCode(event.target.value)} />
+              <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                Auto-filled from the production date. Staff can override it when needed.
+              </div>
             </div>
             <div className="form-group">
               <label className="form-label">Production Date</label>

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Building2, CheckCircle2, LogOut, Package, Send, ShoppingCart } from 'lucide-react';
+import { Building2, CheckCircle2, ChevronDown, LogOut, Minus, Package, Plus, Send, ShoppingCart } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatCurrency, formatDateTime, getProductDisplayName, getProductImageUrl, hasProductImage } from '../data/phaseOneData';
 
@@ -12,6 +12,8 @@ export default function CustomerPortal() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [orderSubmitted, setOrderSubmitted] = useState(false);
+  const [selectedRecentOrderId, setSelectedRecentOrderId] = useState('');
 
   // Multi-client support: if customer has multiple clients, show a company selector.
   const portalClients = useMemo(() => portal?.clients ?? [], [portal?.clients]);
@@ -59,6 +61,10 @@ export default function CustomerPortal() {
     [activeProducts, quantities]
   );
   const orderTotal = selectedLines.reduce((total, line) => total + line.quantity * line.product.clientPrice, 0);
+  const productsById = useMemo(() => new Map(portalProducts.map((product) => [product.id, product])), [portalProducts]);
+  const selectedRecentOrder = selectedRecentOrderId
+    ? portal?.recentOrders.find((order) => order.id === selectedRecentOrderId) ?? null
+    : null;
 
   async function handleCompleteProfile(event) {
     event.preventDefault();
@@ -107,9 +113,11 @@ export default function CustomerPortal() {
 
     if (!result.ok) {
       setError(result.error ?? 'Unable to submit order.');
+      setOrderSubmitted(false);
     } else {
-      setMessage('Order submitted. Modhani staff can now see it in Orders & Invoicing.');
+      setMessage('Thank you, your order has been submitted.');
       setQuantities({});
+      setOrderSubmitted(true);
     }
 
     setSubmitting(false);
@@ -121,6 +129,16 @@ export default function CustomerPortal() {
     setQuantities({});
     setError('');
     setMessage('');
+    setOrderSubmitted(false);
+  }
+
+  function updateProductQuantity(productId, nextValue) {
+    const nextQuantity = Math.max(0, Number(nextValue) || 0);
+    setOrderSubmitted(false);
+    setQuantities((current) => ({
+      ...current,
+      [productId]: nextQuantity ? String(nextQuantity) : '',
+    }));
   }
 
   if (!portal) {
@@ -176,19 +194,66 @@ export default function CustomerPortal() {
           <h1>{activeClient?.name ?? 'Customer Portal'}</h1>
           <p>Choose your delivery location, enter quantities, and submit your order to Modhani.</p>
         </div>
-        <div className="customer-total-card">
-          <span>Order Total</span>
-          <strong>{formatCurrency(orderTotal)}</strong>
-        </div>
       </section>
 
       <form className="customer-order-layout" onSubmit={handleSubmitOrder}>
-        <section className="customer-portal-panel">
+        <section className="customer-products-list">
+          {activeProducts.length ? (
+            activeProducts.map((product) => {
+              const imageUrl = getProductImageUrl(product, { fallback: true });
+              const usesFallback = !hasProductImage(product);
+              const quantity = quantities[product.id] ?? '';
+              const numericQuantity = Number(quantity || 0);
+
+              return (
+                <article className="customer-product-card" key={product.id}>
+                  <div className="customer-product-image">
+                    <img
+                      className={usesFallback ? 'product-image-fallback' : ''}
+                      src={imageUrl}
+                      alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)}
+                    />
+                  </div>
+                  <div className="customer-product-info">
+                    <h3>{getProductDisplayName(product)}</h3>
+                    <p>{product.category || 'Product'}</p>
+                    <strong>{formatCurrency(product.clientPrice)}</strong>
+                  </div>
+                  <div className="customer-product-actions">
+                    <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity - 1)} aria-label={`Decrease ${getProductDisplayName(product)}`}>
+                      <Minus size={16} />
+                    </button>
+                    <input
+                      className="form-input"
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={quantity}
+                      onChange={(event) => updateProductQuantity(product.id, event.target.value)}
+                      aria-label={`${getProductDisplayName(product)} quantity`}
+                    />
+                    <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity + 1)} aria-label={`Increase ${getProductDisplayName(product)}`}>
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                </article>
+              );
+            })
+          ) : (
+            <div className="customer-portal-panel customer-pending-panel">
+              <Package size={34} />
+              <h2>No Products Available</h2>
+              <p>Modhani staff has not enabled products for this company catalogue yet.</p>
+            </div>
+          )}
+        </section>
+
+        <aside className="customer-portal-panel customer-order-summary">
           <div className="portal-section-heading">
             <ShoppingCart size={20} />
             <div>
-              <h2>Order Details</h2>
-              <p>Submitted orders appear as pending portal orders for staff.</p>
+              <h2>Order Summary</h2>
+              <p>{selectedLines.length} selected item{selectedLines.length === 1 ? '' : 's'}</p>
             </div>
           </div>
 
@@ -211,7 +276,14 @@ export default function CustomerPortal() {
 
           <div className="form-group">
             <label className="form-label">Location</label>
-            <select className="form-select" value={activeLocationId} onChange={(event) => setLocationId(event.target.value)}>
+            <select
+              className="form-select"
+              value={activeLocationId}
+              onChange={(event) => {
+                setLocationId(event.target.value);
+                setOrderSubmitted(false);
+              }}
+            >
               {activeLocations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.name}
@@ -223,61 +295,40 @@ export default function CustomerPortal() {
 
           <PortalMessages error={error} message={message} />
 
-          <button className="btn btn-primary" type="submit" disabled={submitting || !activeProducts.length}>
+          {orderSubmitted ? (
+            <div className="customer-submit-confirmation">
+              <CheckCircle2 size={24} />
+              <div>
+                <strong>Thank you</strong>
+                <span>Your order has been submitted.</span>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="customer-cart-lines">
+            {selectedLines.length ? (
+              selectedLines.map((line) => (
+                <div key={line.product.id} className="customer-cart-line">
+                  <span>{getProductDisplayName(line.product)}</span>
+                  <strong>
+                    {line.quantity.toLocaleString()} x {formatCurrency(line.product.clientPrice)}
+                  </strong>
+                </div>
+              ))
+            ) : (
+              <div className="customer-empty-cart">No quantities entered</div>
+            )}
+          </div>
+
+          <div className="customer-total-card">
+            <span>Order Total</span>
+            <strong>{formatCurrency(orderTotal)}</strong>
+          </div>
+
+          <button className="btn btn-primary" type="submit" disabled={submitting || !activeProducts.length || !selectedLines.length}>
             <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Order'}
           </button>
-        </section>
-
-        <section className="customer-products-list">
-          {activeProducts.length ? (
-            activeProducts.map((product) => {
-              const imageUrl = getProductImageUrl(product, { fallback: true });
-              const usesFallback = !hasProductImage(product);
-              const quantity = quantities[product.id] ?? '';
-              const lineTotal = Number(quantity || 0) * product.clientPrice;
-
-              return (
-                <article className="customer-product-row" key={product.id}>
-                  <div className="customer-product-image">
-                    <img
-                      className={usesFallback ? 'product-image-fallback' : ''}
-                      src={imageUrl}
-                      alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)}
-                    />
-                  </div>
-                  <div className="customer-product-info">
-                    <h3>{getProductDisplayName(product)}</h3>
-                    <p>{product.category || 'Product'}</p>
-                    <strong>{formatCurrency(product.clientPrice)}</strong>
-                  </div>
-                  <div className="customer-product-qty">
-                    <label className="form-label">Qty</label>
-                    <input
-                      className="form-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={quantity}
-                      onChange={(event) =>
-                        setQuantities((current) => ({
-                          ...current,
-                          [product.id]: event.target.value,
-                        }))
-                      }
-                    />
-                    <span>{formatCurrency(lineTotal)}</span>
-                  </div>
-                </article>
-              );
-            })
-          ) : (
-            <div className="customer-portal-panel customer-pending-panel">
-              <Package size={34} />
-              <h2>No Products Available</h2>
-              <p>Modhani staff has not enabled products for this company catalogue yet.</p>
-            </div>
-          )}
-        </section>
+        </aside>
       </form>
 
       {portal.recentOrders.length ? (
@@ -291,13 +342,42 @@ export default function CustomerPortal() {
           </div>
           <div className="customer-order-history">
             {portal.recentOrders.map((order) => (
-              <div key={order.id}>
+              <button
+                className="customer-order-history-row"
+                key={order.id}
+                type="button"
+                onClick={() => setSelectedRecentOrderId((current) => (current === order.id ? '' : order.id))}
+              >
                 <strong>Order #{order.orderNumber}</strong>
                 <span>{order.status}</span>
                 <span>{formatDateTime(order.createdAt)}</span>
-              </div>
+                <ChevronDown size={16} className={selectedRecentOrderId === order.id ? 'customer-order-chevron-open' : ''} />
+              </button>
             ))}
           </div>
+          {selectedRecentOrder ? (
+            <div className="customer-recent-order-detail">
+              <div className="customer-recent-order-title">
+                <strong>Order #{selectedRecentOrder.orderNumber}</strong>
+                <span>{formatDateTime(selectedRecentOrder.createdAt)}</span>
+              </div>
+              {(selectedRecentOrder.items ?? []).length ? (
+                selectedRecentOrder.items.map((item) => {
+                  const product = productsById.get(item.productId);
+                  const unitPrice = item.clientPrice ?? product?.clientPrice ?? 0;
+                  return (
+                    <div className="customer-recent-order-line" key={item.id}>
+                      <span>{product ? getProductDisplayName(product) : item.productId}</span>
+                      <strong>{Number(item.quantity).toLocaleString()} units</strong>
+                      <span>{formatCurrency(Number(item.quantity) * unitPrice)}</span>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="customer-empty-cart">No line details available</div>
+              )}
+            </div>
+          ) : null}
         </section>
       ) : null}
     </PortalShell>

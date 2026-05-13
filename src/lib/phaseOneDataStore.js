@@ -10,6 +10,7 @@ function profileToUi(profile) {
     permissions: {
       fulfilOrders: profile.fulfil_orders,
       overridePrices: profile.override_prices,
+      editInvoices: profile.edit_invoices ?? (profile.fulfil_orders || profile.override_prices),
       manageSettings: profile.manage_settings,
     },
   };
@@ -186,6 +187,7 @@ function profileToDb(user) {
     role: user.role,
     fulfil_orders: user.permissions.fulfilOrders,
     override_prices: user.permissions.overridePrices,
+    edit_invoices: Boolean(user.permissions.editInvoices),
     manage_settings: user.permissions.manageSettings,
   };
 }
@@ -966,6 +968,7 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_target_user_id: targetUser.id,
         p_fulfil_orders: Boolean(nextPermissions.fulfilOrders),
         p_override_prices: Boolean(nextPermissions.overridePrices),
+        p_edit_invoices: Boolean(nextPermissions.editInvoices),
         p_manage_settings: Boolean(nextPermissions.manageSettings),
       });
     }

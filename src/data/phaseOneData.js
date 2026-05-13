@@ -10,6 +10,7 @@ export const USERS = [
     permissions: {
       fulfilOrders: true,
       overridePrices: true,
+      editInvoices: true,
       manageSettings: true,
     },
   },
@@ -22,6 +23,7 @@ export const USERS = [
     permissions: {
       fulfilOrders: true,
       overridePrices: false,
+      editInvoices: true,
       manageSettings: false,
     },
   },
@@ -34,6 +36,7 @@ export const USERS = [
     permissions: {
       fulfilOrders: false,
       overridePrices: true,
+      editInvoices: true,
       manageSettings: false,
     },
   },

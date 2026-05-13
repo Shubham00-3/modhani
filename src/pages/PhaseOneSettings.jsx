@@ -20,6 +20,7 @@ export default function PhaseOneSettings() {
   const visibleUsers = state.users.filter((user) =>
     settingSearchMatches([
       'user roles staff permissions fulfil orders override prices manage settings',
+      'edit invoices',
       user.name,
       user.role,
       user.email,
@@ -44,6 +45,7 @@ export default function PhaseOneSettings() {
   const staffSummary = {
     fulfilment: state.users.filter((user) => user.permissions.fulfilOrders).length,
     pricing: state.users.filter((user) => user.permissions.overridePrices).length,
+    invoiceEditing: state.users.filter((user) => user.permissions.editInvoices).length,
     settings: state.users.filter((user) => user.permissions.manageSettings).length,
     emailEnabled: state.clients.filter((client) => client.emailInvoice || client.emailPackingSlip).length,
     failedQbSyncs: state.quickBooksJobs.filter((job) => job.status === 'failed').length,
@@ -75,8 +77,8 @@ export default function PhaseOneSettings() {
       <div className="grid-4">
         <SummaryCard label="Fulfilment Access" value={`${staffSummary.fulfilment} staff`} />
         <SummaryCard label="Override Access" value={`${staffSummary.pricing} staff`} />
+        <SummaryCard label="Invoice Editors" value={`${staffSummary.invoiceEditing} staff`} />
         <SummaryCard label="Settings Admins" value={`${staffSummary.settings} staff`} />
-        <SummaryCard label="Failed QB Syncs" value={`${staffSummary.failedQbSyncs} jobs`} />
       </div>
 
       <div className="grid-2">
@@ -90,6 +92,7 @@ export default function PhaseOneSettings() {
                 <th>User</th>
                 <th>Fulfil Orders</th>
                 <th>Override Prices</th>
+                <th>Edit Invoices</th>
                 <th>Manage Settings</th>
               </tr>
             </thead>
@@ -119,6 +122,19 @@ export default function PhaseOneSettings() {
                         dispatch({
                           type: 'UPDATE_USER',
                           payload: { id: user.id, permissions: { overridePrices: event.target.checked } },
+                        })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(user.permissions.editInvoices)}
+                      disabled={!canManage}
+                      onChange={(event) =>
+                        dispatch({
+                          type: 'UPDATE_USER',
+                          payload: { id: user.id, permissions: { editInvoices: event.target.checked } },
                         })
                       }
                     />

@@ -504,6 +504,7 @@ function OrderDetailPanel({
   const quickBooksStatus = getQuickBooksSyncLabel(order);
   const canEditInvoice =
     order.invoiceNumber &&
+    state.currentUser.permissions.editInvoices &&
     ['invoiced', 'shipped'].includes(order.status) &&
     order.qbSyncStatus !== 'pending' &&
     order.qbSyncStatus !== 'syncing' &&
@@ -1135,6 +1136,10 @@ function EditInvoiceModal({ order, onClose }) {
 
       if (!revisionReason.trim()) {
         throw new Error('Provide a reason for editing this invoice.');
+      }
+
+      if (!state.currentUser.permissions.editInvoices) {
+        throw new Error('This user cannot edit invoices.');
       }
 
       if (!shipToDraft.name.trim() || !shipToDraft.addressLine1.trim() || !shipToDraft.city.trim() || !shipToDraft.province.trim() || !shipToDraft.postalCode.trim()) {
