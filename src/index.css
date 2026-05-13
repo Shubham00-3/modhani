@@ -2142,7 +2142,6 @@ input[type='checkbox']:disabled {
 
 .modal-order {
   max-width: 760px;
-  overflow: visible;
 }
 
 .modal-header {

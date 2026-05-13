@@ -77,11 +77,8 @@ function formatAddressBlock(name, location) {
     .join('<br />');
 }
 
-function getInvoiceHeaderNumber(order, batches) {
-  const savedNumber = order.invoiceNumber ?? `MOD-${order.orderNumber}`;
-  if (!String(savedNumber).startsWith('DRAFT-')) return savedNumber;
-
-  const lotCodes = [
+function getOrderLotCodes(order, batches) {
+  return [
     ...new Set(
       order.items
         .flatMap((item) => item.assignedBatches ?? [])
@@ -89,6 +86,13 @@ function getInvoiceHeaderNumber(order, batches) {
         .filter(Boolean)
     ),
   ];
+}
+
+function getInvoiceHeaderNumber(order, batches) {
+  const savedNumber = order.invoiceNumber ?? `MOD-${order.orderNumber}`;
+  if (!String(savedNumber).startsWith('DRAFT-')) return savedNumber;
+
+  const lotCodes = getOrderLotCodes(order, batches);
 
   return lotCodes.length ? lotCodes.join(', ') : savedNumber;
 }
@@ -99,7 +103,10 @@ export function printPackingSlip({ order, clients, locations, products, batches 
   const shipTo = getOrderShipToSnapshot(order, location);
   const shipToAddress = formatAddressBlock(shipTo.name, shipTo);
   const logoSrc = getLogoSrc();
+  const lotCodes = getOrderLotCodes(order, batches);
+  const lotCodeLabel = lotCodes.length ? lotCodes.join(', ') : 'Not assigned';
   const rows = order.items
+    .filter((item) => item.fulfilledQty > 0)
     .map((item) => {
       const product = getProduct(products, item.productId);
       const batchLines = item.assignedBatches
@@ -116,7 +123,7 @@ export function printPackingSlip({ order, clients, locations, products, batches 
             <span>${item.fulfilledQty.toLocaleString()} units</span>
           </div>
           <ul style="margin:10px 0 0 18px;padding:0;color:#4b5563;">
-            ${batchLines || '<li>No batch assignment</li>'}
+            ${batchLines || '<li>No lot assignment</li>'}
           </ul>
         </section>
       `;
@@ -124,7 +131,7 @@ export function printPackingSlip({ order, clients, locations, products, batches 
     .join('');
 
   openPrintableWindow(
-    `Packing Slip ${order.packingSlipNumber ?? order.orderNumber}`,
+    'Packing Slip',
     `
       <main style="font-family:Segoe UI,Arial,sans-serif;padding:32px;color:#111827;">
           <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:28px;">
@@ -136,7 +143,7 @@ export function printPackingSlip({ order, clients, locations, products, batches 
               </div>
             </div>
             <div style="text-align:right;">
-              <div><strong>Slip #:</strong> ${order.packingSlipNumber ?? `PS-${order.orderNumber}`}</div>
+              <div><strong>Lot Code:</strong> ${lotCodeLabel}</div>
               <div><strong>Order #:</strong> ${order.orderNumber}</div>
               <div><strong>Date:</strong> ${formatDate(order.shippedAt ?? new Date().toISOString())}</div>
             </div>

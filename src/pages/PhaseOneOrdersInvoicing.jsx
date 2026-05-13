@@ -508,6 +508,13 @@ function OrderDetailPanel({
     order.qbSyncStatus !== 'pending' &&
     order.qbSyncStatus !== 'syncing' &&
     !quickBooksJob;
+  const canQueueQuickBooks =
+    order.invoiceNumber &&
+    ['invoiced', 'shipped'].includes(order.status) &&
+    order.qbSyncStatus !== 'pushed' &&
+    order.qbSyncStatus !== 'syncing' &&
+    order.qbSyncStatus !== 'failed' &&
+    !quickBooksJob;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -613,7 +620,7 @@ function OrderDetailPanel({
           </button>
         ) : null}
 
-        {order.status === 'invoiced' && order.qbSyncStatus !== 'pushed' && order.qbSyncStatus !== 'syncing' && !quickBooksJob ? (
+        {canQueueQuickBooks ? (
           <button className="btn btn-secondary" type="button" onClick={() => onPushToQuickBooks(order)}>
             <FileText size={16} /> Queue for QuickBooks Sync
           </button>
@@ -1216,7 +1223,7 @@ function EditInvoiceModal({ order, onClose }) {
             <div className="alert-content">
               <div className="alert-title">Editable invoice details</div>
               <div className="alert-description">
-                Address and quantity changes stay on this invoice. If it already synced, the next Web Connector run updates the same QuickBooks invoice.
+                Address changes stay on this invoice. Quantity reductions also update lot inventory and packing slips; if already synced, the next Web Connector run updates the same QuickBooks invoice.
               </div>
             </div>
           </div>

@@ -145,6 +145,62 @@ function applyAssignments(order, batches, assignments, timestamp) {
   };
 }
 
+function trimFulfilmentToInvoiceLines(order, batches, lines) {
+  const nextBatchesById = new Map(batches.map((batch) => [batch.id, { ...batch }]));
+  const linesByItemId = new Map(lines.map((line) => [line.orderItemId, line]));
+
+  const nextItems = order.items.map((item) => {
+    const line = linesByItemId.get(item.id);
+    if (!line) return item;
+
+    const nextInvoiceQty = Number(line.invoiceQty);
+    const currentFulfilledQty = Number(item.fulfilledQty) || 0;
+    let qtyToReturn = Math.max(currentFulfilledQty - nextInvoiceQty, 0);
+    const nextAssignedBatches = [...item.assignedBatches];
+
+    for (let index = nextAssignedBatches.length - 1; index >= 0 && qtyToReturn > 0; index -= 1) {
+      const assigned = nextAssignedBatches[index];
+      const assignedQty = Number(assigned.qty) || 0;
+      const returnedQty = Math.min(assignedQty, qtyToReturn);
+      const batch = nextBatchesById.get(assigned.batchId);
+
+      if (batch) {
+        const nextRemainingQty = Math.min(Number(batch.qtyProduced) || 0, (Number(batch.qtyRemaining) || 0) + returnedQty);
+        batch.qtyRemaining = nextRemainingQty;
+        batch.status = nextRemainingQty > 0 ? 'active' : 'cleared';
+      }
+
+      qtyToReturn -= returnedQty;
+
+      if (returnedQty >= assignedQty) {
+        nextAssignedBatches.splice(index, 1);
+      } else {
+        nextAssignedBatches[index] = {
+          ...assigned,
+          qty: assignedQty - returnedQty,
+        };
+      }
+    }
+
+    const removedFulfilmentQty = Math.max(currentFulfilledQty - nextInvoiceQty, 0);
+
+    return {
+      ...item,
+      fulfilledQty: Math.min(currentFulfilledQty, nextInvoiceQty),
+      invoiceQty: nextInvoiceQty,
+      declinedQty: (item.declinedQty ?? 0) + removedFulfilmentQty,
+      overridePrice: line.overridePrice,
+      overrideReason: line.overrideReason,
+      assignedBatches: nextAssignedBatches,
+    };
+  });
+
+  return {
+    items: nextItems,
+    batches: batches.map((batch) => nextBatchesById.get(batch.id) ?? batch),
+  };
+}
+
 function reducer(state, action) {
   switch (action.type) {
     case 'INITIALIZE_REMOTE_DATA':
@@ -399,36 +455,33 @@ function reducer(state, action) {
     case 'EDIT_INVOICE':
       return {
         ...state,
-        orders: state.orders.map((order) => {
-          if (order.id !== action.payload.orderId) return order;
+        ...(() => {
+          let nextBatches = state.batches;
+          const nextOrders = state.orders.map((order) => {
+            if (order.id !== action.payload.orderId) return order;
 
-          const nextItems = order.items.map((item) => {
-            const line = action.payload.lines.find((entry) => entry.orderItemId === item.id);
-            if (!line) return item;
+            const result = trimFulfilmentToInvoiceLines(order, state.batches, action.payload.lines);
+            nextBatches = result.batches;
+            const nextItems = result.items;
+            const invoiceTotal = nextItems.reduce((sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item), 0);
 
             return {
-              ...item,
-              invoiceQty: line.invoiceQty,
-              overridePrice: line.overridePrice,
-              overrideReason: line.overrideReason,
+              ...order,
+              items: nextItems,
+              invoiceTotal,
+              invoiceShipToName: action.payload.shipTo?.name ?? order.invoiceShipToName ?? null,
+              invoiceAddressLine1: action.payload.shipTo?.addressLine1 ?? order.invoiceAddressLine1 ?? null,
+              invoiceAddressLine2: action.payload.shipTo?.addressLine2 ?? order.invoiceAddressLine2 ?? null,
+              invoiceCity: action.payload.shipTo?.city ?? order.invoiceCity ?? null,
+              invoiceProvince: action.payload.shipTo?.province ?? order.invoiceProvince ?? null,
+              invoicePostalCode: action.payload.shipTo?.postalCode ?? order.invoicePostalCode ?? null,
+              invoiceCountry: action.payload.shipTo?.country ?? order.invoiceCountry ?? null,
+              qbSyncStatus: order.qbSyncStatus === 'pushed' ? 'pending' : order.qbSyncStatus,
             };
           });
-          const invoiceTotal = nextItems.reduce((sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item), 0);
 
-          return {
-            ...order,
-            items: nextItems,
-            invoiceTotal,
-            invoiceShipToName: action.payload.shipTo?.name ?? order.invoiceShipToName ?? null,
-            invoiceAddressLine1: action.payload.shipTo?.addressLine1 ?? order.invoiceAddressLine1 ?? null,
-            invoiceAddressLine2: action.payload.shipTo?.addressLine2 ?? order.invoiceAddressLine2 ?? null,
-            invoiceCity: action.payload.shipTo?.city ?? order.invoiceCity ?? null,
-            invoiceProvince: action.payload.shipTo?.province ?? order.invoiceProvince ?? null,
-            invoicePostalCode: action.payload.shipTo?.postalCode ?? order.invoicePostalCode ?? null,
-            invoiceCountry: action.payload.shipTo?.country ?? order.invoiceCountry ?? null,
-            qbSyncStatus: order.qbSyncStatus === 'pushed' ? 'pending' : order.qbSyncStatus,
-          };
-        }),
+          return { orders: nextOrders, batches: nextBatches };
+        })(),
         auditLog: [
           {
             id: `audit-${Date.now()}`,
