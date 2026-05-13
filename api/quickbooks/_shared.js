@@ -74,6 +74,19 @@ function buildQuickBooksAddressXml(location, fallbackName) {
           <Country>${escapeXml(compactText(address.country) || 'Canada')}</Country>`;
 }
 
+function getInvoiceShipTo(order, fallbackLocation) {
+  return {
+    name: order.invoice_ship_to_name || fallbackLocation?.name,
+    qb_ship_to_name: order.invoice_ship_to_name || fallbackLocation?.qb_ship_to_name || fallbackLocation?.name,
+    address_line1: order.invoice_address_line1 || fallbackLocation?.address_line1,
+    address_line2: order.invoice_address_line2 || fallbackLocation?.address_line2,
+    city: order.invoice_city || fallbackLocation?.city,
+    province: order.invoice_province || fallbackLocation?.province,
+    postal_code: order.invoice_postal_code || fallbackLocation?.postal_code,
+    country: order.invoice_country || fallbackLocation?.country || 'Canada',
+  };
+}
+
 export function soapEnvelope(body) {
   return `<?xml version="1.0" encoding="utf-8"?>${''}
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns="http://developer.intuit.com/">
@@ -217,19 +230,20 @@ export async function completeInvoiceJob(supabase, ticket, responseXml) {
     return 100;
   }
 
-  if (job.job_type !== 'invoice') {
+  if (job.job_type !== 'invoice' && job.job_type !== 'invoice_update') {
     await markJobPushed(supabase, job, responseXml, getTagValue(responseXml, 'ListID'), getReferenceNumber(job));
     return getCompletionPercentage(supabase);
   }
 
   const qbTxnId = getTagValue(responseXml, 'TxnID');
   const qbRefNumber = getTagValue(responseXml, 'RefNumber');
+  const qbEditSequence = getTagValue(responseXml, 'EditSequence');
   if (!qbTxnId) {
     await failInvoiceJob(supabase, ticket, 'QuickBooks did not return an invoice transaction ID.');
     return 100;
   }
 
-  await markJobPushed(supabase, job, responseXml, qbTxnId, qbRefNumber || `QB-${job.order_id}`);
+  await markJobPushed(supabase, job, responseXml, qbTxnId, qbRefNumber || `QB-${job.order_id}`, qbEditSequence);
   return getCompletionPercentage(supabase);
 }
 
@@ -237,7 +251,7 @@ async function getCompletionPercentage(supabase) {
   return (await hasPendingQuickBooksWork(supabase)) ? 50 : 100;
 }
 
-async function markJobPushed(supabase, job, responseXml, qbId, qbReference) {
+async function markJobPushed(supabase, job, responseXml, qbId, qbReference, qbEditSequence = null) {
   const now = new Date().toISOString();
 
   await supabase.from('quickbooks_sync_jobs').update({
@@ -245,6 +259,7 @@ async function markJobPushed(supabase, job, responseXml, qbId, qbReference) {
     response_xml: responseXml,
     qb_txn_id: qbId || null,
     qb_invoice_number: qbReference || null,
+    qb_edit_sequence: qbEditSequence || null,
     error_message: null,
     locked_by_ticket: null,
     locked_at: null,
@@ -257,9 +272,14 @@ async function markJobPushed(supabase, job, responseXml, qbId, qbReference) {
     response_xml: responseXml,
   });
 
-  if (job.job_type === 'invoice') {
+  if (job.job_type === 'invoice' || job.job_type === 'invoice_update') {
+    await updateInvoiceLineTxnIds(supabase, job.order_id, responseXml);
+
     await supabase.from('orders').update({
+      invoice_number: qbReference,
       qb_invoice_number: qbReference,
+      qb_txn_id: qbId,
+      qb_edit_sequence: qbEditSequence,
       qb_sync_status: 'pushed',
       qb_synced_at: now,
     }).eq('id', job.order_id);
@@ -273,11 +293,36 @@ async function markJobPushed(supabase, job, responseXml, qbId, qbReference) {
   }).eq('id', 'singleton');
 }
 
+async function updateInvoiceLineTxnIds(supabase, orderId, responseXml) {
+  const txnLineIds = getTagValues(responseXml, 'TxnLineID').filter(Boolean);
+  if (!txnLineIds.length) return;
+
+  const { data: items, error } = await supabase
+    .from('order_items')
+    .select('id, invoice_qty, fulfilled_qty')
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  const invoiceItems = (items ?? []).filter((item) => Number(item.invoice_qty ?? item.fulfilled_qty) > 0);
+
+  await Promise.all(
+    invoiceItems.slice(0, txnLineIds.length).map((item, index) =>
+      supabase
+        .from('order_items')
+        .update({ qb_txn_line_id: txnLineIds[index] })
+        .eq('id', item.id)
+    )
+  );
+}
+
 function getQuickBooksStatus(responseXml, jobType) {
   const responseTag = {
     customer: 'CustomerAddRs',
     item: 'ItemNonInventoryAddRs',
     invoice: 'InvoiceAddRs',
+    invoice_update: 'InvoiceModRs',
   }[jobType] || 'InvoiceAddRs';
   const statusCodeMatch = responseXml.match(new RegExp(`<${responseTag}\\b[^>]*\\bstatusCode="([^"]*)"`, 'i'));
   const statusMessageMatch = responseXml.match(new RegExp(`<${responseTag}\\b[^>]*\\bstatusMessage="([^"]*)"`, 'i'));
@@ -326,7 +371,7 @@ export async function failInvoiceJob(supabase, ticket, message) {
     error_message: safeMessage,
   });
 
-  if (job.job_type === 'invoice') {
+  if (job.job_type === 'invoice' || job.job_type === 'invoice_update') {
     await supabase.from('orders').update({ qb_sync_status: 'failed' }).eq('id', job.order_id);
   }
 
@@ -356,7 +401,8 @@ async function buildInvoicePayload(supabase, orderId) {
   const { data: items, error: itemError } = await supabase
     .from('order_items')
     .select('*, products(*)')
-    .eq('order_id', orderId);
+    .eq('order_id', orderId)
+    .order('created_at', { ascending: true });
 
   if (itemError) throw itemError;
 
@@ -391,6 +437,9 @@ async function buildQuickBooksRequest(supabase, job) {
   }
 
   const payload = await buildInvoicePayload(supabase, job.order_id);
+  if (job.job_type === 'invoice_update') {
+    return buildInvoiceModRequest(payload);
+  }
   return buildInvoiceAddRequest(payload);
 }
 
@@ -489,6 +538,7 @@ function buildInvoiceAddRequest({ order, lines }) {
   const client = order.clients;
   const location = order.locations;
   const quickBooksCustomerName = getQuickBooksCustomerName(client, location);
+  const shipTo = getInvoiceShipTo(order, location);
 
   return `<?xml version="1.0" encoding="utf-8"?>
 <?qbxml version="16.0"?>
@@ -500,14 +550,47 @@ function buildInvoiceAddRequest({ order, lines }) {
           <FullName>${escapeXml(quickBooksCustomerName)}</FullName>
         </CustomerRef>
         <TxnDate>${escapeXml(toDate(order.invoiced_at || order.created_at))}</TxnDate>
-        <RefNumber>${escapeXml(order.invoice_number)}</RefNumber>
         <ShipAddress>
-          ${buildQuickBooksAddressXml(location, quickBooksCustomerName)}
+          ${buildQuickBooksAddressXml(shipTo, quickBooksCustomerName)}
         </ShipAddress>
         <Memo>${escapeXml(`ModhaniOS Order #${order.order_number}`)}</Memo>
         ${lines.map(buildInvoiceLine).join('')}
       </InvoiceAdd>
     </InvoiceAddRq>
+  </QBXMLMsgsRq>
+</QBXML>`;
+}
+
+function buildInvoiceModRequest({ order, lines }) {
+  const client = order.clients;
+  const location = order.locations;
+  const quickBooksCustomerName = getQuickBooksCustomerName(client, location);
+  const shipTo = getInvoiceShipTo(order, location);
+
+  if (!order.qb_txn_id || !order.qb_edit_sequence) {
+    throw new Error('QuickBooks invoice update is missing TxnID or EditSequence.');
+  }
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<?qbxml version="16.0"?>
+<QBXML>
+  <QBXMLMsgsRq onError="stopOnError">
+    <InvoiceModRq requestID="${escapeXml(order.id)}">
+      <InvoiceMod>
+        <TxnID>${escapeXml(order.qb_txn_id)}</TxnID>
+        <EditSequence>${escapeXml(order.qb_edit_sequence)}</EditSequence>
+        <CustomerRef>
+          <FullName>${escapeXml(quickBooksCustomerName)}</FullName>
+        </CustomerRef>
+        <TxnDate>${escapeXml(toDate(order.invoiced_at || order.created_at))}</TxnDate>
+        <RefNumber>${escapeXml(order.qb_invoice_number || order.invoice_number)}</RefNumber>
+        <ShipAddress>
+          ${buildQuickBooksAddressXml(shipTo, quickBooksCustomerName)}
+        </ShipAddress>
+        <Memo>${escapeXml(`ModhaniOS Order #${order.order_number}`)}</Memo>
+        ${lines.map(buildInvoiceLineMod).join('')}
+      </InvoiceMod>
+    </InvoiceModRq>
   </QBXMLMsgsRq>
 </QBXML>`;
 }
@@ -522,10 +605,32 @@ function buildInvoiceLine({ item, product, batches }) {
           <ItemRef>
             <FullName>${escapeXml(getQuickBooksItemName(product))}</FullName>
           </ItemRef>
-          <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Batches: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
+          <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Lots: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
           <Quantity>${Number(item.invoice_qty ?? item.fulfilled_qty)}</Quantity>
           <Rate>${Number(unitPrice).toFixed(2)}</Rate>
         </InvoiceLineAdd>`;
+}
+
+function buildInvoiceLineMod({ item, product, batches }) {
+  const unitPrice = item.override_price ?? item.client_price ?? item.base_price ?? 0;
+  const batchText = batches
+    .map((assignment) => `${assignment.batches?.batch_number ?? assignment.batch_id}: ${Number(assignment.qty).toLocaleString()} units`)
+    .join(', ');
+  const txnLineId = item.qb_txn_line_id;
+
+  if (!txnLineId) {
+    throw new Error(`QuickBooks invoice line for ${product.name} is missing TxnLineID.`);
+  }
+
+  return `<InvoiceLineMod>
+          <TxnLineID>${escapeXml(txnLineId)}</TxnLineID>
+          <ItemRef>
+            <FullName>${escapeXml(getQuickBooksItemName(product))}</FullName>
+          </ItemRef>
+          <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Lots: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
+          <Quantity>${Number(item.invoice_qty ?? item.fulfilled_qty)}</Quantity>
+          <Rate>${Number(unitPrice).toFixed(2)}</Rate>
+        </InvoiceLineMod>`;
 }
 
 function toDate(value) {

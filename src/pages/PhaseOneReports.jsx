@@ -202,7 +202,7 @@ export default function PhaseOneReports() {
             <BarChart3 size={28} /> Reports
           </h1>
           <p className="page-subtitle">
-            Persisted operational reporting across clients, locations, products, status, dates, and batch traceability.
+            Persisted operational reporting across clients, locations, products, status, dates, and lot traceability.
           </p>
         </div>
       </div>
@@ -233,7 +233,7 @@ export default function PhaseOneReports() {
         </select>
         <input className="form-input" type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
         <input className="form-input" type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
-        <input className="form-input" placeholder="Batch number" value={filters.batchNumber} onChange={(event) => setFilters((current) => ({ ...current, batchNumber: event.target.value }))} />
+        <input className="form-input" placeholder="Lot code" value={filters.batchNumber} onChange={(event) => setFilters((current) => ({ ...current, batchNumber: event.target.value }))} />
         <select className="form-select" value={filters.period} onChange={(event) => setFilters((current) => ({ ...current, period: event.target.value }))}>
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
@@ -459,7 +459,7 @@ function ReportOrderDrillDown({ order }) {
       </div>
 
       <div>
-        <h3 className="card-title" style={{ marginBottom: 'var(--space-3)' }}>Batch Breakdown & Pricing</h3>
+        <h3 className="card-title" style={{ marginBottom: 'var(--space-3)' }}>Lot Breakdown & Pricing</h3>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {order.items.map((item) => {
             const product = getProduct(state.products, item.productId);
@@ -499,7 +499,7 @@ function ReportOrderDrillDown({ order }) {
 
                 <div style={{ marginTop: 'var(--space-3)' }}>
                   <div style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                    Batch Breakdown
+                    Lot Breakdown
                   </div>
                   {item.assignedBatches.length ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -522,7 +522,7 @@ function ReportOrderDrillDown({ order }) {
                     </div>
                   ) : (
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      No batches assigned yet.
+                      No lots assigned yet.
                     </div>
                   )}
                 </div>

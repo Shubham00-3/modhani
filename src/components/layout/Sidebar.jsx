@@ -7,7 +7,8 @@ import {
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/orders', label: 'Orders & Invoicing', icon: ShoppingCart },
-  { to: '/production', label: 'Production & Batches', icon: FlaskConical },
+  { to: '/production', label: 'Production & Lots', icon: FlaskConical },
+  { to: '/inventory', label: 'Inventory', icon: Package },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];

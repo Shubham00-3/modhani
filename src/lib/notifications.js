@@ -70,7 +70,7 @@ function buildLowStockNotifications({ batches, products }) {
         type: 'low-stock',
         severity,
         title: `${getProductDisplayName(product)} ${severity === 'critical' ? 'critically low' : 'running low'} — ${formatUnits(batch.qtyRemaining)} remaining`,
-        description: `Batch ${batch.batchNumber} is still active and needs replenishment planning.`,
+        description: `Lot Code ${batch.batchNumber} is still active and needs replenishment planning.`,
         relatedLabel: batch.batchNumber,
         timestamp,
       };
@@ -204,8 +204,8 @@ function buildFifoNotifications({ orders, batches, products, clients }) {
       key: `fifo:${oldestBatch.id}:${nextLine.order.id}:${timestamp}`,
       type: 'fifo',
       severity: 'warning',
-      title: `Batch ${oldestBatch.batchNumber} FIFO — assign to next ${clientName} order`,
-      description: `Use the oldest ${getProductDisplayName(product)} batch against Order #${nextLine.order.orderNumber} first.`,
+      title: `Lot Code ${oldestBatch.batchNumber} FIFO — assign to next ${clientName} order`,
+      description: `Use the oldest ${getProductDisplayName(product)} lot against Order #${nextLine.order.orderNumber} first.`,
       relatedLabel: oldestBatch.batchNumber,
       timestamp,
     }];

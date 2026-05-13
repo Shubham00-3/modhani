@@ -18,7 +18,8 @@ import { useApp } from '../../context/useApp';
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/orders', label: 'Orders & Invoicing', icon: ShoppingCart },
-  { to: '/production', label: 'Production & Batches', icon: FlaskConical },
+  { to: '/production', label: 'Production & Lots', icon: FlaskConical },
+  { to: '/inventory', label: 'Inventory', icon: Package },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/audit', label: 'Audit Trail', icon: ScrollText },
   { to: '/clients-locations', label: 'Clients & Locations', icon: Building2 },

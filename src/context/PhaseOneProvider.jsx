@@ -386,6 +386,13 @@ function reducer(state, action) {
             invoiceTotal,
             invoicedAt: action.payload.timestamp,
             invoiceEmailSentAt: action.payload.invoiceEmailSentAt,
+            invoiceShipToName: action.payload.shipTo?.name ?? null,
+            invoiceAddressLine1: action.payload.shipTo?.addressLine1 ?? null,
+            invoiceAddressLine2: action.payload.shipTo?.addressLine2 ?? null,
+            invoiceCity: action.payload.shipTo?.city ?? null,
+            invoiceProvince: action.payload.shipTo?.province ?? null,
+            invoicePostalCode: action.payload.shipTo?.postalCode ?? null,
+            invoiceCountry: action.payload.shipTo?.country ?? null,
           };
         }),
       };
@@ -412,6 +419,14 @@ function reducer(state, action) {
             ...order,
             items: nextItems,
             invoiceTotal,
+            invoiceShipToName: action.payload.shipTo?.name ?? order.invoiceShipToName ?? null,
+            invoiceAddressLine1: action.payload.shipTo?.addressLine1 ?? order.invoiceAddressLine1 ?? null,
+            invoiceAddressLine2: action.payload.shipTo?.addressLine2 ?? order.invoiceAddressLine2 ?? null,
+            invoiceCity: action.payload.shipTo?.city ?? order.invoiceCity ?? null,
+            invoiceProvince: action.payload.shipTo?.province ?? order.invoiceProvince ?? null,
+            invoicePostalCode: action.payload.shipTo?.postalCode ?? order.invoicePostalCode ?? null,
+            invoiceCountry: action.payload.shipTo?.country ?? order.invoiceCountry ?? null,
+            qbSyncStatus: order.qbSyncStatus === 'pushed' ? 'pending' : order.qbSyncStatus,
           };
         }),
         auditLog: [
@@ -438,6 +453,8 @@ function reducer(state, action) {
             ? {
                 ...order,
                 qbInvoiceNumber: action.payload.qbInvoiceNumber,
+                qbTxnId: action.payload.qbTxnId ?? order.qbTxnId ?? null,
+                qbEditSequence: action.payload.qbEditSequence ?? order.qbEditSequence ?? null,
                 qbSyncStatus: 'pushed',
                 qbSyncedAt: action.payload.timestamp,
               }
@@ -465,7 +482,7 @@ function reducer(state, action) {
           {
             id: `qb-job-${Date.now()}`,
             orderId: action.payload.orderId,
-            jobType: 'invoice',
+            jobType: action.payload.jobType ?? 'invoice',
             status: 'pending',
             attempts: 0,
             createdAt: action.payload.timestamp,

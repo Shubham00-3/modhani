@@ -5,6 +5,7 @@ import { useApp } from '../context/useApp';
 import {
   formatDate,
   getItemOutstandingQty,
+  getNextLotCode,
   getProduct,
   getProductDisplayName,
 } from '../data/phaseOneData';
@@ -65,10 +66,10 @@ export default function PhaseOneProductionBatches() {
           <AlertTriangle size={18} />
           <div className="alert-content">
             <div className="alert-title">
-              FIFO reminder: {oldestActive.batchNumber} should be considered first.
+              FIFO reminder: Lot Code {oldestActive.batchNumber} should be considered first.
             </div>
             <div className="alert-description">
-              {getProductDisplayName(getProduct(state.products, oldestActive.productId))} has {oldestActive.qtyRemaining.toLocaleString()} units remaining from the oldest active batch.
+              {getProductDisplayName(getProduct(state.products, oldestActive.productId))} has {oldestActive.qtyRemaining.toLocaleString()} units remaining from the oldest active lot.
             </div>
           </div>
         </div>
@@ -85,7 +86,7 @@ export default function PhaseOneProductionBatches() {
                     Order #{entry.orderNumber} - {getProductDisplayName(getProduct(state.products, entry.productId))}
                   </div>
                   <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                    Outstanding quantity will remain visible until staff manually assigns the next batch.
+                    Outstanding quantity will remain visible until staff manually assigns the next lot.
                   </div>
                 </div>
                 <div className="cell-monospace">{entry.outstandingQty.toLocaleString()} units</div>
@@ -98,9 +99,9 @@ export default function PhaseOneProductionBatches() {
       <div className="card">
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center' }}>
           <div>
-            <div className="card-title" style={{ marginBottom: 2 }}>Batch Inventory</div>
+            <div className="card-title" style={{ marginBottom: 2 }}>Lot Inventory</div>
             <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-              Manual production logging creates inventory one batch at a time.
+              Manual production logging creates inventory one lot at a time.
             </div>
           </div>
           <button className="btn btn-primary" type="button" disabled={!canLogProduction} onClick={() => setShowModal(true)}>
@@ -114,7 +115,7 @@ export default function PhaseOneProductionBatches() {
             <div className="alert-content">
               <div className="alert-title">Add products before logging production</div>
               <div className="alert-description">
-                Production batches can only be created after the product catalogue has been configured.
+                Production lots can only be created after the product catalogue has been configured.
               </div>
             </div>
           </div>
@@ -155,7 +156,7 @@ export default function PhaseOneProductionBatches() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Batch</th>
+                <th>Lot Code</th>
                 <th>Product</th>
                 <th>Production Date</th>
                 <th>Produced</th>
@@ -178,9 +179,9 @@ export default function PhaseOneProductionBatches() {
           </table>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
-            <div className="empty-state-title">No batches match these filters</div>
+            <div className="empty-state-title">No lots match these filters</div>
             <div className="empty-state-description">
-              Reset the filters or log a new production batch to bring inventory back into view.
+              Reset the filters or log a new production lot to bring inventory back into view.
             </div>
           </div>
         )}
@@ -192,7 +193,7 @@ export default function PhaseOneProductionBatches() {
           onSave={async (payload) => {
             const result = await dispatch({ type: 'LOG_PRODUCTION_BATCH', payload });
             if (!result?.ok) return;
-            addToast(`Batch ${payload.batchNumber} logged.`);
+            addToast(`Lot Code ${payload.batchNumber} logged.`);
             setShowModal(false);
           }}
         />
@@ -208,9 +209,9 @@ function LogProductionModal({ onClose, onSave }) {
   const [isProductSearchFocused, setIsProductSearchFocused] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [productionDate, setProductionDate] = useState(new Date().toISOString().slice(0, 10));
-  const [batchNumber, setBatchNumber] = useState(() => getNextBatchNumber(state.batches));
   const [isSaving, setIsSaving] = useState(false);
   const selectedProduct = getProduct(state.products, productId);
+  const lotCode = useMemo(() => getNextLotCode(state.batches, productionDate), [productionDate, state.batches]);
   const filteredProducts = useMemo(() => {
     const search = productSearch.trim().toLowerCase();
     if (!search) return state.products;
@@ -240,7 +241,7 @@ function LogProductionModal({ onClose, onSave }) {
         <div className="modal-header">
           <h3 className="modal-title">
             <FlaskConical size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
-            Log Production Batch
+            Log Production Lot
           </h3>
           <button className="btn btn-ghost" type="button" onClick={onClose}>
             <X size={18} />
@@ -337,8 +338,8 @@ function LogProductionModal({ onClose, onSave }) {
           </div>
           <div className="grid-2">
             <div className="form-group">
-              <label className="form-label">Batch Number</label>
-              <input className="form-input" value={batchNumber} onChange={(event) => setBatchNumber(event.target.value)} />
+              <label className="form-label">Lot Code</label>
+              <input className="form-input" value={lotCode} disabled />
             </div>
             <div className="form-group">
               <label className="form-label">Production Date</label>
@@ -361,13 +362,13 @@ function LogProductionModal({ onClose, onSave }) {
             onClick={async () => {
               if (isSaving) return;
 
-              if (!productId || Number(quantity) <= 0 || !batchNumber.trim()) {
+              if (!productId || Number(quantity) <= 0 || !lotCode.trim()) {
                 addToast('Complete all production fields.', 'warning');
                 return;
               }
 
-              if (state.batches.some((batch) => batch.batchNumber.trim().toLowerCase() === batchNumber.trim().toLowerCase())) {
-                addToast('Batch number already exists. Use a unique batch number.', 'warning');
+              if (state.batches.some((batch) => batch.batchNumber.trim().toLowerCase() === lotCode.trim().toLowerCase())) {
+                addToast('Lot code already exists. Pick another production date or save again.', 'warning');
                 return;
               }
 
@@ -380,7 +381,7 @@ function LogProductionModal({ onClose, onSave }) {
               try {
                 await onSave({
                   id: `batch-${Date.now()}`,
-                  batchNumber: batchNumber.trim(),
+                  batchNumber: lotCode.trim(),
                   productId,
                   productionDate,
                   qtyProduced: Number(quantity),
@@ -398,13 +399,4 @@ function LogProductionModal({ onClose, onSave }) {
       </div>
     </div>
   );
-}
-
-function getNextBatchNumber(batches) {
-  const nextNumber = batches.reduce((max, batch) => {
-    const match = /^B-(\d+)$/i.exec(batch.batchNumber?.trim() ?? '');
-    return match ? Math.max(max, Number(match[1])) : max;
-  }, 3019) + 1;
-
-  return `B-${nextNumber}`;
 }

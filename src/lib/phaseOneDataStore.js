@@ -69,6 +69,7 @@ function quickBooksJobToUi(job) {
     status: job.status,
     qbInvoiceNumber: job.qb_invoice_number,
     qbTxnId: job.qb_txn_id,
+    qbEditSequence: job.qb_edit_sequence,
     errorMessage: job.error_message,
     attempts: Number(job.attempts ?? 0),
     createdAt: job.created_at,
@@ -296,7 +297,16 @@ function orderToDb(order) {
     invoice_number: order.invoiceNumber,
     invoice_total: order.invoiceTotal,
     qb_invoice_number: order.qbInvoiceNumber,
+    qb_txn_id: order.qbTxnId ?? null,
+    qb_edit_sequence: order.qbEditSequence ?? null,
     qb_sync_status: order.qbSyncStatus,
+    invoice_ship_to_name: order.invoiceShipToName ?? null,
+    invoice_address_line1: order.invoiceAddressLine1 ?? null,
+    invoice_address_line2: order.invoiceAddressLine2 ?? null,
+    invoice_city: order.invoiceCity ?? null,
+    invoice_province: order.invoiceProvince ?? null,
+    invoice_postal_code: order.invoicePostalCode ?? null,
+    invoice_country: order.invoiceCountry ?? null,
     packing_slip_number: order.packingSlipNumber,
     created_at: order.createdAt,
     fulfilled_at: order.fulfilledAt,
@@ -323,6 +333,7 @@ function orderItemToDb(orderId, item) {
     client_price: Number(item.clientPrice),
     override_price: item.overridePrice == null ? null : Number(item.overridePrice),
     override_reason: item.overrideReason ?? null,
+    qb_txn_line_id: item.qbTxnLineId ?? null,
   };
 }
 
@@ -465,6 +476,7 @@ export async function fetchRemoteState(supabase, userId) {
       clientPrice: Number(item.client_price),
       overridePrice: item.override_price == null ? null : Number(item.override_price),
       overrideReason: item.override_reason,
+      qbTxnLineId: item.qb_txn_line_id ?? null,
       assignedBatches: assignmentsByItemId.get(item.id) ?? [],
     });
     itemsByOrderId.set(item.order_id, current);
@@ -482,7 +494,16 @@ export async function fetchRemoteState(supabase, userId) {
     invoiceNumber: order.invoice_number,
     invoiceTotal: order.invoice_total == null ? null : Number(order.invoice_total),
     qbInvoiceNumber: order.qb_invoice_number,
+    qbTxnId: order.qb_txn_id ?? null,
+    qbEditSequence: order.qb_edit_sequence ?? null,
     qbSyncStatus: order.qb_sync_status,
+    invoiceShipToName: order.invoice_ship_to_name ?? null,
+    invoiceAddressLine1: order.invoice_address_line1 ?? null,
+    invoiceAddressLine2: order.invoice_address_line2 ?? null,
+    invoiceCity: order.invoice_city ?? null,
+    invoiceProvince: order.invoice_province ?? null,
+    invoicePostalCode: order.invoice_postal_code ?? null,
+    invoiceCountry: order.invoice_country ?? null,
     packingSlipNumber: order.packing_slip_number,
     createdAt: order.created_at,
     fulfilledAt: order.fulfilled_at,
@@ -753,6 +774,13 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_invoice_number: action.payload.invoiceNumber,
         p_overrides: action.payload.overrides,
         p_invoice_email_sent_at: action.payload.invoiceEmailSentAt,
+        p_ship_to_name: action.payload.shipTo?.name ?? null,
+        p_ship_to_address_line1: action.payload.shipTo?.addressLine1 ?? null,
+        p_ship_to_address_line2: action.payload.shipTo?.addressLine2 ?? null,
+        p_ship_to_city: action.payload.shipTo?.city ?? null,
+        p_ship_to_province: action.payload.shipTo?.province ?? null,
+        p_ship_to_postal_code: action.payload.shipTo?.postalCode ?? null,
+        p_ship_to_country: action.payload.shipTo?.country ?? null,
       });
     case 'EDIT_INVOICE':
       return callRpc(supabase, 'modhanios_update_invoice', {
@@ -760,6 +788,7 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_user_id: currentUser.id,
         p_lines: action.payload.lines,
         p_reason: action.payload.reason,
+        p_ship_to: action.payload.shipTo ?? null,
       });
     case 'PUSH_QB_INVOICE':
       return callRpc(supabase, 'modhanios_push_qb_invoice', {

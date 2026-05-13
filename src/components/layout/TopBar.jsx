@@ -5,7 +5,8 @@ import { Search, Bell } from 'lucide-react';
 const pageTitles = {
   '/': 'Overview',
   '/orders': 'Orders & Invoicing',
-  '/production': 'Production & Batches',
+  '/production': 'Production & Lots',
+  '/inventory': 'Inventory',
   '/reports': 'Reports',
   '/settings': 'Settings',
   '/audit': 'Audit Trail',

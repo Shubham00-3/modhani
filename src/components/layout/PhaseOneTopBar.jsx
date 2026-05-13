@@ -8,7 +8,8 @@ import { formatRelativeTime } from '../../lib/notifications';
 const pageTitles = {
   '/': 'Overview',
   '/orders': 'Orders & Invoicing',
-  '/production': 'Production & Batches',
+  '/production': 'Production & Lots',
+  '/inventory': 'Inventory',
   '/reports': 'Reports',
   '/clients-locations': 'Clients & Locations',
   '/products': 'Products',

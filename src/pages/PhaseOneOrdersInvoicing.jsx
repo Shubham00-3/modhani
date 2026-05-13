@@ -23,6 +23,7 @@ import {
   getLocationName,
   getQuickBooksSyncLabel,
   getOrderOutstandingQty,
+  getOrderShipToSnapshot,
   getOrderValue,
   getProduct,
   getProductDisplayName,
@@ -201,13 +202,14 @@ export default function PhaseOneOrdersInvoicing() {
       type: 'QUEUE_QB_INVOICE',
       payload: {
         orderId: order.id,
+        jobType: order.qbTxnId ? 'invoice_update' : 'invoice',
         timestamp: new Date().toISOString(),
       },
     });
 
     if (!result?.ok) return;
 
-    addToast(`Invoice ${order.invoiceNumber} queued for QuickBooks Desktop sync.`);
+    addToast(`Invoice ${order.invoiceNumber} queued for QuickBooks Desktop ${order.qbTxnId ? 'update' : 'sync'}.`);
   }
 
   async function handleConfirmShipment(order) {
@@ -473,6 +475,15 @@ function InfoCard({ label, value }) {
   );
 }
 
+function FormTextInput({ label, value, onChange }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      <input className="form-input" value={value ?? ''} onChange={(event) => onChange(event.target.value)} />
+    </div>
+  );
+}
+
 function OrderDetailPanel({
   order,
   onStartFulfilment,
@@ -488,13 +499,13 @@ function OrderDetailPanel({
   const lockedBy = order.lockedBy ? state.users.find((user) => user.id === order.lockedBy) : null;
   const invoiceableTotal = getInvoiceableTotal(order);
   const quickBooksJob = state.quickBooksJobs.find(
-    (job) => job.orderId === order.id && job.jobType === 'invoice' && job.status !== 'pushed'
+    (job) => order.id && job.orderId === order.id && ['invoice', 'invoice_update'].includes(job.jobType) && job.status !== 'pushed'
   );
   const quickBooksStatus = getQuickBooksSyncLabel(order);
   const canEditInvoice =
     order.invoiceNumber &&
-    order.status === 'invoiced' &&
-    order.qbSyncStatus !== 'pushed' &&
+    ['invoiced', 'shipped'].includes(order.status) &&
+    order.qbSyncStatus !== 'pending' &&
     order.qbSyncStatus !== 'syncing' &&
     !quickBooksJob;
 
@@ -578,7 +589,7 @@ function OrderDetailPanel({
                   <div style={{ marginTop: 'var(--space-3)', paddingLeft: 'var(--space-4)', borderLeft: '2px solid var(--color-border)' }}>
                     {item.assignedBatches.map((assigned, index) => (
                       <div key={`${assigned.batchId}-${index}`} style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                        Batch {getBatchLabel(state.batches, assigned.batchId)}: {assigned.qty.toLocaleString()} units
+                        Lot Code {getBatchLabel(state.batches, assigned.batchId)}: {assigned.qty.toLocaleString()} units
                       </div>
                     ))}
                   </div>
@@ -614,7 +625,7 @@ function OrderDetailPanel({
           </button>
         ) : null}
 
-        {order.status === 'invoiced' && order.qbSyncStatus === 'failed' ? (
+        {['invoiced', 'shipped'].includes(order.status) && order.qbSyncStatus === 'failed' ? (
           <button className="btn btn-secondary" type="button" onClick={() => onPushToQuickBooks(order)}>
             <FileText size={16} /> Retry QuickBooks Sync
           </button>
@@ -927,7 +938,7 @@ function FulfilmentPanel({ order, onBack }) {
 
       <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
         <button className="btn btn-primary" type="button" onClick={confirmAssignments}>
-          Save Batch Assignment
+          Save Lot Assignment
         </button>
         <button className="btn btn-ghost" type="button" onClick={onBack}>
           Cancel
@@ -940,6 +951,7 @@ function FulfilmentPanel({ order, onBack }) {
 function InvoiceModal({ order, onClose }) {
   const { state, dispatch, addToast } = useApp();
   const client = state.clients.find((entry) => entry.id === order.clientId);
+  const location = state.locations.find((entry) => entry.id === order.locationId);
   const invoiceLines = order.items.filter((item) => item.fulfilledQty > 0);
   const [lineOverrides, setLineOverrides] = useState(() =>
     Object.fromEntries(
@@ -977,8 +989,9 @@ function InvoiceModal({ order, onClose }) {
       });
 
       const timestamp = new Date().toISOString();
-      const invoiceNumber = `MOD-${order.orderNumber}`;
+      const invoiceNumber = `DRAFT-${order.orderNumber}`;
       const emailSentAt = client?.emailInvoice ? timestamp : null;
+      const shipTo = getOrderShipToSnapshot(order, location);
 
       const result = await dispatch({
         type: 'CREATE_INVOICE',
@@ -987,6 +1000,7 @@ function InvoiceModal({ order, onClose }) {
           invoiceNumber,
           timestamp,
           overrides,
+          shipTo,
           invoiceEmailSentAt: emailSentAt,
         },
       });
@@ -1090,9 +1104,11 @@ function InvoiceModal({ order, onClose }) {
 
 function EditInvoiceModal({ order, onClose }) {
   const { state, dispatch, addToast } = useApp();
+  const location = state.locations.find((entry) => entry.id === order.locationId);
   const invoiceLines = order.items.filter((item) => item.fulfilledQty > 0);
   const [revisionReason, setRevisionReason] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [shipToDraft, setShipToDraft] = useState(() => getOrderShipToSnapshot(order, location));
   const [lineDrafts, setLineDrafts] = useState(() =>
     Object.fromEntries(
       invoiceLines.map((item) => [
@@ -1112,6 +1128,10 @@ function EditInvoiceModal({ order, onClose }) {
 
       if (!revisionReason.trim()) {
         throw new Error('Provide a reason for editing this invoice.');
+      }
+
+      if (!shipToDraft.name.trim() || !shipToDraft.addressLine1.trim() || !shipToDraft.city.trim() || !shipToDraft.province.trim() || !shipToDraft.postalCode.trim()) {
+        throw new Error('Complete the Ship To name, street, city, province, and postal code.');
       }
 
       const lines = invoiceLines.map((item) => {
@@ -1157,6 +1177,15 @@ function EditInvoiceModal({ order, onClose }) {
           orderId: order.id,
           lines,
           reason: revisionReason.trim(),
+          shipTo: {
+            name: shipToDraft.name.trim(),
+            addressLine1: shipToDraft.addressLine1.trim(),
+            addressLine2: shipToDraft.addressLine2.trim(),
+            city: shipToDraft.city.trim(),
+            province: shipToDraft.province.trim(),
+            postalCode: shipToDraft.postalCode.trim(),
+            country: shipToDraft.country.trim() || 'Canada',
+          },
           timestamp: new Date().toISOString(),
         },
       });
@@ -1185,9 +1214,9 @@ function EditInvoiceModal({ order, onClose }) {
           <div className="alert alert-info">
             <FileText size={18} />
             <div className="alert-content">
-              <div className="alert-title">Editable before QuickBooks sync</div>
+              <div className="alert-title">Editable invoice details</div>
               <div className="alert-description">
-                Changes update this ModhaniOS invoice before it is queued or pushed to QuickBooks.
+                Address and quantity changes stay on this invoice. If it already synced, the next Web Connector run updates the same QuickBooks invoice.
               </div>
             </div>
           </div>
@@ -1201,6 +1230,19 @@ function EditInvoiceModal({ order, onClose }) {
               onChange={(event) => setRevisionReason(event.target.value)}
               placeholder="Example: customer changed quantity before pickup"
             />
+          </div>
+
+          <div className="card" style={{ padding: 'var(--space-4)' }}>
+            <div className="card-title">Ship To</div>
+            <div className="grid-2" style={{ marginTop: 'var(--space-4)' }}>
+              <FormTextInput label="Name" value={shipToDraft.name} onChange={(value) => setShipToDraft((current) => ({ ...current, name: value }))} />
+              <FormTextInput label="Address Line 1" value={shipToDraft.addressLine1} onChange={(value) => setShipToDraft((current) => ({ ...current, addressLine1: value }))} />
+              <FormTextInput label="Address Line 2" value={shipToDraft.addressLine2} onChange={(value) => setShipToDraft((current) => ({ ...current, addressLine2: value }))} />
+              <FormTextInput label="City" value={shipToDraft.city} onChange={(value) => setShipToDraft((current) => ({ ...current, city: value }))} />
+              <FormTextInput label="Province" value={shipToDraft.province} onChange={(value) => setShipToDraft((current) => ({ ...current, province: value }))} />
+              <FormTextInput label="Postal Code" value={shipToDraft.postalCode} onChange={(value) => setShipToDraft((current) => ({ ...current, postalCode: value }))} />
+              <FormTextInput label="Country" value={shipToDraft.country} onChange={(value) => setShipToDraft((current) => ({ ...current, country: value }))} />
+            </div>
           </div>
 
           {invoiceLines.map((item) => {
@@ -1387,7 +1429,16 @@ function AddOrderModal({ onClose }) {
       invoiceNumber: null,
       invoiceTotal: null,
       qbInvoiceNumber: null,
+      qbTxnId: null,
+      qbEditSequence: null,
       qbSyncStatus: null,
+      invoiceShipToName: null,
+      invoiceAddressLine1: null,
+      invoiceAddressLine2: null,
+      invoiceCity: null,
+      invoiceProvince: null,
+      invoicePostalCode: null,
+      invoiceCountry: null,
       packingSlipNumber: null,
       createdAt: timestamp,
       fulfilledAt: null,

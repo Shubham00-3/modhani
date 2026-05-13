@@ -3,7 +3,7 @@ import {
   formatDate,
   getClientName,
   getEffectiveItemPrice,
-  getLocationName,
+  getOrderShipToSnapshot,
   getProduct,
   getProductDisplayName,
 } from '../data/phaseOneData';
@@ -77,9 +77,27 @@ function formatAddressBlock(name, location) {
     .join('<br />');
 }
 
+function getInvoiceHeaderNumber(order, batches) {
+  const savedNumber = order.invoiceNumber ?? `MOD-${order.orderNumber}`;
+  if (!String(savedNumber).startsWith('DRAFT-')) return savedNumber;
+
+  const lotCodes = [
+    ...new Set(
+      order.items
+        .flatMap((item) => item.assignedBatches ?? [])
+        .map((assigned) => batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId)
+        .filter(Boolean)
+    ),
+  ];
+
+  return lotCodes.length ? lotCodes.join(', ') : savedNumber;
+}
+
 export function printPackingSlip({ order, clients, locations, products, batches }) {
   const clientName = getClientName(clients, order.clientId);
-  const locationName = getLocationName(locations, order.locationId);
+  const location = locations.find((entry) => entry.id === order.locationId);
+  const shipTo = getOrderShipToSnapshot(order, location);
+  const shipToAddress = formatAddressBlock(shipTo.name, shipTo);
   const logoSrc = getLogoSrc();
   const rows = order.items
     .map((item) => {
@@ -87,7 +105,7 @@ export function printPackingSlip({ order, clients, locations, products, batches 
       const batchLines = item.assignedBatches
         .map((assigned) => {
           const batch = batches.find((entry) => entry.id === assigned.batchId);
-          return `<li>${batch?.batchNumber ?? assigned.batchId}: ${assigned.qty.toLocaleString()} units</li>`;
+          return `<li>Lot Code ${batch?.batchNumber ?? assigned.batchId}: ${assigned.qty.toLocaleString()} units</li>`;
         })
         .join('');
 
@@ -130,8 +148,8 @@ export function printPackingSlip({ order, clients, locations, products, batches 
               <div style="font-size:18px;font-weight:600;margin-top:4px;">${clientName}</div>
             </div>
             <div style="padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
-              <div style="font-size:12px;text-transform:uppercase;color:#6b7280;">Location</div>
-              <div style="font-size:18px;font-weight:600;margin-top:4px;">${locationName}</div>
+              <div style="font-size:12px;text-transform:uppercase;color:#6b7280;">Ship To</div>
+              <div style="font-size:16px;font-weight:600;margin-top:4px;">${shipToAddress}</div>
             </div>
           </section>
 
@@ -150,10 +168,11 @@ export function printInvoice({ order, clients, locations, products, batches = []
   const client = clients.find((entry) => entry.id === order.clientId);
   const location = locations.find((entry) => entry.id === order.locationId);
   const clientName = getClientName(clients, order.clientId);
-  const locationName = getLocationName(locations, order.locationId);
+  const shipToSnapshot = getOrderShipToSnapshot(order, location);
   const logoSrc = getLogoSrc();
   const invoiceLines = order.items.filter((item) => item.fulfilledQty > 0);
   const invoiceTotal = order.invoiceTotal ?? invoiceLines.reduce((sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item), 0);
+  const invoiceHeaderNumber = getInvoiceHeaderNumber(order, batches);
   const rows = invoiceLines
     .map((item) => {
       const product = getProduct(products, item.productId);
@@ -186,11 +205,11 @@ export function printInvoice({ order, clients, locations, products, batches = []
     .map(() => '<tr class="blank-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>')
     .join('');
   const invoiceTo = formatAddressBlock(clientName, location);
-  const shipTo = formatAddressBlock(locationName, location);
+  const shipTo = formatAddressBlock(shipToSnapshot.name, shipToSnapshot);
   const totalLabel = Number(invoiceTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   openPrintableWindow(
-    `Invoice ${order.invoiceNumber ?? order.orderNumber}`,
+    `Invoice ${invoiceHeaderNumber}`,
     `
       <style>
         @page { size: letter; margin: 0.35in; }
@@ -247,7 +266,7 @@ export function printInvoice({ order, clients, locations, products, batches = []
             <div class="invoice-title">Invoice</div>
             <table class="box-table">
               <tr><th>Date</th><th>Invoice #</th></tr>
-              <tr><td>${escapeHtml(formatDate(order.invoicedAt ?? new Date().toISOString()))}</td><td>${escapeHtml(order.invoiceNumber ?? `MOD-${order.orderNumber}`)}</td></tr>
+              <tr><td>${escapeHtml(formatDate(order.invoicedAt ?? new Date().toISOString()))}</td><td>${escapeHtml(invoiceHeaderNumber)}</td></tr>
             </table>
             <table class="box-table po-box">
               <tr><th style="width:50%;">P.O. No.</th><td>${escapeHtml(order.poNumber ?? '')}</td></tr>
@@ -320,6 +339,6 @@ export function printInvoice({ order, clients, locations, products, batches = []
 
 export function getPackingSlipPreview(order, batches) {
   return buildBatchSummary(order, batches)
-    .map((entry) => `${entry.batchNumber}: ${entry.qty}`)
+    .map((entry) => `Lot Code ${entry.batchNumber}: ${entry.qty}`)
     .join(', ');
 }

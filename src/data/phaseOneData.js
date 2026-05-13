@@ -154,6 +154,53 @@ export function isLocationShipToReady(location) {
   return Boolean((location?.qbShipToName || location?.name)?.trim());
 }
 
+export function getLotCodeBase(productionDate) {
+  const [year, month, day] = String(productionDate ?? '').split('-').map(Number);
+  if (!year || !month || !day) return '';
+
+  const current = Date.UTC(year, month - 1, day);
+  const start = Date.UTC(year, 0, 1);
+  const dayOfYear = Math.floor((current - start) / 86400000) + 1;
+  return `${String(year).slice(-2)}${String(dayOfYear).padStart(3, '0')}`;
+}
+
+export function getNextLotCode(batches, productionDate) {
+  const base = getLotCodeBase(productionDate);
+  if (!base) return '';
+
+  const usedSuffixes = new Set(
+    batches
+      .map((batch) => String(batch.batchNumber ?? '').trim())
+      .filter((lotCode) => lotCode === base || lotCode.startsWith(`${base}-`))
+      .map((lotCode) => {
+        if (lotCode === base) return 1;
+        const suffix = Number(lotCode.slice(base.length + 1));
+        return Number.isInteger(suffix) && suffix > 1 ? suffix : null;
+      })
+      .filter(Boolean)
+  );
+
+  if (!usedSuffixes.has(1)) return base;
+
+  let nextSuffix = 2;
+  while (usedSuffixes.has(nextSuffix)) {
+    nextSuffix += 1;
+  }
+  return `${base}-${nextSuffix}`;
+}
+
+export function getOrderShipToSnapshot(order, location) {
+  return {
+    name: order?.invoiceShipToName ?? location?.name ?? '',
+    addressLine1: order?.invoiceAddressLine1 ?? location?.addressLine1 ?? '',
+    addressLine2: order?.invoiceAddressLine2 ?? location?.addressLine2 ?? '',
+    city: order?.invoiceCity ?? location?.city ?? '',
+    province: order?.invoiceProvince ?? location?.province ?? '',
+    postalCode: order?.invoicePostalCode ?? location?.postalCode ?? '',
+    country: order?.invoiceCountry ?? location?.country ?? 'Canada',
+  };
+}
+
 export function formatClientLocationScale(client, configuredCount = 0) {
   const plannedCount = Number(client?.locationCount ?? 0);
   if (configuredCount > 0) {
