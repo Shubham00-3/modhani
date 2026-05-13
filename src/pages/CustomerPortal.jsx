@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Building2, CheckCircle2, Minus, Package, Plus, Search, MapPin, Truck } from 'lucide-react';
+import { Building2, CheckCircle2, Minus, Package, Plus, Search } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatCurrency, formatDateTime, getProductDisplayName, getProductImageUrl, hasProductImage } from '../data/phaseOneData';
 
@@ -43,7 +43,7 @@ export default function CustomerPortal() {
   );
 
   const activeLocationId = locationId || activeLocations[0]?.id || '';
-  const activeLocation = activeLocations.find((loc) => loc.id === activeLocationId);
+  const activeLocationName = activeLocations.find((loc) => loc.id === activeLocationId)?.name ?? 'No location';
 
   // Filter products to those priced for the active client.
   const activeProducts = useMemo(() => {
@@ -83,7 +83,6 @@ export default function CustomerPortal() {
     [activeProducts, quantities]
   );
   const orderTotal = selectedLines.reduce((total, line) => total + line.quantity * line.product.clientPrice, 0);
-  const totalSelectedCases = selectedLines.reduce((total, line) => total + line.quantity, 0);
   const productsById = useMemo(() => new Map(portalProducts.map((product) => [product.id, product])), [portalProducts]);
   const selectedRecentOrder = selectedRecentOrderId
     ? portal?.recentOrders.find((order) => order.id === selectedRecentOrderId) ?? null
@@ -212,8 +211,6 @@ export default function CustomerPortal() {
   return (
     <PortalShell
       onLogout={logout}
-      clientName={activeClient?.name}
-      locationName={activeLocation?.name}
       searchQuery={searchQuery}
       onSearchChange={setSearchQuery}
     >
@@ -223,20 +220,6 @@ export default function CustomerPortal() {
           <span className="cp-hero-eyebrow">Wholesale Dairy Ordering</span>
           <h1>Order dairy inventory</h1>
           <p>Fast case entry, clean cart review, recent orders, and delivery location control in one focused screen.</p>
-          <div className="cp-hero-stats">
-            <div className="cp-hero-stat">
-              <strong>{activeProducts.length}</strong>
-              <span>Available items</span>
-            </div>
-            <div className="cp-hero-stat">
-              <strong>{totalSelectedCases}</strong>
-              <span>Selected cases</span>
-            </div>
-            <div className="cp-hero-stat cp-hero-stat-accent">
-              <Truck size={14} />
-              <span>Next Delivery route</span>
-            </div>
-          </div>
         </div>
         <div className="cp-hero-visual">
           {activeProducts.slice(0, 3).map((product, i) => {
@@ -366,7 +349,7 @@ export default function CustomerPortal() {
                 </select>
               )}
             </div>
-            <strong>{activeLocation?.name ?? 'No location'}</strong>
+            <strong>{activeLocationName}</strong>
           </div>
 
           {hasMultipleClients ? (
@@ -491,7 +474,7 @@ function getCategoryColor(category) {
   return colors[category] || '#C5CCC7';
 }
 
-function PortalShell({ children, onLogout, clientName, locationName, searchQuery, onSearchChange }) {
+function PortalShell({ children, onLogout, searchQuery, onSearchChange }) {
   return (
     <main className="customer-portal-page">
       <header className="cp-nav">
@@ -518,8 +501,6 @@ function PortalShell({ children, onLogout, clientName, locationName, searchQuery
 
           {/* Right: Client/Location pills + Sign Out */}
           <div className="cp-nav-right">
-            {clientName && <span className="cp-nav-pill">{clientName}</span>}
-            {locationName && <span className="cp-nav-pill"><MapPin size={12} /> {locationName}</span>}
             <button className="cp-signout-btn" type="button" onClick={onLogout}>
               Sign out
             </button>

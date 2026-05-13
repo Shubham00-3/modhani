@@ -2945,20 +2945,6 @@ input[type='checkbox']:disabled {
   margin-left: auto;
   flex-shrink: 0;
 }
-.cp-nav-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  background: #fff;
-  border: 1px solid rgba(0,0,0,0.08);
-  border-radius: var(--radius-full);
-  padding: 7px 16px;
-  font-size: .78rem;
-  font-weight: 600;
-  color: var(--color-text);
-  white-space: nowrap;
-  box-shadow: 0 2px 6px rgba(0,0,0,.03);
-}
 .cp-signout-btn {
   background: #1A3021;
   color: #fff;
@@ -3037,35 +3023,6 @@ input[type='checkbox']:disabled {
   color: rgba(255,255,255,.75);
   margin-bottom: 20px;
 }
-.cp-hero-stats {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.cp-hero-stat {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(255,255,255,.1);
-  backdrop-filter: blur(6px);
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: var(--radius-lg);
-  padding: 8px 14px;
-  font-size: .75rem;
-  font-weight: 600;
-  color: rgba(255,255,255,.85);
-}
-.cp-hero-stat strong {
-  font-weight: 800;
-  font-size: .95rem;
-  color: #fff;
-}
-.cp-hero-stat-accent {
-  background: rgba(209,161,78,.2);
-  border-color: rgba(209,161,78,.25);
-  color: #EBC48E;
-}
-
 /* 3D floating product images in hero */
 .cp-hero-visual {
   position: relative;
@@ -3688,8 +3645,7 @@ input[type='checkbox']:disabled {
   }
 
   .cp-brand-name,
-  .cp-brand-sub,
-  .cp-nav-pill {
+  .cp-brand-sub {
     display: none;
   }
 
