@@ -1,6 +1,6 @@
 import { createElement, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { BarChart3, ClipboardList, Package, RefreshCw, ScrollText, Truck } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { BarChart3, ClipboardList, ImageOff, Package, RefreshCw, ScrollText, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatClientLocationScale,
@@ -12,7 +12,23 @@ import {
   getOrderOutstandingQty,
   getOrderValue,
   getProductDisplayName,
+  getProductImageUrl,
+  hasProductImage,
 } from '../data/phaseOneData';
+
+const LOW_STOCK_THRESHOLD = 20;
+
+function getStockStatus(totalRemaining) {
+  if (totalRemaining <= 0) return 'out';
+  if (totalRemaining <= LOW_STOCK_THRESHOLD) return 'low';
+  return 'in';
+}
+
+function getStockStatusLabel(status) {
+  if (status === 'out') return 'Out of stock';
+  if (status === 'low') return 'Running low';
+  return 'In stock';
+}
 
 export default function PhaseOneOverview() {
   const { state } = useApp();
@@ -103,9 +119,38 @@ export default function PhaseOneOverview() {
       : null;
   const recentOrdersSource = dashboardSearchRaw ? dashboardSearchOrders : state.orders;
   const recentOrders = [...recentOrdersSource].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
-  const lowStockBatches = [...state.batches]
-    .filter((batch) => batch.qtyRemaining > 0 && batch.qtyRemaining <= 150)
-    .sort((a, b) => a.qtyRemaining - b.qtyRemaining);
+  const inventoryPreviewRows = state.products
+    .map((product) => {
+      const productBatches = state.batches.filter((batch) => batch.productId === product.id);
+      const activeBatches = productBatches
+        .filter((batch) => batch.status === 'active' && batch.qtyRemaining > 0)
+        .sort((a, b) => new Date(a.productionDate) - new Date(b.productionDate));
+      const totalProduced = productBatches.reduce((sum, batch) => sum + Number(batch.qtyProduced ?? 0), 0);
+      const totalRemaining = productBatches.reduce((sum, batch) => sum + Number(batch.qtyRemaining ?? 0), 0);
+      const oldestLot = activeBatches[0];
+      const newestActivity = productBatches.reduce((latest, batch) => {
+        const batchTime = new Date(batch.updatedAt ?? batch.productionDate).getTime();
+        return Number.isNaN(batchTime) ? latest : Math.max(latest, batchTime);
+      }, 0);
+
+      return {
+        product,
+        activeBatches,
+        totalProduced,
+        totalRemaining,
+        oldestLot,
+        newestActivity,
+        stockStatus: getStockStatus(totalRemaining),
+      };
+    })
+    .filter((row) => row.totalProduced > 0 || row.totalRemaining > 0)
+    .sort((a, b) => {
+      const statusOrder = { out: 0, low: 1, in: 2 };
+      return statusOrder[a.stockStatus] - statusOrder[b.stockStatus]
+        || a.totalRemaining - b.totalRemaining
+        || b.newestActivity - a.newestActivity;
+    })
+    .slice(0, 4);
   const topClients = state.clients
     .map((client) => {
       const clientOrders = state.orders.filter((order) => order.clientId === client.id);
@@ -234,17 +279,46 @@ export default function PhaseOneOverview() {
         </div>
 
         <div className="card">
-          <div className="card-title">
-            <ScrollText size={18} /> Inventory Alerts
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center' }}>
+            <div>
+              <div className="card-title">
+                <ScrollText size={18} /> Inventory Preview
+              </div>
+              <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: -4 }}>
+                Running low at {LOW_STOCK_THRESHOLD.toLocaleString()} units or less.
+              </div>
+            </div>
+            <Link className="btn btn-secondary" to="/inventory">View full inventory</Link>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {lowStockBatches.length ? (
-              lowStockBatches.map((batch) => (
-                <div key={batch.id} className="alert alert-warning">
-                  <div className="alert-content">
-                    <div className="alert-title">{batch.batchNumber} is running low</div>
-                    <div className="alert-description">
-                      {batch.qtyRemaining.toLocaleString()} units remaining in this batch.
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+            {inventoryPreviewRows.length ? (
+              inventoryPreviewRows.map((row) => (
+                <div
+                  key={row.product.id}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '52px minmax(0, 1fr) auto',
+                    gap: 'var(--space-3)',
+                    alignItems: 'center',
+                  }}
+                >
+                  <DashboardProductImage product={row.product} />
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700 }}>{getProductDisplayName(row.product)}</div>
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                      {row.product.category || 'Uncategorized'} | {row.product.unitSize || 'Unit not set'}
+                    </div>
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                      Oldest: {row.oldestLot ? `${row.oldestLot.batchNumber} (${formatDate(row.oldestLot.productionDate)})` : '-'}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <span className={`badge badge-${row.stockStatus === 'low' ? 'partial' : row.stockStatus === 'out' ? 'declined' : 'fulfilled'}`}>
+                      {getStockStatusLabel(row.stockStatus)}
+                    </span>
+                    <div className="cell-monospace" style={{ marginTop: 6 }}>{row.totalRemaining.toLocaleString()} left</div>
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                      {row.activeBatches.length.toLocaleString()} active lots
                     </div>
                   </div>
                 </div>
@@ -253,7 +327,7 @@ export default function PhaseOneOverview() {
               <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
                 <div className="empty-state-title">No urgent stock alerts</div>
                 <div className="empty-state-description">
-                  Current demo inventory levels are healthy enough for the next fulfilment cycle.
+                  Log production lots to populate the inventory preview.
                 </div>
               </div>
             )}
@@ -303,6 +377,17 @@ export default function PhaseOneOverview() {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+function DashboardProductImage({ product }) {
+  const imageUrl = getProductImageUrl(product, { fallback: true });
+  const usesFallback = !hasProductImage(product);
+
+  return (
+    <div className={`product-thumb ${usesFallback ? 'product-thumb-fallback' : ''}`} style={{ width: 52, height: 52 }}>
+      {imageUrl ? <img src={imageUrl} alt={getProductDisplayName(product)} /> : <ImageOff size={18} />}
     </div>
   );
 }

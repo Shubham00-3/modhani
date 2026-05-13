@@ -31,6 +31,7 @@ export default function PhaseOneInventory() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
   const [lotStatusFilter, setLotStatusFilter] = useState('');
+  const [sortBy, setSortBy] = useState('product');
   const categories = useMemo(
     () => [...new Set(state.products.map((product) => product.category).filter(Boolean))].sort(),
     [state.products]
@@ -45,7 +46,7 @@ export default function PhaseOneInventory() {
         const visibleBatches = lotStatusFilter
           ? productBatches.filter((batch) => batch.status === lotStatusFilter)
           : productBatches;
-        const activeBatches = productBatches.filter((batch) => batch.qtyRemaining > 0);
+        const activeBatches = productBatches.filter((batch) => batch.status === 'active' && batch.qtyRemaining > 0);
         const totalProduced = productBatches.reduce((sum, batch) => sum + Number(batch.qtyProduced ?? 0), 0);
         const totalRemaining = productBatches.reduce((sum, batch) => sum + Number(batch.qtyRemaining ?? 0), 0);
         const oldestLot = [...activeBatches].sort((a, b) => new Date(a.productionDate) - new Date(b.productionDate))[0];
@@ -55,6 +56,7 @@ export default function PhaseOneInventory() {
         return {
           product,
           batches: visibleBatches,
+          activeBatches,
           totalProduced,
           totalRemaining,
           oldestLot,
@@ -77,8 +79,27 @@ export default function PhaseOneInventory() {
       .filter((row) => (stockFilter ? row.stockStatus === stockFilter : true))
       .filter((row) => (lotStatusFilter ? row.batches.length > 0 : true))
       .filter((row) => (normalizedSearch ? row.searchText.includes(normalizedSearch) : true))
-      .sort((a, b) => getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product)));
-  }, [categoryFilter, lotStatusFilter, search, state.batches, state.products, stockFilter]);
+      .sort((a, b) => {
+        if (sortBy === 'category') {
+          return (a.product.category || '').localeCompare(b.product.category || '')
+            || getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
+        }
+        if (sortBy === 'remaining-asc') return a.totalRemaining - b.totalRemaining;
+        if (sortBy === 'remaining-desc') return b.totalRemaining - a.totalRemaining;
+        if (sortBy === 'status') {
+          const statusOrder = { out: 0, low: 1, in: 2 };
+          return statusOrder[a.stockStatus] - statusOrder[b.stockStatus]
+            || a.totalRemaining - b.totalRemaining;
+        }
+        if (sortBy === 'oldest-lot') {
+          const aDate = a.oldestLot?.productionDate ? new Date(a.oldestLot.productionDate).getTime() : Number.MAX_SAFE_INTEGER;
+          const bDate = b.oldestLot?.productionDate ? new Date(b.oldestLot.productionDate).getTime() : Number.MAX_SAFE_INTEGER;
+          return aDate - bDate;
+        }
+
+        return getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
+      });
+  }, [categoryFilter, lotStatusFilter, search, sortBy, state.batches, state.products, stockFilter]);
 
   const historyRows = useMemo(() => buildInventoryHistory(state), [state]);
   const hasActiveFilters = Boolean(search || categoryFilter || stockFilter || lotStatusFilter);
@@ -126,15 +147,24 @@ export default function PhaseOneInventory() {
             <option value="active">Active Lots</option>
             <option value="cleared">Cleared Lots</option>
           </select>
+          <select className="form-select" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <option value="product">Sort by Product</option>
+            <option value="category">Sort by Category</option>
+            <option value="status">Sort by Stock Status</option>
+            <option value="remaining-asc">Sort by Low Remaining</option>
+            <option value="remaining-desc">Sort by High Remaining</option>
+            <option value="oldest-lot">Sort by Oldest Active Lot</option>
+          </select>
           <button
             className="btn btn-secondary"
             type="button"
-            disabled={!hasActiveFilters}
+            disabled={!hasActiveFilters && sortBy === 'product'}
             onClick={() => {
               setSearch('');
               setCategoryFilter('');
               setStockFilter('');
               setLotStatusFilter('');
+              setSortBy('product');
             }}
           >
             <RotateCcw size={14} /> Reset
@@ -143,14 +173,17 @@ export default function PhaseOneInventory() {
 
         {inventoryRows.length ? (
           <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
-            {inventoryRows.map(({ product, batches, totalProduced, totalRemaining, oldestLot, stockStatus }) => (
+            {inventoryRows.map(({ product, batches, activeBatches, totalProduced, totalRemaining, oldestLot, stockStatus }) => (
               <div key={product.id} className="card" style={{ padding: 'var(--space-4)' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '72px minmax(0, 1fr) auto', gap: 'var(--space-4)', alignItems: 'center' }}>
                   <ProductImage product={product} />
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 800 }}>{getProductDisplayName(product)}</div>
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      {product.category || 'Uncategorized'} | {product.qbItemName || 'No QuickBooks item'}
+                      Category: {product.category || 'Uncategorized'} | Unit: {product.unitSize || 'Not set'} | QB: {product.qbItemName || 'Not mapped'}
+                    </div>
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 6 }}>
+                      Active lots: {activeBatches.length ? activeBatches.map((batch) => `${batch.batchNumber} (${batch.qtyRemaining.toLocaleString()})`).join(', ') : 'None'}
                     </div>
                     <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                       {batches.length ? batches.map((batch) => (
