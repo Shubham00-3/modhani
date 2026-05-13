@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Building2, CheckCircle2, ChevronDown, LogOut, Minus, Package, Plus, Send, ShoppingCart } from 'lucide-react';
+import { Building2, CheckCircle2, Minus, Package, Plus, Search, MapPin, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatCurrency, formatDateTime, getProductDisplayName, getProductImageUrl, hasProductImage } from '../data/phaseOneData';
 
@@ -14,6 +14,8 @@ export default function CustomerPortal() {
   const [error, setError] = useState('');
   const [orderSubmitted, setOrderSubmitted] = useState(false);
   const [selectedRecentOrderId, setSelectedRecentOrderId] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('all');
 
   // Multi-client support: if customer has multiple clients, show a company selector.
   const portalClients = useMemo(() => portal?.clients ?? [], [portal?.clients]);
@@ -41,6 +43,7 @@ export default function CustomerPortal() {
   );
 
   const activeLocationId = locationId || activeLocations[0]?.id || '';
+  const activeLocation = activeLocations.find((loc) => loc.id === activeLocationId);
 
   // Filter products to those priced for the active client.
   const activeProducts = useMemo(() => {
@@ -49,6 +52,25 @@ export default function CustomerPortal() {
       (p) => p.pricingClientId === activeClientId || (!p.pricingClientId && portalClientCount <= 1)
     );
   }, [portalProducts, activeClientId, portalClientCount]);
+
+  // Get unique categories for filter pills
+  const categories = useMemo(() => {
+    const cats = [...new Set(activeProducts.map((p) => p.category).filter(Boolean))];
+    return cats.sort();
+  }, [activeProducts]);
+
+  // Filter products by category and search
+  const filteredProducts = useMemo(() => {
+    let filtered = activeProducts;
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter((p) => p.category === selectedCategory);
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      filtered = filtered.filter((p) => getProductDisplayName(p).toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
+    }
+    return filtered;
+  }, [activeProducts, selectedCategory, searchQuery]);
 
   const selectedLines = useMemo(
     () =>
@@ -61,6 +83,7 @@ export default function CustomerPortal() {
     [activeProducts, quantities]
   );
   const orderTotal = selectedLines.reduce((total, line) => total + line.quantity * line.product.clientPrice, 0);
+  const totalSelectedCases = selectedLines.reduce((total, line) => total + line.quantity, 0);
   const productsById = useMemo(() => new Map(portalProducts.map((product) => [product.id, product])), [portalProducts]);
   const selectedRecentOrder = selectedRecentOrderId
     ? portal?.recentOrders.find((order) => order.id === selectedRecentOrderId) ?? null
@@ -187,19 +210,79 @@ export default function CustomerPortal() {
   }
 
   return (
-    <PortalShell onLogout={logout}>
-      <section className="customer-portal-header">
-        <div>
-          <p className="eyebrow">Customer Portal</p>
-          <h1>{activeClient?.name ?? 'Customer Portal'}</h1>
-          <p>Choose your delivery location, enter quantities, and submit your order to Modhani.</p>
+    <PortalShell
+      onLogout={logout}
+      clientName={activeClient?.name}
+      locationName={activeLocation?.name}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+    >
+      {/* Hero Banner */}
+      <section className="cp-hero">
+        <div className="cp-hero-text">
+          <span className="cp-hero-eyebrow">Wholesale Dairy Ordering</span>
+          <h1>Order dairy inventory</h1>
+          <p>Fast case entry, clean cart review, recent orders, and delivery location control in one focused screen.</p>
+          <div className="cp-hero-stats">
+            <div className="cp-hero-stat">
+              <strong>{activeProducts.length}</strong>
+              <span>Available items</span>
+            </div>
+            <div className="cp-hero-stat">
+              <strong>{totalSelectedCases}</strong>
+              <span>Selected cases</span>
+            </div>
+            <div className="cp-hero-stat cp-hero-stat-accent">
+              <Truck size={14} />
+              <span>Next Delivery route</span>
+            </div>
+          </div>
+        </div>
+        <div className="cp-hero-visual">
+          {activeProducts.slice(0, 3).map((product, i) => {
+            const imageUrl = getProductImageUrl(product, { fallback: true });
+            return (
+              <div
+                key={product.id}
+                className="cp-hero-product-card"
+                style={{ '--card-index': i }}
+              >
+                <img src={imageUrl} alt={getProductDisplayName(product)} />
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Catalogue Header */}
+      <section className="cp-catalogue-header">
+        <h2 className="cp-catalogue-title">Catalogue</h2>
+        <div className="cp-category-pills">
+          <button
+            type="button"
+            className={`cp-category-pill ${selectedCategory === 'all' ? 'active' : ''}`}
+            onClick={() => setSelectedCategory('all')}
+          >
+            All products
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              className={`cp-category-pill ${selectedCategory === cat ? 'active' : ''}`}
+              onClick={() => setSelectedCategory(cat)}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
       </section>
 
       <form className="customer-order-layout" onSubmit={handleSubmitOrder}>
+        {/* Product Grid */}
         <section className="customer-products-list">
-          {activeProducts.length ? (
-            activeProducts.map((product) => {
+          {filteredProducts.length ? (
+            filteredProducts.map((product) => {
               const imageUrl = getProductImageUrl(product, { fallback: true });
               const usesFallback = !hasProductImage(product);
               const quantity = quantities[product.id] ?? '';
@@ -215,8 +298,8 @@ export default function CustomerPortal() {
                     />
                   </div>
                   <div className="customer-product-info">
-                    <h3>{getProductDisplayName(product)}</h3>
-                    <p>{product.category || 'Product'}</p>
+                    <h3>{product.name}</h3>
+                    <span className="cp-product-unit">{product.unitSize} {product.category ? `- ${product.category}` : ''}</span>
                     <strong>{formatCurrency(product.clientPrice)}</strong>
                   </div>
                   <div className="customer-product-actions">
@@ -243,23 +326,54 @@ export default function CustomerPortal() {
             <div className="customer-portal-panel customer-pending-panel">
               <Package size={34} />
               <h2>No Products Available</h2>
-              <p>Modhani staff has not enabled products for this company catalogue yet.</p>
+              <p>
+                {activeProducts.length
+                  ? 'No products match the current search or category filter.'
+                  : 'Modhani staff has not enabled products for this company catalogue yet.'}
+              </p>
             </div>
           )}
         </section>
 
-        <aside className="customer-portal-panel customer-order-summary">
-          <div className="portal-section-heading">
-            <ShoppingCart size={20} />
+        {/* Order Summary Sidebar */}
+        <aside className="cp-order-summary">
+          <div className="cp-summary-header">
             <div>
-              <h2>Order Summary</h2>
-              <p>{selectedLines.length} selected item{selectedLines.length === 1 ? '' : 's'}</p>
+              <h2>Order summary</h2>
+              <p>Review selected products before sending to Modhani.</p>
             </div>
+            <span className="cp-live-badge"><span className="cp-live-dot" /> Live cart</span>
+          </div>
+
+          {/* Delivery Location */}
+          <div className="cp-delivery-location">
+            <div className="cp-delivery-label">
+              <span>DELIVERY LOCATION</span>
+              {activeLocations.length > 1 && (
+                <select
+                  className="cp-delivery-edit"
+                  value={activeLocationId}
+                  onChange={(event) => {
+                    setLocationId(event.target.value);
+                    setOrderSubmitted(false);
+                  }}
+                >
+                  {activeLocations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <strong>{activeLocation?.name ?? 'No location'}</strong>
           </div>
 
           {hasMultipleClients ? (
-            <div className="form-group">
-              <label className="form-label">Company</label>
+            <div className="cp-delivery-location">
+              <div className="cp-delivery-label">
+                <span>COMPANY</span>
+              </div>
               <select
                 className="form-select"
                 value={activeClientId}
@@ -274,124 +388,143 @@ export default function CustomerPortal() {
             </div>
           ) : null}
 
-          <div className="form-group">
-            <label className="form-label">Location</label>
-            <select
-              className="form-select"
-              value={activeLocationId}
-              onChange={(event) => {
-                setLocationId(event.target.value);
-                setOrderSubmitted(false);
-              }}
-            >
-              {activeLocations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
-                </option>
-              ))}
-              {activeLocations.length === 0 ? <option value="">No locations available</option> : null}
-            </select>
-          </div>
+          <PortalMessages error={error} />
 
-          <PortalMessages error={error} message={message} />
-
-          {orderSubmitted ? (
-            <div className="customer-submit-confirmation">
-              <CheckCircle2 size={24} />
-              <div>
-                <strong>Thank you</strong>
-                <span>Your order has been submitted.</span>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="customer-cart-lines">
+          {/* Cart Lines */}
+          <div className="cp-cart-lines">
             {selectedLines.length ? (
               selectedLines.map((line) => (
-                <div key={line.product.id} className="customer-cart-line">
-                  <span>{getProductDisplayName(line.product)}</span>
-                  <strong>
-                    {line.quantity.toLocaleString()} x {formatCurrency(line.product.clientPrice)}
-                  </strong>
+                <div key={line.product.id} className="cp-cart-line">
+                  <span className="cp-cart-dot" style={{ background: getCategoryColor(line.product.category) }} />
+                  <div className="cp-cart-line-info">
+                    <strong>{getProductDisplayName(line.product)}</strong>
+                    <span>{line.quantity} {line.quantity === 1 ? 'case' : 'cases'}</span>
+                  </div>
+                  <span className="cp-cart-line-price">{formatCurrency(line.quantity * line.product.clientPrice)}</span>
                 </div>
               ))
             ) : (
-              <div className="customer-empty-cart">No quantities entered</div>
+              <div className="customer-empty-cart">No quantities entered yet</div>
             )}
           </div>
 
-          <div className="customer-total-card">
-            <span>Order Total</span>
+          {/* Total */}
+          <div className="cp-estimated-total">
+            <span>Estimated total</span>
             <strong>{formatCurrency(orderTotal)}</strong>
           </div>
 
-          <button className="btn btn-primary" type="submit" disabled={submitting || !activeProducts.length || !selectedLines.length}>
-            <Send size={16} /> {submitting ? 'Submitting...' : 'Submit Order'}
+          {/* Submit */}
+          <button className="cp-submit-btn" type="submit" disabled={submitting || !activeProducts.length || !selectedLines.length}>
+            {submitting ? 'Submitting...' : 'Submit Order'}
           </button>
+
+          {orderSubmitted && (
+            <div className="cp-success-message animate-entrance">
+              <CheckCircle2 size={16} />
+              <span>Thank you, your order has been submitted.</span>
+            </div>
+          )}
         </aside>
       </form>
 
+      {/* Recent Orders - Compact Inline */}
       {portal.recentOrders.length ? (
-        <section className="customer-portal-panel">
-          <div className="portal-section-heading">
-            <CheckCircle2 size={20} />
-            <div>
-              <h2>Recent Portal Orders</h2>
-              <p>Your latest submitted portal orders.</p>
-            </div>
-          </div>
-          <div className="customer-order-history">
-            {portal.recentOrders.map((order) => (
+        <section id="recent-orders" className="cp-recent-orders-bar">
+          <span className="cp-recent-label">Recent orders</span>
+          <div className="cp-recent-pills">
+            {portal.recentOrders.slice(0, 5).map((order) => (
               <button
-                className="customer-order-history-row"
                 key={order.id}
                 type="button"
+                className={`cp-recent-pill ${selectedRecentOrderId === order.id ? 'active' : ''}`}
                 onClick={() => setSelectedRecentOrderId((current) => (current === order.id ? '' : order.id))}
               >
-                <strong>Order #{order.orderNumber}</strong>
-                <span>{order.status}</span>
-                <span>{formatDateTime(order.createdAt)}</span>
-                <ChevronDown size={16} className={selectedRecentOrderId === order.id ? 'customer-order-chevron-open' : ''} />
+                <span className="cp-recent-pill-number">#{order.orderNumber}</span>
+                <span className={`cp-recent-pill-status status-${order.status.toLowerCase().replace(/\s+/g, '-')}`}>{order.status}</span>
               </button>
             ))}
           </div>
-          {selectedRecentOrder ? (
-            <div className="customer-recent-order-detail">
-              <div className="customer-recent-order-title">
-                <strong>Order #{selectedRecentOrder.orderNumber}</strong>
-                <span>{formatDateTime(selectedRecentOrder.createdAt)}</span>
-              </div>
-              {(selectedRecentOrder.items ?? []).length ? (
-                selectedRecentOrder.items.map((item) => {
-                  const product = productsById.get(item.productId);
-                  const unitPrice = item.clientPrice ?? product?.clientPrice ?? 0;
-                  return (
-                    <div className="customer-recent-order-line" key={item.id}>
-                      <span>{product ? getProductDisplayName(product) : item.productId}</span>
-                      <strong>{Number(item.quantity).toLocaleString()} units</strong>
-                      <span>{formatCurrency(Number(item.quantity) * unitPrice)}</span>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="customer-empty-cart">No line details available</div>
-              )}
+        </section>
+      ) : null}
+
+      {/* Expanded Recent Order Detail */}
+      {selectedRecentOrder ? (
+        <section className="cp-recent-detail animate-entrance">
+          <div className="cp-recent-detail-header">
+            <strong>Order #{selectedRecentOrder.orderNumber}</strong>
+            <span>{formatDateTime(selectedRecentOrder.createdAt)}</span>
+          </div>
+          {(selectedRecentOrder.items ?? []).length ? (
+            <div className="cp-recent-detail-lines">
+              {selectedRecentOrder.items.map((item) => {
+                const product = productsById.get(item.productId);
+                const unitPrice = item.clientPrice ?? product?.clientPrice ?? 0;
+                return (
+                  <div className="cp-recent-detail-line" key={item.id}>
+                    <span>{product ? getProductDisplayName(product) : item.productId}</span>
+                    <span className="cp-detail-qty">{Number(item.quantity).toLocaleString()} units</span>
+                    <span className="cp-detail-price">{formatCurrency(Number(item.quantity) * unitPrice)}</span>
+                  </div>
+                );
+              })}
             </div>
-          ) : null}
+          ) : (
+            <div className="customer-empty-cart">No line details available</div>
+          )}
         </section>
       ) : null}
     </PortalShell>
   );
 }
 
-function PortalShell({ children, onLogout }) {
+/* Utility to get a color for each product category */
+function getCategoryColor(category) {
+  const colors = {
+    'Dahi': '#D4B896',
+    'Milk': '#B5CDB6',
+    'Yogurt': '#C5D8C5',
+    'Butter': '#E8D5A3',
+    'Paneer': '#BDDBB5',
+    'Lassi': '#EBC48E',
+  };
+  return colors[category] || '#C5CCC7';
+}
+
+function PortalShell({ children, onLogout, clientName, locationName, searchQuery, onSearchChange }) {
   return (
     <main className="customer-portal-page">
-      <header className="customer-portal-nav">
-        <img className="sidebar-brand-logo" src="/modhani-logo.svg" alt="Modhani" />
-        <button className="btn btn-ghost" type="button" onClick={onLogout}>
-          <LogOut size={16} /> Sign Out
-        </button>
+      <header className="cp-nav">
+        <div className="cp-nav-inner">
+          {/* Left: Logo */}
+          <div className="cp-nav-brand">
+            <img className="cp-brand-logo" src="/modhani-logo.svg" alt="Modhani" />
+            <div>
+              <strong className="cp-brand-name">Modhani</strong>
+              <span className="cp-brand-sub">Customer ordering portal</span>
+            </div>
+          </div>
+
+          {/* Center: Search */}
+          <div className="cp-nav-search">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Search products, cases, SKUs..."
+              value={searchQuery ?? ''}
+              onChange={(e) => onSearchChange?.(e.target.value)}
+            />
+          </div>
+
+          {/* Right: Client/Location pills + Sign Out */}
+          <div className="cp-nav-right">
+            {clientName && <span className="cp-nav-pill">{clientName}</span>}
+            {locationName && <span className="cp-nav-pill"><MapPin size={12} /> {locationName}</span>}
+            <button className="cp-signout-btn" type="button" onClick={onLogout}>
+              Sign out
+            </button>
+          </div>
+        </div>
       </header>
       <div className="customer-portal-content">{children}</div>
     </main>
