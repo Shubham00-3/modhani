@@ -14,6 +14,7 @@ import PhaseOneClientsLocations from './pages/PhaseOneClientsLocations';
 import PhaseOneProducts from './pages/PhaseOneProducts';
 import PhaseOneCustomers from './pages/PhaseOneCustomers';
 import CustomerPortal from './pages/CustomerPortal';
+import DriverPortal from './pages/DriverPortal';
 
 export default function App() {
   const { state, dispatch } = useApp();
@@ -53,6 +54,10 @@ export default function App() {
 
   if (state.authConfigured && state.authRole === 'customer') {
     return <CustomerPortal />;
+  }
+
+  if (state.authConfigured && state.authRole === 'driver') {
+    return <DriverPortal />;
   }
 
   return (

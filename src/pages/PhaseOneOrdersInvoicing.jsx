@@ -32,7 +32,7 @@ import {
   hasProductImage,
   isLocationShipToReady,
 } from '../data/phaseOneData';
-import { printInvoice, printPackingSlip } from '../utils/printDocuments';
+import { printInvoice, printPackingSlip, printProofOfDelivery } from '../utils/printDocuments';
 
 export default function PhaseOneOrdersInvoicing() {
   const { state, dispatch, addToast } = useApp();
@@ -442,6 +442,15 @@ export default function PhaseOneOrdersInvoicing() {
                       batches: state.batches,
                     })
                   }
+                  onPrintProofOfDelivery={(currentOrder) =>
+                    printProofOfDelivery({
+                      order: currentOrder,
+                      clients: state.clients,
+                      locations: state.locations,
+                      products: state.products,
+                      batches: state.batches,
+                    })
+                  }
                   onPrintInvoice={(currentOrder) =>
                     printInvoice({
                       order: currentOrder,
@@ -493,6 +502,7 @@ function OrderDetailPanel({
   onPushToQuickBooks,
   onConfirmShipment,
   onPrintPackingSlip,
+  onPrintProofOfDelivery,
   onPrintInvoice,
 }) {
   const { state } = useApp();
@@ -539,6 +549,16 @@ function OrderDetailPanel({
         <InfoCard label="Outstanding" value={`${getOrderOutstandingQty(order).toLocaleString()} units`} />
         <InfoCard label="Invoice" value={order.invoiceNumber ?? '-'} />
         <InfoCard label="QuickBooks" value={quickBooksStatus} />
+        <InfoCard
+          label="POD"
+          value={
+            order.podSignedAt ? (
+              <span className="badge badge-success">Signed by {order.podSignedBy}</span>
+            ) : (
+              '-'
+            )
+          }
+        />
       </div>
 
       {quickBooksJob ? (
@@ -657,7 +677,34 @@ function OrderDetailPanel({
             <Printer size={16} /> Print Packing Slip
           </button>
         ) : null}
+
+        {order.podSignedAt ? (
+          <button className="btn btn-ghost" type="button" onClick={() => onPrintProofOfDelivery(order)}>
+            <Printer size={16} /> Print POD
+          </button>
+        ) : null}
       </div>
+
+      {order.podSignedAt ? (
+        <div className="card" style={{ padding: 'var(--space-4)' }}>
+          <h3 className="card-title">Proof of Delivery</h3>
+          <div className="pod-staff-summary">
+            <div>
+              <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
+                Signed by
+              </div>
+              <strong>{order.podSignedBy}</strong>
+              <div style={{ color: 'var(--color-text-muted)', marginTop: 4 }}>
+                {formatDateTime(order.podSignedAt)}
+              </div>
+              {order.podNotes ? <p style={{ marginTop: 10 }}>{order.podNotes}</p> : null}
+            </div>
+            {order.podSignatureDataUrl ? (
+              <img src={order.podSignatureDataUrl} alt="Proof of delivery signature" />
+            ) : null}
+          </div>
+        </div>
+      ) : null}
 
       {order.declineReason && order.status !== 'declined' ? (
         <div className="alert alert-warning">

@@ -338,6 +338,11 @@ function orderToDb(order) {
     invoice_postal_code: order.invoicePostalCode ?? null,
     invoice_country: order.invoiceCountry ?? null,
     packing_slip_number: order.packingSlipNumber,
+    pod_signature_data_url: order.podSignatureDataUrl ?? null,
+    pod_signed_by: order.podSignedBy ?? null,
+    pod_signed_at: order.podSignedAt ?? null,
+    pod_notes: order.podNotes ?? null,
+    pod_captured_by: order.podCapturedBy ?? null,
     created_at: order.createdAt,
     fulfilled_at: order.fulfilledAt,
     invoiced_at: order.invoicedAt,
@@ -535,6 +540,11 @@ export async function fetchRemoteState(supabase, userId) {
     invoicePostalCode: order.invoice_postal_code ?? null,
     invoiceCountry: order.invoice_country ?? null,
     packingSlipNumber: order.packing_slip_number,
+    podSignatureDataUrl: order.pod_signature_data_url ?? null,
+    podSignedBy: order.pod_signed_by ?? null,
+    podSignedAt: order.pod_signed_at ?? null,
+    podNotes: order.pod_notes ?? null,
+    podCapturedBy: order.pod_captured_by ?? null,
     createdAt: order.created_at,
     fulfilledAt: order.fulfilled_at,
     invoicedAt: order.invoiced_at,
@@ -581,13 +591,33 @@ export async function fetchRemoteState(supabase, userId) {
 export async function fetchAuthIdentity(supabase, userId) {
   const { data: staffProfile, error: staffError } = await supabase
     .from('profiles')
-    .select('user_id')
+    .select('user_id, role')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (staffError) throw staffError;
+  if (staffProfile?.role === 'driver') return 'driver';
   if (staffProfile) return 'staff';
   return 'customer';
+}
+
+export async function fetchDriverPortalState(supabase, userId) {
+  const data = await fetchRemoteState(supabase, userId);
+  const deliveryStatuses = new Set(['shipped']);
+
+  return {
+    ...data,
+    orders: data.orders.filter((order) => deliveryStatuses.has(order.status)),
+    auditLog: data.auditLog.filter((entry) => {
+      if (!entry.orderId) return false;
+      return data.orders.some((order) => deliveryStatuses.has(order.status) && order.id === entry.orderId);
+    }),
+    quickBooksJobs: [],
+    reportRows: [],
+    customerContacts: [],
+    customerClientAssignments: [],
+    customerLocationAssignments: [],
+  };
 }
 
 export async function fetchCustomerPortalState(supabase, user) {
@@ -830,6 +860,14 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_user_id: currentUser.id,
         p_packing_slip_number: action.payload.packingSlipNumber,
         p_packing_slip_sent_at: action.payload.packingSlipSentAt,
+      });
+    case 'COMPLETE_DELIVERY_POD':
+      return callRpc(supabase, 'modhanios_complete_delivery_pod', {
+        p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+        p_signed_by: action.payload.signedBy,
+        p_signature_data_url: action.payload.signatureDataUrl,
+        p_notes: action.payload.notes ?? null,
       });
     case 'LOG_PRODUCTION_BATCH':
       return callRpc(supabase, 'modhanios_log_production_batch', {

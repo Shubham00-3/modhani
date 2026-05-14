@@ -344,6 +344,94 @@ export function printInvoice({ order, clients, locations, products, batches = []
   );
 }
 
+export function printProofOfDelivery({ order, clients, locations, products, batches = [] }) {
+  const clientName = getClientName(clients, order.clientId);
+  const location = locations.find((entry) => entry.id === order.locationId);
+  const shipTo = getOrderShipToSnapshot(order, location);
+  const logoSrc = getLogoSrc();
+  const rows = order.items
+    .filter((item) => (item.invoiceQty ?? item.fulfilledQty) > 0)
+    .map((item) => {
+      const product = getProduct(products, item.productId);
+      const qty = item.invoiceQty ?? item.fulfilledQty;
+      const lotCodes =
+        item.assignedBatches
+          ?.map((assigned) => {
+            const batch = batches.find((entry) => entry.id === assigned.batchId);
+            return `${batch?.batchNumber ?? assigned.batchId}: ${assigned.qty}`;
+          })
+          .filter(Boolean)
+          .join(', ') || 'No lot assignment';
+
+      return `
+        <tr>
+          <td style="border:1px solid #e5e7eb;padding:10px;">${escapeHtml(getProductDisplayName(product))}</td>
+          <td style="border:1px solid #e5e7eb;padding:10px;">${escapeHtml(lotCodes)}</td>
+          <td style="border:1px solid #e5e7eb;padding:10px;text-align:right;">${qty.toLocaleString()}</td>
+        </tr>
+      `;
+    })
+    .join('');
+  const signatureImage = order.podSignatureDataUrl
+    ? `<img src="${order.podSignatureDataUrl}" alt="POD signature" style="max-width:320px;max-height:120px;object-fit:contain;" />`
+    : '<div style="height:90px;border-bottom:1px solid #111827;"></div>';
+
+  openPrintableWindow(
+    `POD ${order.orderNumber}`,
+    `
+      <main style="font-family:Segoe UI,Arial,sans-serif;padding:32px;color:#111827;background:#fff;min-height:100vh;">
+        <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:28px;">
+          <div style="display:flex;align-items:center;gap:18px;">
+            <img src="${logoSrc}" alt="Modhani" style="width:168px;height:auto;object-fit:contain;" />
+            <div>
+              <div style="font-size:28px;font-weight:700;">Proof of Delivery</div>
+              <div style="margin-top:6px;color:#6b7280;">Signed delivery record</div>
+            </div>
+          </div>
+          <div style="text-align:right;line-height:1.6;">
+            <div><strong>Order #:</strong> ${escapeHtml(order.orderNumber)}</div>
+            <div><strong>Invoice #:</strong> ${escapeHtml(order.invoiceNumber ?? '-')}</div>
+            <div><strong>Signed:</strong> ${escapeHtml(formatDate(order.podSignedAt ?? new Date().toISOString()))}</div>
+          </div>
+        </header>
+
+        <section style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px;">
+          <div style="padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
+            <div style="font-size:12px;text-transform:uppercase;color:#6b7280;">Client</div>
+            <div style="font-size:18px;font-weight:600;margin-top:4px;">${escapeHtml(clientName)}</div>
+          </div>
+          <div style="padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
+            <div style="font-size:12px;text-transform:uppercase;color:#6b7280;">Ship To</div>
+            <div style="font-size:16px;font-weight:600;margin-top:4px;">${formatAddressBlock(shipTo.name, shipTo)}</div>
+          </div>
+        </section>
+
+        <table style="width:100%;border-collapse:collapse;margin-bottom:32px;">
+          <thead>
+            <tr>
+              <th style="text-align:left;border:1px solid #e5e7eb;padding:10px;background:#f9fafb;">Product</th>
+              <th style="text-align:left;border:1px solid #e5e7eb;padding:10px;background:#f9fafb;">Lot Codes</th>
+              <th style="text-align:right;border:1px solid #e5e7eb;padding:10px;background:#f9fafb;">Qty</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+
+        <section style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:end;">
+          <div style="padding:18px;border:1px solid #e5e7eb;border-radius:10px;">
+            <div style="font-size:12px;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Receiver Signature</div>
+            ${signatureImage}
+          </div>
+          <div style="padding:18px;border:1px solid #e5e7eb;border-radius:10px;line-height:1.7;">
+            <div><strong>Received By:</strong> ${escapeHtml(order.podSignedBy ?? '-')}</div>
+            <div><strong>Delivery Notes:</strong> ${escapeHtml(order.podNotes ?? '-')}</div>
+          </div>
+        </section>
+      </main>
+    `
+  );
+}
+
 export function getPackingSlipPreview(order, batches) {
   return buildBatchSummary(order, batches)
     .map((entry) => `Lot Code ${entry.batchNumber}: ${entry.qty}`)

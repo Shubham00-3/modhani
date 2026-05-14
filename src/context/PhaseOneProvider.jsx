@@ -22,6 +22,7 @@ import {
   executeWorkflowAction,
   fetchAuthIdentity,
   fetchCustomerPortalState,
+  fetchDriverPortalState,
   fetchRemoteState,
   persistAction,
   persistNotificationDismissals,
@@ -279,6 +280,18 @@ function reducer(state, action) {
         authLoading: false,
         isAuthenticated: true,
         authRole: 'customer',
+        authError: null,
+      };
+    case 'INITIALIZE_DRIVER_PORTAL':
+      return {
+        ...state,
+        ...action.payload.data,
+        currentUserId: action.payload.currentUserId,
+        customerPortal: null,
+        initialized: true,
+        authLoading: false,
+        isAuthenticated: true,
+        authRole: 'driver',
         authError: null,
       };
     case 'SET_AUTH_STATUS':
@@ -633,6 +646,37 @@ function reducer(state, action) {
             : order
         ),
       };
+    case 'COMPLETE_DELIVERY_POD':
+      return {
+        ...state,
+        orders: state.orders.map((order) =>
+          order.id === action.payload.orderId
+            ? {
+                ...order,
+                podSignatureDataUrl: action.payload.signatureDataUrl,
+                podSignedBy: action.payload.signedBy,
+                podSignedAt: action.payload.timestamp,
+                podNotes: action.payload.notes ?? null,
+                podCapturedBy: action.payload.userId ?? state.currentUserId,
+              }
+            : order
+        ),
+        auditLog: [
+          {
+            id: `audit-${Date.now()}`,
+            timestamp: action.payload.timestamp,
+            action: 'pod_captured',
+            orderId: action.payload.orderId,
+            clientId: state.orders.find((order) => order.id === action.payload.orderId)?.clientId ?? null,
+            userId: action.payload.userId ?? state.currentUserId,
+            userName: state.users.find((user) => user.id === (action.payload.userId ?? state.currentUserId))?.name ?? 'Driver',
+            details: `Proof of delivery signed by ${action.payload.signedBy}`,
+            previousValue: null,
+            newValue: 'POD captured',
+          },
+          ...state.auditLog,
+        ],
+      };
     case 'UPDATE_USER':
       return {
         ...state,
@@ -674,6 +718,7 @@ const serverWorkflowActions = new Set([
   'PUSH_QB_INVOICE',
   'QUEUE_QB_INVOICE',
   'CONFIRM_SHIPMENT',
+  'COMPLETE_DELIVERY_POD',
   'LOG_PRODUCTION_BATCH',
 ]);
 const serverAdminActions = new Set([
@@ -770,6 +815,19 @@ export function AppProvider({ children }) {
     }
   }, []);
 
+  const loadDriverPortalData = useCallback(async (userId) => {
+    if (!supabase) return;
+
+    const data = await fetchDriverPortalState(supabase, userId);
+    baseDispatch({
+      type: 'INITIALIZE_DRIVER_PORTAL',
+      payload: {
+        data,
+        currentUserId: userId,
+      },
+    });
+  }, []);
+
   const loadAuthenticatedUser = useCallback(
     async (user) => {
       if (!supabase) return;
@@ -785,9 +843,15 @@ export function AppProvider({ children }) {
         return;
       }
 
+      if (identity === 'driver') {
+        baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } });
+        await loadDriverPortalData(user.id);
+        return;
+      }
+
       await loadCustomerPortalData(user, { needsPasswordSetup });
     },
-    [loadCustomerPortalData, loadRemoteData]
+    [loadCustomerPortalData, loadDriverPortalData, loadRemoteData]
   );
 
   const handleRemoteBootstrapError = useCallback((userId, fetchError) => {
@@ -1134,7 +1198,11 @@ export function AppProvider({ children }) {
 
         if (previousState.currentUserId) {
           try {
-            await loadRemoteData(previousState.currentUserId);
+            if (previousState.authRole === 'driver') {
+              await loadDriverPortalData(previousState.currentUserId);
+            } else {
+              await loadRemoteData(previousState.currentUserId);
+            }
           } catch (reloadError) {
             addToast(`Reload failed: ${reloadError.message}`, 'warning');
             return { ok: false, error: reloadError };
@@ -1163,7 +1231,7 @@ export function AppProvider({ children }) {
 
       return { ok: true };
     },
-    [addToast, loadRemoteData]
+    [addToast, loadDriverPortalData, loadRemoteData]
   );
 
   const value = useMemo(

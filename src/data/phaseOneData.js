@@ -40,6 +40,19 @@ export const USERS = [
       manageSettings: false,
     },
   },
+  {
+    id: 'user-driver-001',
+    email: 'driver.modhani@modhanios.local',
+    name: 'Modhani Driver',
+    initials: 'MD',
+    role: 'driver',
+    permissions: {
+      fulfilOrders: false,
+      overridePrices: false,
+      editInvoices: false,
+      manageSettings: false,
+    },
+  },
 ];
 
 export const PRODUCTS = [
