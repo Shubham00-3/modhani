@@ -167,6 +167,13 @@ async function seedCoreTables(userIdMap) {
     category: product.category,
     base_catalogue_price: product.baseCataloguePrice,
     tier_prices: buildTierPrices(product.baseCataloguePrice, product.tierPrices),
+    item_number: product.itemNumber ?? null,
+    upc: product.upc ?? null,
+    packaging_details: product.packagingDetails ?? null,
+    units_per_case: product.unitsPerCase ?? null,
+    shelf_life_days: product.shelfLifeDays ?? null,
+    lead_time_days: product.leadTimeDays ?? null,
+    order_unit_label: product.orderUnitLabel ?? null,
     qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
     qb_mapping_status: product.qbMappingStatus ?? 'ready',
   })));

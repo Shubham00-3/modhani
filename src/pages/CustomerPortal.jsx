@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Building2, CheckCircle2, Minus, Package, Plus, Search } from 'lucide-react';
 import { useApp } from '../context/useApp';
-import { formatCurrency, formatDateTime, getProductDisplayName, getProductImageUrl, hasProductImage } from '../data/phaseOneData';
+import {
+  formatCurrency,
+  formatDateTime,
+  getProductDisplayName,
+  getProductImageUrl,
+  getProductOrderUnitLabel,
+  hasProductImage,
+} from '../data/phaseOneData';
 
 export default function CustomerPortal() {
   const { state, logout, completeCustomerProfile, submitPortalOrder } = useApp();
@@ -64,7 +71,20 @@ export default function CustomerPortal() {
     }
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      filtered = filtered.filter((p) => getProductDisplayName(p).toLowerCase().includes(q) || (p.category || '').toLowerCase().includes(q));
+      filtered = filtered.filter((p) =>
+        [
+          getProductDisplayName(p),
+          p.category,
+          p.itemNumber,
+          p.upc,
+          p.packagingDetails,
+          p.orderUnitLabel,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+          .includes(q)
+      );
     }
     return filtered;
   }, [activeProducts, selectedCategory, searchQuery]);
@@ -267,6 +287,7 @@ export default function CustomerPortal() {
               const usesFallback = !hasProductImage(product);
               const quantity = quantities[product.id] ?? '';
               const numericQuantity = Number(quantity || 0);
+              const orderUnit = getProductOrderUnitLabel(product);
 
               return (
                 <article className="customer-product-card" key={product.id}>
@@ -279,7 +300,9 @@ export default function CustomerPortal() {
                   </div>
                   <div className="customer-product-info">
                     <h3>{product.name}</h3>
-                    <span className="cp-product-unit">{product.unitSize} {product.category ? `- ${product.category}` : ''}</span>
+                    <span className="cp-product-unit">
+                      {[product.packagingDetails || product.unitSize, orderUnit].filter(Boolean).join(' - ')}
+                    </span>
                     <strong>{formatCurrency(product.clientPrice)}</strong>
                   </div>
                   <div className="customer-product-actions">
@@ -378,7 +401,7 @@ export default function CustomerPortal() {
                   <span className="cp-cart-dot" style={{ background: getCategoryColor(line.product.category) }} />
                   <div className="cp-cart-line-info">
                     <strong>{getProductDisplayName(line.product)}</strong>
-                    <span>{line.quantity} {line.quantity === 1 ? 'case' : 'cases'}</span>
+                    <span>{line.quantity} x {getProductOrderUnitLabel(line.product)}</span>
                   </div>
                   <span className="cp-cart-line-price">{formatCurrency(line.quantity * line.product.clientPrice)}</span>
                 </div>
@@ -443,7 +466,9 @@ export default function CustomerPortal() {
                 return (
                   <div className="cp-recent-detail-line" key={item.id}>
                     <span>{product ? getProductDisplayName(product) : item.productId}</span>
-                    <span className="cp-detail-qty">{Number(item.quantity).toLocaleString()} units</span>
+                    <span className="cp-detail-qty">
+                      {Number(item.quantity).toLocaleString()} x {product ? getProductOrderUnitLabel(product) : 'Order unit'}
+                    </span>
                     <span className="cp-detail-price">{formatCurrency(Number(item.quantity) * unitPrice)}</span>
                   </div>
                 );

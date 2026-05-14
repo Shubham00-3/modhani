@@ -2,7 +2,14 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Package, Plus, Search, Settings2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
-import { formatCurrency, getProductDisplayName, getProductImageUrl, getProductTierPrice, hasProductImage } from '../data/phaseOneData';
+import {
+  formatCurrency,
+  getProductDisplayName,
+  getProductImageUrl,
+  getProductOrderUnitLabel,
+  getProductTierPrice,
+  hasProductImage,
+} from '../data/phaseOneData';
 import { ProductModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneProducts() {
@@ -26,6 +33,13 @@ export default function PhaseOneProducts() {
         product.name,
         product.unitSize,
         product.category,
+        product.itemNumber,
+        product.upc,
+        product.packagingDetails,
+        product.unitsPerCase,
+        product.shelfLifeDays,
+        product.leadTimeDays,
+        product.orderUnitLabel,
         product.qbItemName,
         product.baseCataloguePrice,
         ...Object.values(product.tierPrices ?? {}),
@@ -88,10 +102,12 @@ export default function PhaseOneProducts() {
             <thead>
               <tr>
                 <th>Image</th>
+                <th>Item #</th>
                 <th>Product</th>
                 <th>Category</th>
-                <th>QuickBooks Item</th>
+                <th>Packaging</th>
                 <th>Tier 1 Price</th>
+                <th>Shelf Life</th>
                 <th />
               </tr>
             </thead>
@@ -102,10 +118,22 @@ export default function PhaseOneProducts() {
                     <td>
                       <ProductThumbnail product={product} onPreview={setPreviewProduct} />
                     </td>
-                    <td style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</td>
+                    <td className="cell-monospace">{product.itemNumber || '-'}</td>
+                    <td>
+                      <div style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</div>
+                      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>
+                        {[product.upc ? `UPC ${product.upc}` : '', product.qbItemName ? `QB ${product.qbItemName}` : ''].filter(Boolean).join(' | ')}
+                      </div>
+                    </td>
                     <td>{product.category || '-'}</td>
-                    <td>{product.qbItemName || getProductDisplayName(product)}</td>
+                    <td>
+                      <div>{product.packagingDetails || product.unitSize || '-'}</div>
+                      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>
+                        {getProductOrderUnitLabel(product)}
+                      </div>
+                    </td>
                     <td className="cell-monospace">{formatCurrency(getProductTierPrice(product, 1))}</td>
+                    <td>{product.shelfLifeDays ? `${product.shelfLifeDays} days` : '-'}</td>
                     <td>
                       <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingProduct(product)}>
                         Edit
@@ -115,7 +143,7 @@ export default function PhaseOneProducts() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="6" style={{ padding: 0 }}>
+                  <td colSpan="8" style={{ padding: 0 }}>
                     <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
                       <div className="empty-state-title">No matching products</div>
                       <div className="empty-state-description">

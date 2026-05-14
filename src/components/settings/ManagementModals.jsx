@@ -12,28 +12,29 @@ import {
 } from '../../data/phaseOneData';
 import { isSupabaseConfigured, supabase } from '../../lib/supabaseClient';
 
-const PRODUCT_UNIT_OPTIONS = ['kg', 'grams', 'liters', 'ml'];
-
 export function ProductModal({ product, onClose }) {
   const { state, dispatch, addToast } = useApp();
-  const initialUnit = parseUnitSize(product?.unitSize);
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(getProductImageUrl(product, { fallback: true }));
   const [form, setForm] = useState(
     product
       ? {
           ...product,
-          unitQuantity: initialUnit.quantity,
-          unitMeasure: initialUnit.unit,
           tierPrices: buildTierPriceForm(product),
         }
       : {
           name: '',
-          unitQuantity: '',
-          unitMeasure: 'kg',
+          unitSize: '',
           category: '',
           baseCataloguePrice: '',
           tierPrices: buildTierPriceForm(null),
+          itemNumber: '',
+          upc: '',
+          packagingDetails: '',
+          unitsPerCase: '',
+          shelfLifeDays: '',
+          leadTimeDays: '',
+          orderUnitLabel: '',
           qbItemName: '',
           imageUrl: '',
           imagePath: '',
@@ -46,13 +47,14 @@ export function ProductModal({ product, onClose }) {
       onClose={onClose}
       onSave={async () => {
         const name = form.name.trim();
-        const unitQuantity = Number(form.unitQuantity);
-        const unitMeasure = form.unitMeasure;
-        const unitSize = `${form.unitQuantity} ${unitMeasure}`.trim();
+        const unitSize = String(form.unitSize ?? '').trim();
         const qbItemName = (form.qbItemName || `${name} ${unitSize}`).trim();
         const tierPrices = buildTierPricesFromForm(form.tierPrices);
         const baseCataloguePrice = tierPrices[1];
         const productId = product?.id ?? `prod-${Date.now()}`;
+        const unitsPerCase = parseOptionalNumber(form.unitsPerCase);
+        const shelfLifeDays = parseOptionalInteger(form.shelfLifeDays);
+        const leadTimeDays = parseOptionalInteger(form.leadTimeDays);
         let imageUrl = form.imageUrl ?? '';
         let imagePath = form.imagePath ?? '';
 
@@ -61,13 +63,8 @@ export function ProductModal({ product, onClose }) {
           return false;
         }
 
-        if (Number.isNaN(unitQuantity) || unitQuantity <= 0) {
-          addToast('Unit quantity must be a number greater than zero.', 'warning');
-          return false;
-        }
-
-        if (!PRODUCT_UNIT_OPTIONS.includes(unitMeasure)) {
-          addToast('Select a valid unit.', 'warning');
+        if (!unitSize) {
+          addToast('Enter product size or packaging unit.', 'warning');
           return false;
         }
 
@@ -77,6 +74,11 @@ export function ProductModal({ product, onClose }) {
 
         if (hasInvalidTierPrice) {
           addToast('Tier prices must be zero or greater.', 'warning');
+          return false;
+        }
+
+        if (Number.isNaN(unitsPerCase) || Number.isNaN(shelfLifeDays) || Number.isNaN(leadTimeDays)) {
+          addToast('Units per case, shelf life, and lead time must be zero or greater.', 'warning');
           return false;
         }
 
@@ -126,6 +128,13 @@ export function ProductModal({ product, onClose }) {
             id: productId,
             baseCataloguePrice,
             tierPrices,
+            itemNumber: String(form.itemNumber ?? '').trim(),
+            upc: String(form.upc ?? '').trim(),
+            packagingDetails: String(form.packagingDetails ?? '').trim(),
+            unitsPerCase,
+            shelfLifeDays,
+            leadTimeDays,
+            orderUnitLabel: String(form.orderUnitLabel ?? '').trim(),
             qbItemName,
             qbMappingStatus: qbItemName ? 'ready' : 'needs_mapping',
             imageUrl,
@@ -142,18 +151,18 @@ export function ProductModal({ product, onClose }) {
     >
       <FormInput label="Product Name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
       <FormInput
-        label="Quantity"
-        type="number"
-        value={form.unitQuantity}
-        onChange={(value) => setForm((current) => ({ ...current, unitQuantity: value }))}
-      />
-      <FormSelect
-        label="Unit"
-        value={form.unitMeasure}
-        options={PRODUCT_UNIT_OPTIONS}
-        onChange={(value) => setForm((current) => ({ ...current, unitMeasure: value }))}
+        label="Product Size / Retail Unit"
+        value={form.unitSize}
+        onChange={(value) => setForm((current) => ({ ...current, unitSize: value }))}
       />
       <FormInput label="Category" value={form.category} onChange={(value) => setForm((current) => ({ ...current, category: value }))} />
+      <FormInput label="Modhani Item #" value={form.itemNumber ?? ''} onChange={(value) => setForm((current) => ({ ...current, itemNumber: value }))} />
+      <FormInput label="UPC" value={form.upc ?? ''} onChange={(value) => setForm((current) => ({ ...current, upc: value }))} />
+      <FormInput label="Packaging Details" value={form.packagingDetails ?? ''} onChange={(value) => setForm((current) => ({ ...current, packagingDetails: value }))} />
+      <FormInput label="Units Per Case" type="number" value={form.unitsPerCase ?? ''} onChange={(value) => setForm((current) => ({ ...current, unitsPerCase: value }))} />
+      <FormInput label="Shelf Life Days" type="number" value={form.shelfLifeDays ?? ''} onChange={(value) => setForm((current) => ({ ...current, shelfLifeDays: value }))} />
+      <FormInput label="Lead Time Days" type="number" value={form.leadTimeDays ?? ''} onChange={(value) => setForm((current) => ({ ...current, leadTimeDays: value }))} />
+      <FormInput label="Order Unit Label" value={form.orderUnitLabel ?? ''} onChange={(value) => setForm((current) => ({ ...current, orderUnitLabel: value }))} />
       <div className="form-group">
         <label className="form-label">Tier Prices</label>
         <div className="tier-price-grid">
@@ -419,6 +428,10 @@ export function PricingModal({ clientId, onClose }) {
     [
       getProductDisplayName(product),
       product.category,
+      product.itemNumber,
+      product.upc,
+      product.packagingDetails,
+      product.orderUnitLabel,
       product.qbItemName,
       getProductTierPrice(product, selectedTier),
     ]
@@ -511,7 +524,7 @@ export function PricingModal({ clientId, onClose }) {
                 <span className="pricing-product-main">
                   <strong>{getProductDisplayName(product)}</strong>
                   <span className="pricing-product-meta">
-                    {[product.category, product.qbItemName].filter(Boolean).join(' - ') || 'Catalogue item'}
+                    {[product.category, product.itemNumber ? `Item ${product.itemNumber}` : '', product.packagingDetails].filter(Boolean).join(' - ') || 'Catalogue item'}
                   </span>
                 </span>
                 <span className="pricing-product-price">
@@ -576,21 +589,6 @@ function FormInput({ label, value, onChange, type = 'text' }) {
   );
 }
 
-function FormSelect({ label, value, options, onChange }) {
-  return (
-    <div className="form-group">
-      <label className="form-label">{label}</label>
-      <select className="form-select" value={value} onChange={(event) => onChange(event.target.value)}>
-        {options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
-}
-
 function buildTierPriceForm(product) {
   return Object.fromEntries(
     PRICE_TIERS.map((tier) => [tier, product ? String(getProductTierPrice(product, tier)) : ''])
@@ -606,36 +604,18 @@ function buildTierPricesFromForm(tierPrices) {
   );
 }
 
-function parseUnitSize(unitSize = '') {
-  const normalized = String(unitSize).trim();
-  const match = normalized.match(/^(\d+(?:\.\d+)?)\s*(kg|kilograms?|grams?|g|liters?|litres?|l|ml|milliliters?)$/i);
+function parseOptionalNumber(value) {
+  const normalized = String(value ?? '').trim();
+  if (!normalized) return null;
 
-  if (!match) {
-    return { quantity: '', unit: 'kg' };
-  }
+  const number = Number(normalized);
+  return Number.isFinite(number) && number >= 0 ? number : NaN;
+}
 
-  const unit = match[2].toLowerCase();
-  const unitMap = {
-    g: 'grams',
-    gram: 'grams',
-    grams: 'grams',
-    kilogram: 'kg',
-    kilograms: 'kg',
-    kg: 'kg',
-    l: 'liters',
-    liter: 'liters',
-    liters: 'liters',
-    litre: 'liters',
-    litres: 'liters',
-    ml: 'ml',
-    milliliter: 'ml',
-    milliliters: 'ml',
-  };
-
-  return {
-    quantity: match[1],
-    unit: unitMap[unit] ?? 'kg',
-  };
+function parseOptionalInteger(value) {
+  const number = parseOptionalNumber(value);
+  if (number == null || Number.isNaN(number)) return number;
+  return Number.isInteger(number) ? number : NaN;
 }
 
 function isValidEmail(value) {

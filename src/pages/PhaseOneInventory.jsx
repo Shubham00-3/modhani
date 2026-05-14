@@ -8,6 +8,7 @@ import {
   getProduct,
   getProductDisplayName,
   getProductImageUrl,
+  getProductOrderUnitLabel,
   hasProductImage,
 } from '../data/phaseOneData';
 
@@ -65,6 +66,10 @@ export default function PhaseOneInventory() {
             product.name,
             product.unitSize,
             product.category,
+            product.itemNumber,
+            product.upc,
+            product.packagingDetails,
+            product.orderUnitLabel,
             product.qbItemName,
             getProductDisplayName(product),
             lotCodes,
@@ -180,7 +185,8 @@ export default function PhaseOneInventory() {
                   <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 800 }}>{getProductDisplayName(product)}</div>
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      Category: {product.category || 'Uncategorized'} | Unit: {product.unitSize || 'Not set'} | QB: {product.qbItemName || 'Not mapped'}
+                      Category: {product.category || 'Uncategorized'} | Unit: {product.packagingDetails || product.unitSize || 'Not set'} | {getProductOrderUnitLabel(product)}
+                      {product.itemNumber ? ` | Item #${product.itemNumber}` : ''}
                     </div>
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 6 }}>
                       Active lots: {activeBatches.length ? activeBatches.map((batch) => `${batch.batchNumber} (${batch.qtyRemaining.toLocaleString()})`).join(', ') : 'None'}

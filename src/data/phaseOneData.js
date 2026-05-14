@@ -132,6 +132,19 @@ export function getProductDisplayName(product) {
   return `${product.name} ${product.unitSize}`;
 }
 
+export function getProductOrderUnitLabel(product) {
+  const explicitLabel = String(product?.orderUnitLabel ?? '').trim();
+  if (explicitLabel) return explicitLabel;
+
+  const unitsPerCase = Number(product?.unitsPerCase);
+  if (Number.isFinite(unitsPerCase) && unitsPerCase > 1) {
+    return `Case of ${Number.isInteger(unitsPerCase) ? unitsPerCase : unitsPerCase.toLocaleString()}`;
+  }
+
+  if (Number.isFinite(unitsPerCase) && unitsPerCase === 1) return 'Each';
+  return 'Case';
+}
+
 export function normalizePriceTier(value) {
   const tier = Number(value);
   if (!Number.isInteger(tier) || tier < 1 || tier > PRICE_TIERS.length) return 1;
