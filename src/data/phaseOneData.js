@@ -45,10 +45,13 @@ export const USERS = [
 export const PRODUCTS = [
 ];
 
+export const PRICE_TIERS = Array.from({ length: 10 }, (_, index) => index + 1);
+
 export const CLIENTS = [
   {
     id: 'client-loblaws',
     name: 'Loblaws',
+    priceTier: 1,
     locationCount: 100,
     emailPackingSlip: true,
     emailInvoice: true,
@@ -61,6 +64,7 @@ export const CLIENTS = [
   {
     id: 'client-chalo-freshco',
     name: 'Chalo FreshCo',
+    priceTier: 1,
     locationCount: 100,
     emailPackingSlip: true,
     emailInvoice: true,
@@ -73,6 +77,7 @@ export const CLIENTS = [
   {
     id: 'client-a1-cash-carry',
     name: 'A1 Cash & Carry',
+    priceTier: 1,
     locationCount: 10,
     emailPackingSlip: true,
     emailInvoice: true,
@@ -85,6 +90,7 @@ export const CLIENTS = [
   {
     id: 'client-desi-stores',
     name: 'Desi Stores',
+    priceTier: 1,
     locationCount: 4,
     emailPackingSlip: true,
     emailInvoice: true,
@@ -124,6 +130,34 @@ export function getProduct(products, productId) {
 export function getProductDisplayName(product) {
   if (!product) return 'Unknown product';
   return `${product.name} ${product.unitSize}`;
+}
+
+export function normalizePriceTier(value) {
+  const tier = Number(value);
+  if (!Number.isInteger(tier) || tier < 1 || tier > PRICE_TIERS.length) return 1;
+  return tier;
+}
+
+export function buildTierPrices(baseCataloguePrice = 0, tierPrices = {}) {
+  const basePrice = Number(baseCataloguePrice);
+  const fallbackPrice = Number.isFinite(basePrice) && basePrice >= 0 ? basePrice : 0;
+
+  return Object.fromEntries(
+    PRICE_TIERS.map((tier) => {
+      const tierValue = Number(tierPrices?.[tier] ?? tierPrices?.[String(tier)] ?? fallbackPrice);
+      return [tier, Number.isFinite(tierValue) && tierValue >= 0 ? tierValue : fallbackPrice];
+    })
+  );
+}
+
+export function getProductTierPrice(product, tier = 1) {
+  if (!product) return 0;
+
+  const normalizedTier = normalizePriceTier(tier);
+  const tierPrice = Number(product.tierPrices?.[normalizedTier] ?? product.tierPrices?.[String(normalizedTier)]);
+
+  if (Number.isFinite(tierPrice) && tierPrice >= 0) return tierPrice;
+  return Number(product.baseCataloguePrice ?? 0);
 }
 
 export const PRODUCT_IMAGE_FALLBACK_URL = '/modhani-logo.svg';
@@ -298,7 +332,11 @@ export function getBatchLabel(batches, batchId) {
 }
 
 export function getClientPricingForProduct(clientPricing, clientId, productId, fallbackPrice = 0) {
-  return clientPricing.find((price) => price.clientId === clientId && price.productId === productId)?.price ?? fallbackPrice;
+  return (
+    clientPricing.find(
+      (price) => price.clientId === clientId && price.productId === productId && price.isActive !== false
+    )?.price ?? fallbackPrice
+  );
 }
 
 export function buildBatchSummary(order, batches) {

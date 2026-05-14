@@ -1,4 +1,10 @@
-import { buildReportRowsFromOrders, QUICKBOOKS_SETTINGS } from '../data/phaseOneData';
+import {
+  buildReportRowsFromOrders,
+  buildTierPrices,
+  getProductTierPrice,
+  normalizePriceTier,
+  QUICKBOOKS_SETTINGS,
+} from '../data/phaseOneData';
 
 function profileToUi(profile) {
   return {
@@ -20,6 +26,7 @@ function clientToUi(client) {
   return {
     id: client.id,
     name: client.name,
+    priceTier: normalizePriceTier(client.price_tier),
     locationCount: client.location_count,
     emailPackingSlip: client.email_packing_slip,
     emailInvoice: client.email_invoice,
@@ -49,12 +56,15 @@ function locationToUi(location) {
 }
 
 function productToUi(product) {
+  const baseCataloguePrice = Number(product.base_catalogue_price);
+
   return {
     id: product.id,
     name: product.name,
     unitSize: product.unit_size,
     category: product.category,
-    baseCataloguePrice: Number(product.base_catalogue_price),
+    baseCataloguePrice,
+    tierPrices: buildTierPrices(baseCataloguePrice, product.tier_prices),
     qbItemName: product.qb_item_name ?? `${product.name} ${product.unit_size}`.trim(),
     qbMappingStatus: product.qb_mapping_status ?? 'ready',
     imageUrl: product.image_url ?? '',
@@ -196,6 +206,7 @@ function clientToDb(client) {
   return {
     id: client.id,
     name: client.name,
+    price_tier: normalizePriceTier(client.priceTier),
     location_count: client.locationCount ?? 0,
     email_packing_slip: Boolean(client.emailPackingSlip),
     email_invoice: Boolean(client.emailInvoice),
@@ -225,12 +236,15 @@ function locationToDb(location) {
 }
 
 function productToDb(product) {
+  const tierPrices = buildTierPrices(product.baseCataloguePrice, product.tierPrices);
+
   return {
     id: product.id,
     name: product.name,
     unit_size: product.unitSize,
     category: product.category ?? null,
-    base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
+    base_catalogue_price: getProductTierPrice({ ...product, tierPrices }, 1),
+    tier_prices: tierPrices,
     qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
     qb_mapping_status: product.qbMappingStatus ?? 'ready',
     image_url: product.imageUrl ?? null,
@@ -634,32 +648,25 @@ export async function fetchCustomerPortalState(supabase, user) {
   )?.error;
   if (firstError) throw firstError;
 
-  // Build pricing map keyed by "clientId:productId".
-  const pricingMap = new Map();
-  (pricingResult.data ?? []).forEach((pricing) => {
-    const key = `${pricing.client_id}:${pricing.product_id}`;
-    pricingMap.set(key, pricing);
-  });
+  const productsById = new Map((productsResult.data ?? []).map((product) => [product.id, productToUi(product)]));
+  const products = (pricingResult.data ?? [])
+    .filter((pricing) => assignedClientIds.includes(pricing.client_id))
+    .filter((pricing) => pricing.is_active && Number(pricing.price) > 0)
+    .map((pricing) => {
+      const productUi = productsById.get(pricing.product_id);
+      if (!productUi) return null;
 
-  const products = (productsResult.data ?? []).map((product) => {
-    const productUi = productToUi(product);
-    // Find the first active pricing across assigned clients.
-    let bestPricing = null;
-    for (const cid of assignedClientIds) {
-      const pricing = pricingMap.get(`${cid}:${product.id}`);
-      if (pricing && pricing.is_active && Number(pricing.price) > 0) {
-        bestPricing = pricing;
-        break;
-      }
-    }
-
-    return {
-      ...productUi,
-      clientPrice: bestPricing ? Number(bestPricing.price) : productUi.baseCataloguePrice,
-      pricingId: bestPricing?.id ?? null,
-      pricingClientId: bestPricing?.client_id ?? null,
-    };
-  });
+      return {
+        ...productUi,
+        clientPrice: Number(pricing.price),
+        pricingId: pricing.id,
+        pricingClientId: pricing.client_id,
+      };
+    })
+    .filter(Boolean)
+    .sort((left, right) =>
+      `${left.name} ${left.unitSize}`.localeCompare(`${right.name} ${right.unitSize}`)
+    );
 
   const itemsByOrderId = new Map();
   (orderItemsResult.data ?? []).forEach((item) => {
@@ -836,6 +843,7 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_unit_size: product.unitSize,
         p_category: product.category ?? null,
         p_base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
+        p_tier_prices: buildTierPrices(product.baseCataloguePrice, product.tierPrices),
         p_qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
         p_image_url: product.imageUrl ?? null,
         p_image_path: product.imagePath ?? null,
@@ -894,6 +902,13 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_is_active: Boolean(pricing.isActive),
       });
     }
+    case 'SAVE_CLIENT_CATALOGUE':
+      return callRpc(supabase, 'modhanios_save_client_catalogue', {
+        p_user_id: currentUser.id,
+        p_client_id: action.payload.clientId,
+        p_price_tier: normalizePriceTier(action.payload.priceTier),
+        p_enabled_product_ids: action.payload.enabledProductIds ?? [],
+      });
     case 'UPDATE_CUSTOMER_CONTACT': {
       const contact = action.payload;
       return callRpc(supabase, 'modhanios_update_customer_contact', {
@@ -998,6 +1013,23 @@ export async function persistAction(supabase, action, previousState, nextState) 
       return supabase.from('client_product_prices').upsert(pricingToDb(action.payload), {
         onConflict: 'client_id,product_id',
       });
+    case 'SAVE_CLIENT_CATALOGUE': {
+      const client = nextState.clients.find((entry) => entry.id === action.payload.clientId);
+      const clientPricing = nextState.clientPricing.filter((entry) => entry.clientId === action.payload.clientId);
+
+      if (client) {
+        const { error: clientError } = await supabase
+          .from('clients')
+          .update({ price_tier: normalizePriceTier(client.priceTier) })
+          .eq('id', client.id);
+        if (clientError) return { error: clientError };
+      }
+
+      if (!clientPricing.length) return { error: null };
+      return supabase.from('client_product_prices').upsert(clientPricing.map(pricingToDb), {
+        onConflict: 'client_id,product_id',
+      });
+    }
     case 'ADD_BATCH':
     case 'UPDATE_BATCH':
       return upsertRow(supabase, 'batches', batchToDb(action.payload));

@@ -47,7 +47,7 @@ export default function PhaseOneClientsLocations() {
         <div>
           <h1 className="page-title">Clients & Locations</h1>
           <p className="page-subtitle">
-            Manage client accounts, store locations, and negotiated pricing in one place.
+            Manage client accounts, store locations, pricing tiers, and visible products in one place.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
@@ -96,6 +96,9 @@ export default function PhaseOneClientsLocations() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
             {filteredClients.map((client) => {
               const clientLocations = state.locations.filter((location) => location.clientId === client.id);
+              const enabledProductCount = state.clientPricing.filter(
+                (pricing) => pricing.clientId === client.id && pricing.isActive
+              ).length;
 
               return (
                 <div key={client.id} className="card" style={{ padding: 'var(--space-4)' }}>
@@ -108,10 +111,13 @@ export default function PhaseOneClientsLocations() {
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: 4 }}>
                       QB Customer: {client.qbCustomerName || client.name}
                     </div>
+                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)', marginTop: 4 }}>
+                      Tier {client.priceTier ?? 1} pricing - {enabledProductCount.toLocaleString()} visible products
+                    </div>
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
                     <button className="btn btn-secondary btn-sm" type="button" disabled={!canManage} onClick={() => setPricingClientId(client.id)}>
-                      <DollarSign size={14} /> Pricing
+                      <DollarSign size={14} /> Pricing & Products
                     </button>
                     <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingClient(client)}>
                       Edit

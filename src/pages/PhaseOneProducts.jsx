@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Package, Plus, Search, Settings2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
-import { formatCurrency, getProductDisplayName, getProductImageUrl, hasProductImage } from '../data/phaseOneData';
+import { formatCurrency, getProductDisplayName, getProductImageUrl, getProductTierPrice, hasProductImage } from '../data/phaseOneData';
 import { ProductModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneProducts() {
@@ -28,6 +28,7 @@ export default function PhaseOneProducts() {
         product.category,
         product.qbItemName,
         product.baseCataloguePrice,
+        ...Object.values(product.tierPrices ?? {}),
       ]
         .filter(Boolean)
         .join(' ')
@@ -90,7 +91,7 @@ export default function PhaseOneProducts() {
                 <th>Product</th>
                 <th>Category</th>
                 <th>QuickBooks Item</th>
-                <th>Base Catalogue Price</th>
+                <th>Tier 1 Price</th>
                 <th />
               </tr>
             </thead>
@@ -104,7 +105,7 @@ export default function PhaseOneProducts() {
                     <td style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</td>
                     <td>{product.category || '-'}</td>
                     <td>{product.qbItemName || getProductDisplayName(product)}</td>
-                    <td className="cell-monospace">{formatCurrency(product.baseCataloguePrice)}</td>
+                    <td className="cell-monospace">{formatCurrency(getProductTierPrice(product, 1))}</td>
                     <td>
                       <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingProduct(product)}>
                         Edit

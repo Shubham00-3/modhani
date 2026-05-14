@@ -2517,6 +2517,92 @@ input[type='checkbox']:disabled {
   min-width: 0;
 }
 
+.tier-price-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.tier-price-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.pricing-product-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+}
+
+.pricing-product-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.pricing-product-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.pricing-product-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  cursor: pointer;
+}
+
+.pricing-product-row.is-enabled {
+  border-color: rgba(17, 92, 54, 0.36);
+  background: #f4fbf6;
+}
+
+.pricing-product-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pricing-product-main strong,
+.pricing-product-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pricing-product-meta {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.pricing-product-price {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--color-primary);
+  white-space: nowrap;
+}
+
 .customer-contact-list {
   display: flex;
   flex-direction: column;
@@ -4230,9 +4316,18 @@ input[type='checkbox']:disabled {
   .product-image-editor,
   .order-line-editor,
   .pricing-catalogue-row,
+  .pricing-product-row,
   .customer-contact-row,
   .customer-order-layout {
     grid-template-columns: 1fr;
+  }
+
+  .tier-price-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pricing-product-price {
+    justify-self: start;
   }
 
   .product-image-preview {

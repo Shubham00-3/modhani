@@ -9,6 +9,7 @@ import {
   PRODUCTS,
   QUICKBOOKS_SETTINGS,
   USERS,
+  buildTierPrices,
 } from '../src/data/phaseOneData.js';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -126,12 +127,14 @@ async function seedCoreTables(userIdMap) {
     role: user.role,
     fulfil_orders: user.permissions.fulfilOrders,
     override_prices: user.permissions.overridePrices,
+    edit_invoices: Boolean(user.permissions.editInvoices),
     manage_settings: user.permissions.manageSettings,
   })));
 
   await insertRows('clients', CLIENTS.map((client) => ({
     id: client.id,
     name: client.name,
+    price_tier: client.priceTier ?? 1,
     location_count: client.locationCount,
     email_packing_slip: client.emailPackingSlip,
     email_invoice: client.emailInvoice,
@@ -163,6 +166,7 @@ async function seedCoreTables(userIdMap) {
     unit_size: product.unitSize,
     category: product.category,
     base_catalogue_price: product.baseCataloguePrice,
+    tier_prices: buildTierPrices(product.baseCataloguePrice, product.tierPrices),
     qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
     qb_mapping_status: product.qbMappingStatus ?? 'ready',
   })));
@@ -172,6 +176,7 @@ async function seedCoreTables(userIdMap) {
     client_id: price.clientId,
     product_id: price.productId,
     price: price.price,
+    is_active: Boolean(price.isActive),
   })));
 
   await insertRows('batches', BATCHES.map((batch) => ({

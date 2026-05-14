@@ -20,7 +20,6 @@ export default function CustomerPortal() {
   // Multi-client support: if customer has multiple clients, show a company selector.
   const portalClients = useMemo(() => portal?.clients ?? [], [portal?.clients]);
   const portalProducts = useMemo(() => portal?.products ?? [], [portal?.products]);
-  const portalClientCount = portalClients.length;
   const hasMultipleClients = portalClients.length > 1;
   const [selectedClientId, setSelectedClientId] = useState('');
 
@@ -48,10 +47,8 @@ export default function CustomerPortal() {
   // Filter products to those priced for the active client.
   const activeProducts = useMemo(() => {
     if (!portalProducts.length || !activeClientId) return [];
-    return portalProducts.filter(
-      (p) => p.pricingClientId === activeClientId || (!p.pricingClientId && portalClientCount <= 1)
-    );
-  }, [portalProducts, activeClientId, portalClientCount]);
+    return portalProducts.filter((p) => p.pricingClientId === activeClientId);
+  }, [portalProducts, activeClientId]);
 
   // Get unique categories for filter pills
   const categories = useMemo(() => {
