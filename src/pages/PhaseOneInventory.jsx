@@ -177,36 +177,49 @@ export default function PhaseOneInventory() {
         </div>
 
         {inventoryRows.length ? (
-          <div style={{ display: 'grid', gap: 'var(--space-4)' }}>
+          <div className="inventory-grid">
             {inventoryRows.map(({ product, batches, activeBatches, totalProduced, totalRemaining, oldestLot, stockStatus }) => (
-              <div key={product.id} className="card" style={{ padding: 'var(--space-4)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '72px minmax(0, 1fr) auto', gap: 'var(--space-4)', alignItems: 'center' }}>
+              <div key={product.id} className={`inventory-card inventory-card-${stockStatus}`}>
+                <div className="inventory-card-main">
                   <ProductImage product={product} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 800 }}>{getProductDisplayName(product)}</div>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      Category: {product.category || 'Uncategorized'} | Unit: {product.packagingDetails || product.unitSize || 'Not set'} | {getProductOrderUnitLabel(product)}
-                      {product.itemNumber ? ` | Item #${product.itemNumber}` : ''}
+                  <div className="inventory-card-info">
+                    <div className="inventory-card-name">{getProductDisplayName(product)}</div>
+                    <div className="inventory-card-meta">
+                      {product.category || 'Uncategorized'} · {product.packagingDetails || product.unitSize || 'Not set'} · {getProductOrderUnitLabel(product)}
+                      {product.itemNumber ? ` · #${product.itemNumber}` : ''}
                     </div>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 6 }}>
-                      Active lots: {activeBatches.length ? activeBatches.map((batch) => `${batch.batchNumber} (${batch.qtyRemaining.toLocaleString()})`).join(', ') : 'None'}
-                    </div>
-                    <div style={{ marginTop: 'var(--space-2)', display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                      {batches.length ? batches.map((batch) => (
+                  </div>
+                </div>
+                <div className="inventory-card-stats">
+                  <div className="inventory-stat-primary">
+                    <span className="inventory-stat-value">{totalRemaining.toLocaleString()}</span>
+                    <span className="inventory-stat-label">remaining</span>
+                  </div>
+                  <div className="inventory-stat-secondary">
+                    <span>{totalProduced.toLocaleString()} produced</span>
+                    <span>
+                      <span className={`badge badge-${stockStatus === 'low' ? 'partial' : stockStatus === 'out' ? 'declined' : 'fulfilled'}`}>
+                        {getStockStatusLabel(stockStatus)}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <div className="inventory-card-lots">
+                  <div className="inventory-lots-header">
+                    <span>Active lots: {activeBatches.length || 0}</span>
+                    {oldestLot ? <span className="inventory-oldest">FIFO: {oldestLot.batchNumber} ({formatDate(oldestLot.productionDate)})</span> : null}
+                  </div>
+                  {batches.length ? (
+                    <div className="inventory-lot-badges">
+                      {batches.map((batch) => (
                         <span key={batch.id} className={`badge badge-${batch.status}`}>
                           {batch.batchNumber}: {batch.qtyRemaining.toLocaleString()}
                         </span>
-                      )) : <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>No lots logged</span>}
+                      ))}
                     </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div><span className={`badge badge-${stockStatus === 'low' ? 'partial' : stockStatus === 'out' ? 'declined' : 'fulfilled'}`}>{getStockStatusLabel(stockStatus)}</span></div>
-                    <div className="cell-monospace" style={{ marginTop: 8 }}>{totalRemaining.toLocaleString()} remaining</div>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>{totalProduced.toLocaleString()} produced</div>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      Oldest: {oldestLot ? `${oldestLot.batchNumber} (${formatDate(oldestLot.productionDate)})` : '-'}
-                    </div>
-                  </div>
+                  ) : (
+                    <div className="inventory-no-lots">No lots logged</div>
+                  )}
                 </div>
               </div>
             ))}
