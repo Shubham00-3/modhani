@@ -325,6 +325,7 @@ export default function PhaseOneOrdersInvoicing() {
           <option value="fulfilled">Fulfilled</option>
           <option value="invoiced">Invoiced</option>
           <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
           <option value="declined">Declined</option>
         </select>
 
@@ -516,13 +517,13 @@ function OrderDetailPanel({
   const canEditInvoice =
     order.invoiceNumber &&
     state.currentUser.permissions.editInvoices &&
-    ['invoiced', 'shipped'].includes(order.status) &&
+    ['invoiced', 'shipped', 'delivered'].includes(order.status) &&
     order.qbSyncStatus !== 'pending' &&
     order.qbSyncStatus !== 'syncing' &&
     !quickBooksJob;
   const canQueueQuickBooks =
     order.invoiceNumber &&
-    ['invoiced', 'shipped'].includes(order.status) &&
+    ['invoiced', 'shipped', 'delivered'].includes(order.status) &&
     order.qbSyncStatus !== 'pushed' &&
     order.qbSyncStatus !== 'syncing' &&
     order.qbSyncStatus !== 'failed' &&
@@ -654,7 +655,7 @@ function OrderDetailPanel({
           </button>
         ) : null}
 
-        {['invoiced', 'shipped'].includes(order.status) && order.qbSyncStatus === 'failed' ? (
+        {['invoiced', 'shipped', 'delivered'].includes(order.status) && order.qbSyncStatus === 'failed' ? (
           <button className="btn btn-secondary" type="button" onClick={() => onPushToQuickBooks(order)}>
             <FileText size={16} /> Retry QuickBooks Sync
           </button>

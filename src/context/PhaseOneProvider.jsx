@@ -653,6 +653,7 @@ function reducer(state, action) {
           order.id === action.payload.orderId
             ? {
                 ...order,
+                status: 'delivered',
                 podSignatureDataUrl: action.payload.signatureDataUrl,
                 podSignedBy: action.payload.signedBy,
                 podSignedAt: action.payload.timestamp,
