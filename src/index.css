@@ -2145,7 +2145,8 @@ input[type='checkbox']:disabled {
   width: 90%;
   max-width: 560px;
   max-height: 85vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   animation: slideUp var(--transition-slow);
 }
 
@@ -2171,6 +2172,8 @@ input[type='checkbox']:disabled {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .modal-footer {
