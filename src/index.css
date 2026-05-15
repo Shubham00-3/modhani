@@ -3752,6 +3752,9 @@ input[type='checkbox']:disabled {
   color: var(--color-text-muted);
 }
 .cp-nav-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   font-size: .82rem;
   font-weight: 600;
   color: var(--color-text-secondary);
@@ -3761,6 +3764,7 @@ input[type='checkbox']:disabled {
   text-decoration: none;
   transition: color .2s;
   padding: 0;
+  white-space: nowrap;
 }
 .cp-nav-link:hover {
   color: var(--color-primary);
@@ -4544,7 +4548,7 @@ input[type='checkbox']:disabled {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  padding: 14px 24px;
   background: var(--color-primary);
   color: var(--color-text-inverse);
   z-index: 200;
@@ -4562,6 +4566,12 @@ input[type='checkbox']:disabled {
   font-size: var(--font-size-lg);
 }
 
+.cp-floating-cart-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .cp-floating-cart-btn {
   background: white;
   color: var(--color-primary);
@@ -4573,6 +4583,23 @@ input[type='checkbox']:disabled {
 
 .cp-floating-cart-btn:hover {
   background: rgba(255, 255, 255, 0.9);
+}
+
+.cp-floating-cart-dismiss {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.cp-floating-cart-dismiss:hover {
+  color: white;
+  background: rgba(255, 255, 255, 0.15);
 }
 
 /* ---------- Cart Page ---------- */

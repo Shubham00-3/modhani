@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, CheckCircle2, Minus, Package, Plus, Search, ShoppingCart } from 'lucide-react';
+import { Building2, CheckCircle2, Minus, Package, Plus, Search, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { useCart } from '../hooks/useCart';
 import {
@@ -33,6 +33,8 @@ export default function CustomerPortal() {
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [dismissedCartCount, setDismissedCartCount] = useState(0);
+  const showFloatingCart = cartItemCount > 0 && cartItemCount > dismissedCartCount;
 
   // Get unique categories for filter pills
   const categories = useMemo(() => {
@@ -207,7 +209,7 @@ export default function CustomerPortal() {
       </section>
 
       {/* Product Grid */}
-      <section className="customer-products-list">
+      <section className="customer-products-list" style={showFloatingCart ? { paddingBottom: 80 } : undefined}>
         {filteredProducts.length ? (
           filteredProducts.map((product) => {
             const imageUrl = getProductImageUrl(product, { fallback: true });
@@ -266,16 +268,26 @@ export default function CustomerPortal() {
       </section>
 
       {/* Floating cart bar */}
-      {cartItemCount > 0 && (
+      {showFloatingCart && (
         <div className="cp-floating-cart">
           <div className="cp-floating-cart-info">
             <ShoppingCart size={20} />
             <span>{cartItemCount} item{cartItemCount !== 1 ? 's' : ''}</span>
             <strong>{formatCurrency(orderTotal)}</strong>
           </div>
-          <Link to="/cart" className="btn btn-primary cp-floating-cart-btn">
-            View Cart &rarr;
-          </Link>
+          <div className="cp-floating-cart-actions">
+            <Link to="/cart" className="btn btn-primary cp-floating-cart-btn">
+              View Cart &rarr;
+            </Link>
+            <button
+              className="cp-floating-cart-dismiss"
+              type="button"
+              onClick={() => setDismissedCartCount(cartItemCount)}
+              aria-label="Dismiss cart bar"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
       )}
     </>
