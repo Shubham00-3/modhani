@@ -14,6 +14,9 @@ import PhaseOneClientsLocations from './pages/PhaseOneClientsLocations';
 import PhaseOneProducts from './pages/PhaseOneProducts';
 import PhaseOneCustomers from './pages/PhaseOneCustomers';
 import CustomerPortal from './pages/CustomerPortal';
+import CustomerThankYou from './pages/CustomerThankYou';
+import CustomerRecentOrders from './pages/CustomerRecentOrders';
+import CustomerPortalShell from './pages/CustomerPortalShell';
 import DriverPortal from './pages/DriverPortal';
 
 export default function App() {
@@ -53,7 +56,15 @@ export default function App() {
   }
 
   if (state.authConfigured && state.authRole === 'customer') {
-    return <CustomerPortal />;
+    return (
+      <CustomerPortalShell>
+        <Routes>
+          <Route path="/thank-you" element={<CustomerThankYou />} />
+          <Route path="/recent-orders" element={<CustomerRecentOrders />} />
+          <Route path="*" element={<CustomerPortal />} />
+        </Routes>
+      </CustomerPortalShell>
+    );
   }
 
   if (state.authConfigured && state.authRole === 'driver') {

@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Building2, CheckCircle2, Minus, Package, Plus, Search } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatCurrency,
-  formatDateTime,
   getProductDisplayName,
   getProductImageUrl,
   getProductOrderUnitLabel,
@@ -11,7 +11,8 @@ import {
 } from '../data/phaseOneData';
 
 export default function CustomerPortal() {
-  const { state, logout, completeCustomerProfile, submitPortalOrder } = useApp();
+  const navigate = useNavigate();
+  const { state, completeCustomerProfile, submitPortalOrder } = useApp();
   const portal = state.customerPortal;
   const [fullName, setFullName] = useState('');
   const [locationId, setLocationId] = useState('');
@@ -19,8 +20,6 @@ export default function CustomerPortal() {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [orderSubmitted, setOrderSubmitted] = useState(false);
-  const [selectedRecentOrderId, setSelectedRecentOrderId] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
 
@@ -100,10 +99,6 @@ export default function CustomerPortal() {
     [activeProducts, quantities]
   );
   const orderTotal = selectedLines.reduce((total, line) => total + line.quantity * line.product.clientPrice, 0);
-  const productsById = useMemo(() => new Map(portalProducts.map((product) => [product.id, product])), [portalProducts]);
-  const selectedRecentOrder = selectedRecentOrderId
-    ? portal?.recentOrders.find((order) => order.id === selectedRecentOrderId) ?? null
-    : null;
 
   async function handleCompleteProfile(event) {
     event.preventDefault();
@@ -152,11 +147,10 @@ export default function CustomerPortal() {
 
     if (!result.ok) {
       setError(result.error ?? 'Unable to submit order.');
-      setOrderSubmitted(false);
     } else {
-      setMessage('Thank you, your order has been submitted.');
       setQuantities({});
-      setOrderSubmitted(true);
+      navigate('/thank-you');
+      return;
     }
 
     setSubmitting(false);
@@ -168,12 +162,10 @@ export default function CustomerPortal() {
     setQuantities({});
     setError('');
     setMessage('');
-    setOrderSubmitted(false);
   }
 
   function updateProductQuantity(productId, nextValue) {
     const nextQuantity = Math.max(0, Number(nextValue) || 0);
-    setOrderSubmitted(false);
     setQuantities((current) => ({
       ...current,
       [productId]: nextQuantity ? String(nextQuantity) : '',
@@ -181,12 +173,12 @@ export default function CustomerPortal() {
   }
 
   if (!portal) {
-    return <PortalShell onLogout={logout}>Loading customer portal...</PortalShell>;
+    return <div>Loading customer portal...</div>;
   }
 
   if (!portal.contact) {
     return (
-      <PortalShell onLogout={logout}>
+      <>
         <section className="customer-portal-panel">
           <div className="portal-section-heading">
             <Building2 size={20} />
@@ -206,31 +198,25 @@ export default function CustomerPortal() {
           </form>
           <PortalMessages error={error} message={message} />
         </section>
-      </PortalShell>
+      </>
     );
   }
 
   if (portal.contact.status !== 'active' || (!portal.client && portalClients.length === 0)) {
     return (
-      <PortalShell onLogout={logout}>
-        <section className="customer-portal-panel customer-pending-panel">
-          <CheckCircle2 size={34} />
-          <h1>Pending Staff Approval</h1>
-          <p>
-            Your customer account is created. Modhani staff still needs to link {portal.contact.email} to a company
-            before you can place orders.
-          </p>
-        </section>
-      </PortalShell>
+      <section className="customer-portal-panel customer-pending-panel">
+        <CheckCircle2 size={34} />
+        <h1>Pending Staff Approval</h1>
+        <p>
+          Your customer account is created. Modhani staff still needs to link {portal.contact.email} to a company
+          before you can place orders.
+        </p>
+      </section>
     );
   }
 
   return (
-    <PortalShell
-      onLogout={logout}
-      searchQuery={searchQuery}
-      onSearchChange={setSearchQuery}
-    >
+    <>
       {/* Hero Banner */}
       <section className="cp-hero">
         <div className="cp-hero-text">
@@ -257,6 +243,15 @@ export default function CustomerPortal() {
       {/* Catalogue Header */}
       <section className="cp-catalogue-header">
         <h2 className="cp-catalogue-title">Catalogue</h2>
+        <div className="cp-nav-search">
+          <Search size={16} />
+          <input
+            type="text"
+            placeholder="Search products, cases, SKUs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
         <div className="cp-category-pills">
           <button
             type="button"
@@ -358,7 +353,6 @@ export default function CustomerPortal() {
                   value={activeLocationId}
                   onChange={(event) => {
                     setLocationId(event.target.value);
-                    setOrderSubmitted(false);
                   }}
                 >
                   {activeLocations.map((location) => (
@@ -422,64 +416,9 @@ export default function CustomerPortal() {
             {submitting ? 'Submitting...' : 'Submit Order'}
           </button>
 
-          {orderSubmitted && (
-            <div className="cp-success-message animate-entrance">
-              <CheckCircle2 size={16} />
-              <span>Thank you, your order has been submitted.</span>
-            </div>
-          )}
         </aside>
       </form>
-
-      {/* Recent Orders - Compact Inline */}
-      {portal.recentOrders.length ? (
-        <section id="recent-orders" className="cp-recent-orders-bar">
-          <span className="cp-recent-label">Recent orders</span>
-          <div className="cp-recent-pills">
-            {portal.recentOrders.slice(0, 5).map((order) => (
-              <button
-                key={order.id}
-                type="button"
-                className={`cp-recent-pill ${selectedRecentOrderId === order.id ? 'active' : ''}`}
-                onClick={() => setSelectedRecentOrderId((current) => (current === order.id ? '' : order.id))}
-              >
-                <span className="cp-recent-pill-number">#{order.orderNumber}</span>
-                <span className={`cp-recent-pill-status status-${order.status.toLowerCase().replace(/\s+/g, '-')}`}>{order.status}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {/* Expanded Recent Order Detail */}
-      {selectedRecentOrder ? (
-        <section className="cp-recent-detail animate-entrance">
-          <div className="cp-recent-detail-header">
-            <strong>Order #{selectedRecentOrder.orderNumber}</strong>
-            <span>{formatDateTime(selectedRecentOrder.createdAt)}</span>
-          </div>
-          {(selectedRecentOrder.items ?? []).length ? (
-            <div className="cp-recent-detail-lines">
-              {selectedRecentOrder.items.map((item) => {
-                const product = productsById.get(item.productId);
-                const unitPrice = item.clientPrice ?? product?.clientPrice ?? 0;
-                return (
-                  <div className="cp-recent-detail-line" key={item.id}>
-                    <span>{product ? getProductDisplayName(product) : item.productId}</span>
-                    <span className="cp-detail-qty">
-                      {Number(item.quantity).toLocaleString()} x {product ? getProductOrderUnitLabel(product) : 'Order unit'}
-                    </span>
-                    <span className="cp-detail-price">{formatCurrency(Number(item.quantity) * unitPrice)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="customer-empty-cart">No line details available</div>
-          )}
-        </section>
-      ) : null}
-    </PortalShell>
+    </>
   );
 }
 
@@ -494,44 +433,6 @@ function getCategoryColor(category) {
     'Lassi': '#EBC48E',
   };
   return colors[category] || '#C5CCC7';
-}
-
-function PortalShell({ children, onLogout, searchQuery, onSearchChange }) {
-  return (
-    <main className="customer-portal-page">
-      <header className="cp-nav">
-        <div className="cp-nav-inner">
-          {/* Left: Logo */}
-          <div className="cp-nav-brand">
-            <img className="cp-brand-logo" src="/modhani-logo.svg" alt="Modhani" />
-            <div>
-              <strong className="cp-brand-name">Modhani</strong>
-              <span className="cp-brand-sub">Customer ordering portal</span>
-            </div>
-          </div>
-
-          {/* Center: Search */}
-          <div className="cp-nav-search">
-            <Search size={16} />
-            <input
-              type="text"
-              placeholder="Search products, cases, SKUs..."
-              value={searchQuery ?? ''}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-            />
-          </div>
-
-          {/* Right: Client/Location pills + Sign Out */}
-          <div className="cp-nav-right">
-            <button className="cp-signout-btn" type="button" onClick={onLogout}>
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
-      <div className="customer-portal-content">{children}</div>
-    </main>
-  );
 }
 
 function PortalMessages({ error, message }) {

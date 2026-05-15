@@ -3205,12 +3205,11 @@ input[type='checkbox']:disabled {
   align-items: start;
 }
 
-/* ── Product Cards (3D) ── */
+/* ── Product Cards ── */
 .customer-products-list {
   display: grid;
   grid-template-columns: repeat(3,1fr);
   gap: 20px;
-  perspective: 1200px;
 }
 .customer-product-card {
   position: relative;
@@ -3220,29 +3219,12 @@ input[type='checkbox']:disabled {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transform-style: preserve-3d;
-  box-shadow:
-    0 10px 30px rgba(0,0,0,.06),
-    inset 0 1px 0 rgba(255,255,255,1);
-  transition: all .4s cubic-bezier(.34,1.56,.64,1);
-  animation: cpSlideUp .7s cubic-bezier(.34,1.56,.64,1) .2s both;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  transition: box-shadow .2s ease, transform .2s ease;
 }
 .customer-product-card:hover {
-  transform: translateY(-10px) scale(1.02);
-  box-shadow:
-    0 30px 50px rgba(0,0,0,.1),
-    inset 0 1px 0 rgba(255,255,255,1);
-  z-index: 5;
-}
-/* Shine sweep */
-.customer-product-card::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.7) 45%, rgba(255,255,255,.3) 50%, transparent 65%);
-  border-radius: inherit;
-  pointer-events: none;
-  opacity: 0; z-index: 5;
-  animation: cpShineSweep 7s ease-in-out infinite;
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+  transform: translateY(-2px);
 }
 .customer-product-image {
   position: relative;
@@ -3256,11 +3238,6 @@ input[type='checkbox']:disabled {
 .customer-product-image img {
   width: 65%; height: 65%;
   object-fit: contain;
-  transition: transform .5s cubic-bezier(.34,1.56,.64,1);
-  filter: drop-shadow(0 8px 16px rgba(0,0,0,.1));
-}
-.customer-product-card:hover .customer-product-image img {
-  transform: scale(1.12) translateY(-4px);
 }
 .customer-product-image .product-image-fallback {
   width: 40%; opacity: .4;
@@ -3637,6 +3614,105 @@ input[type='checkbox']:disabled {
 }
 .animate-entrance {
   animation: cpSlideUp .4s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+
+/* ── Thank You Page ── */
+.cp-thankyou {
+  max-width: 560px;
+  margin: 60px auto;
+  text-align: center;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 20px;
+  padding: 48px 32px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.06);
+}
+.cp-thankyou-icon {
+  width: 64px; height: 64px;
+  margin: 0 auto 20px;
+  color: var(--color-success);
+}
+.cp-thankyou h1 {
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+.cp-thankyou p {
+  font-size: .92rem;
+  color: var(--color-text-muted);
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+.cp-thankyou-btn {
+  display: inline-block;
+  padding: 12px 28px;
+  background: #1A3021;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-lg);
+  font-size: .88rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all .2s;
+  box-shadow: 0 4px 12px rgba(26,48,33,.2);
+}
+.cp-thankyou-btn:hover {
+  box-shadow: 0 8px 20px rgba(26,48,33,.3);
+}
+
+/* ── Recent Orders Page ── */
+.cp-recent-orders-page h1 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 20px;
+}
+.cp-recent-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.cp-recent-order-card {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.06);
+  border-radius: 16px;
+  padding: 20px 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.04);
+}
+.cp-recent-order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+.cp-recent-order-card-header strong {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.cp-recent-order-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.cp-recent-order-meta span {
+  font-size: .78rem;
+  color: var(--color-text-muted);
+}
+.cp-nav-link {
+  font-size: .82rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color .2s;
+  padding: 0;
+}
+.cp-nav-link:hover {
+  color: var(--color-primary);
 }
 
 /* Pending / Profile panels */
