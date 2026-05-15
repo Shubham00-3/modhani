@@ -228,28 +228,7 @@ export function getLotCodeBase(productionDate) {
 }
 
 export function getNextLotCode(batches, productionDate) {
-  const base = getLotCodeBase(productionDate);
-  if (!base) return '';
-
-  const usedSuffixes = new Set(
-    batches
-      .map((batch) => String(batch.batchNumber ?? '').trim())
-      .filter((lotCode) => lotCode === base || lotCode.startsWith(`${base}-`))
-      .map((lotCode) => {
-        if (lotCode === base) return 1;
-        const suffix = Number(lotCode.slice(base.length + 1));
-        return Number.isInteger(suffix) && suffix > 1 ? suffix : null;
-      })
-      .filter(Boolean)
-  );
-
-  if (!usedSuffixes.has(1)) return base;
-
-  let nextSuffix = 2;
-  while (usedSuffixes.has(nextSuffix)) {
-    nextSuffix += 1;
-  }
-  return `${base}-${nextSuffix}`;
+  return getLotCodeBase(productionDate);
 }
 
 export function getOrderShipToSnapshot(order, location) {

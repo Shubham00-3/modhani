@@ -375,11 +375,6 @@ function LogProductionModal({ onClose, onSave }) {
                 return;
               }
 
-              if (state.batches.some((batch) => batch.batchNumber.trim().toLowerCase() === lotCode.trim().toLowerCase())) {
-                addToast('Lot code already exists. Pick another production date or save again.', 'warning');
-                return;
-              }
-
               if (productionDate > new Date().toISOString().slice(0, 10)) {
                 addToast('Production date cannot be in the future.', 'warning');
                 return;
