@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AppProvider } from './context/PhaseOneProvider';
 import App from './App';
 import './index.css';
+import './index-portal.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

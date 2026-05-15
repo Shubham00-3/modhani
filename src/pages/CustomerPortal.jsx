@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, CheckCircle2, Minus, Package, Plus, Search, ShoppingCart, X } from 'lucide-react';
+import { Building2, CheckCircle2, Minus, Package, Plus, Search, ShoppingCart, X, ZoomIn } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { useCart } from '../hooks/useCart';
 import {
@@ -35,6 +35,7 @@ export default function CustomerPortal() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [dismissedCartCount, setDismissedCartCount] = useState(0);
   const showFloatingCart = cartItemCount > 0 && cartItemCount > dismissedCartCount;
+  const [viewProduct, setViewProduct] = useState(null);
 
   // Get unique categories for filter pills
   const categories = useMemo(() => {
@@ -220,13 +221,19 @@ export default function CustomerPortal() {
 
             return (
               <article className="customer-product-card" key={product.id}>
-                <div className="customer-product-image">
+                <button
+                  className="customer-product-image cp-product-clickable"
+                  type="button"
+                  onClick={() => setViewProduct(product)}
+                  aria-label={`View ${getProductDisplayName(product)} details`}
+                >
                   <img
                     className={usesFallback ? 'product-image-fallback' : ''}
                     src={imageUrl}
                     alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)}
                   />
-                </div>
+                  <span className="cp-product-zoom"><ZoomIn size={18} /></span>
+                </button>
                 <div className="customer-product-info">
                   <h3>{product.name}</h3>
                   <span className="cp-product-unit">
@@ -290,7 +297,112 @@ export default function CustomerPortal() {
           </div>
         </div>
       )}
+
+      {/* Product Detail Modal */}
+      {viewProduct && (
+        <ProductDetailModal
+          product={viewProduct}
+          quantity={quantities[viewProduct.id] ?? ''}
+          onQuantityChange={(val) => updateProductQuantity(viewProduct.id, val)}
+          onClose={() => setViewProduct(null)}
+        />
+      )}
     </>
+  );
+}
+
+function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
+  const imageUrl = getProductImageUrl(product, { fallback: true });
+  const usesFallback = !hasProductImage(product);
+  const orderUnit = getProductOrderUnitLabel(product);
+  const numericQuantity = Number(quantity || 0);
+
+  useEffect(() => {
+    function handleEscape(event) {
+      if (event.key === 'Escape') onClose();
+    }
+    document.addEventListener('keydown', handleEscape);
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = '';
+    };
+  }, [onClose]);
+
+  return (
+    <div className="cp-detail-overlay" onClick={onClose}>
+      <div className="cp-detail-modal" onClick={(e) => e.stopPropagation()}>
+        <button className="cp-detail-close" type="button" onClick={onClose} aria-label="Close">
+          <X size={22} />
+        </button>
+
+        <div className="cp-detail-image">
+          <img
+            className={usesFallback ? 'product-image-fallback' : ''}
+            src={imageUrl}
+            alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)}
+          />
+        </div>
+
+        <div className="cp-detail-body">
+          {product.category && <span className="cp-detail-category">{product.category}</span>}
+          <h2 className="cp-detail-name">{getProductDisplayName(product)}</h2>
+
+          <div className="cp-detail-meta">
+            {product.packagingDetails || product.unitSize ? (
+              <div className="cp-detail-meta-row">
+                <span>Packaging</span>
+                <strong>{product.packagingDetails || product.unitSize}</strong>
+              </div>
+            ) : null}
+            {orderUnit ? (
+              <div className="cp-detail-meta-row">
+                <span>Order Unit</span>
+                <strong>{orderUnit}</strong>
+              </div>
+            ) : null}
+            {product.itemNumber ? (
+              <div className="cp-detail-meta-row">
+                <span>Item #</span>
+                <strong>{product.itemNumber}</strong>
+              </div>
+            ) : null}
+            {product.upc ? (
+              <div className="cp-detail-meta-row">
+                <span>UPC</span>
+                <strong>{product.upc}</strong>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="cp-detail-price">{formatCurrency(product.clientPrice)}</div>
+
+          <div className="cp-detail-actions">
+            <div className="cp-detail-qty">
+              <button className="btn btn-secondary btn-icon" type="button" onClick={() => onQuantityChange(numericQuantity - 1)}>
+                <Minus size={18} />
+              </button>
+              <input
+                className="form-input"
+                type="number"
+                min="0"
+                step="1"
+                value={quantity}
+                onChange={(e) => onQuantityChange(e.target.value)}
+              />
+              <button className="btn btn-secondary btn-icon" type="button" onClick={() => onQuantityChange(numericQuantity + 1)}>
+                <Plus size={18} />
+              </button>
+            </div>
+            {numericQuantity > 0 && (
+              <div className="cp-detail-line-total">
+                Subtotal: <strong>{formatCurrency(numericQuantity * product.clientPrice)}</strong>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
