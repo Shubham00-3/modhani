@@ -8,6 +8,7 @@ import {
   getNextLotCode,
   getProduct,
   getProductDisplayName,
+  normalizeLotCode,
 } from '../data/phaseOneData';
 
 export default function PhaseOneProductionBatches() {
@@ -386,7 +387,7 @@ function LogProductionModal({ onClose, onSave }) {
               try {
                 await onSave({
                   id: `batch-${Date.now()}`,
-                  batchNumber: lotCode.trim(),
+                  batchNumber: normalizeLotCode(lotCode),
                   productId,
                   productionDate,
                   qtyProduced: Number(quantity),

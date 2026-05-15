@@ -10,6 +10,7 @@ import {
   getOrderValue,
   getProduct,
   getProductDisplayName,
+  normalizeLotCode,
 } from '../data/phaseOneData';
 import { printInvoice, printProofOfDelivery } from '../utils/printDocuments';
 
@@ -254,11 +255,15 @@ export default function DriverPortal() {
                   .map((item) => {
                     const product = getProduct(state.products, item.productId);
                     const qty = item.invoiceQty ?? item.fulfilledQty;
-                    const lotCodes = item.assignedBatches
-                      .map((assigned) => {
-                        const batch = state.batches.find((entry) => entry.id === assigned.batchId);
-                        return `${batch?.batchNumber ?? assigned.batchId}: ${assigned.qty}`;
-                      })
+                    const lotCodes = [
+                      ...new Set(
+                        item.assignedBatches.map((assigned) => {
+                          const batch = state.batches.find((entry) => entry.id === assigned.batchId);
+                          return normalizeLotCode(batch?.batchNumber ?? assigned.batchId);
+                        })
+                      ),
+                    ]
+                      .filter(Boolean)
                       .join(', ');
 
                     return (

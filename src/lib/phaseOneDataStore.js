@@ -2,6 +2,7 @@ import {
   buildReportRowsFromOrders,
   buildTierPrices,
   getProductTierPrice,
+  normalizeLotCode,
   normalizePriceTier,
   QUICKBOOKS_SETTINGS,
 } from '../data/phaseOneData';
@@ -108,7 +109,7 @@ function pricingToUi(pricing) {
 function batchToUi(batch) {
   return {
     id: batch.id,
-    batchNumber: batch.batch_number,
+    batchNumber: normalizeLotCode(batch.batch_number),
     productId: batch.product_id,
     productionDate: batch.production_date,
     qtyProduced: Number(batch.qty_produced),
@@ -179,7 +180,11 @@ function reportLineToUi(row) {
     invoiceNumber: row.invoice_number,
     qbInvoiceNumber: row.qb_invoice_number,
     packingSlipNumber: row.packing_slip_number,
-    batchNumbers: row.batch_numbers ?? '',
+    batchNumbers: String(row.batch_numbers ?? '')
+      .split(',')
+      .map((lotCode) => normalizeLotCode(lotCode))
+      .filter(Boolean)
+      .join(', '),
     orderedQty: Number(row.ordered_qty),
     fulfilledQty: Number(row.fulfilled_qty),
     invoiceQty: row.invoice_qty == null ? null : Number(row.invoice_qty),
@@ -305,7 +310,7 @@ function customerLocationAssignmentToUi(row) {
 function batchToDb(batch) {
   return {
     id: batch.id,
-    batch_number: batch.batchNumber,
+    batch_number: normalizeLotCode(batch.batchNumber),
     product_id: batch.productId,
     production_date: batch.productionDate,
     qty_produced: Number(batch.qtyProduced),
@@ -523,7 +528,7 @@ export async function fetchRemoteState(supabase, userId) {
     clientId: order.client_id,
     locationId: order.location_id,
     source: order.source,
-    status: order.status,
+    status: order.status === 'shipped' && order.pod_signed_at ? 'delivered' : order.status,
     lockedBy: order.locked_by,
     lockedAt: order.locked_at,
     invoiceNumber: order.invoice_number,
@@ -737,7 +742,7 @@ export async function fetchCustomerPortalState(supabase, user) {
     clientId: order.client_id,
     locationId: order.location_id,
     source: order.source,
-    status: order.status,
+    status: order.status === 'shipped' && order.pod_signed_at ? 'delivered' : order.status,
     createdAt: order.created_at,
     items: itemsByOrderId.get(order.id) ?? [],
   }));

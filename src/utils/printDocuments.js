@@ -6,6 +6,7 @@ import {
   getOrderShipToSnapshot,
   getProduct,
   getProductDisplayName,
+  normalizeLotCode,
 } from '../data/phaseOneData';
 
 function openPrintableWindow(title, markup) {
@@ -82,7 +83,7 @@ function getOrderLotCodes(order, batches) {
     ...new Set(
       order.items
         .flatMap((item) => item.assignedBatches ?? [])
-        .map((assigned) => batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId)
+        .map((assigned) => normalizeLotCode(batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId))
         .filter(Boolean)
     ),
   ];
@@ -112,7 +113,7 @@ export function printPackingSlip({ order, clients, locations, products, batches 
       const batchLines = item.assignedBatches
         .map((assigned) => {
           const batch = batches.find((entry) => entry.id === assigned.batchId);
-          return `<li>Lot Code ${batch?.batchNumber ?? assigned.batchId}: ${assigned.qty.toLocaleString()} units</li>`;
+          return `<li>Lot Code ${normalizeLotCode(batch?.batchNumber ?? assigned.batchId)}: ${assigned.qty.toLocaleString()} units</li>`;
         })
         .join('');
 
@@ -188,7 +189,7 @@ export function printInvoice({ order, clients, locations, products, batches = []
       const lineTotal = unitPrice * invoiceQty;
       const lotCode =
         item.assignedBatches
-          ?.map((assigned) => batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId)
+          ?.map((assigned) => normalizeLotCode(batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId))
           .filter(Boolean)
           .join(', ') || '';
       const description = product ? getProductDisplayName(product) : item.productId;
@@ -355,11 +356,14 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
       const product = getProduct(products, item.productId);
       const qty = item.invoiceQty ?? item.fulfilledQty;
       const lotCodes =
-        item.assignedBatches
-          ?.map((assigned) => {
-            const batch = batches.find((entry) => entry.id === assigned.batchId);
-            return `${batch?.batchNumber ?? assigned.batchId}: ${assigned.qty}`;
-          })
+        [
+          ...new Set(
+            item.assignedBatches?.map((assigned) => {
+              const batch = batches.find((entry) => entry.id === assigned.batchId);
+              return normalizeLotCode(batch?.batchNumber ?? assigned.batchId);
+            }) ?? []
+          ),
+        ]
           .filter(Boolean)
           .join(', ') || 'No lot assignment';
 

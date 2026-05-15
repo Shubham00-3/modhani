@@ -583,6 +583,9 @@ function OrderDetailPanel({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {order.items.map((item) => {
             const product = getProduct(state.products, item.productId);
+            const assignedLotCodes = [
+              ...new Set(item.assignedBatches.map((assigned) => getBatchLabel(state.batches, assigned.batchId)).filter(Boolean)),
+            ];
             return (
               <div
                 key={item.id}
@@ -619,9 +622,9 @@ function OrderDetailPanel({
 
                 {item.assignedBatches.length > 0 ? (
                   <div style={{ marginTop: 'var(--space-3)', paddingLeft: 'var(--space-4)', borderLeft: '2px solid var(--color-border)' }}>
-                    {item.assignedBatches.map((assigned, index) => (
-                      <div key={`${assigned.batchId}-${index}`} style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                        Lot Code {getBatchLabel(state.batches, assigned.batchId)}: {assigned.qty.toLocaleString()} units
+                    {assignedLotCodes.map((lotCode) => (
+                      <div key={lotCode} style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                        Lot Code {lotCode}
                       </div>
                     ))}
                   </div>

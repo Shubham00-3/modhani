@@ -231,6 +231,10 @@ export function getNextLotCode(batches, productionDate) {
   return getLotCodeBase(productionDate);
 }
 
+export function normalizeLotCode(lotCode) {
+  return String(lotCode ?? '').trim().replace(/^(\d{5})-\d+$/, '$1');
+}
+
 export function getOrderShipToSnapshot(order, location) {
   return {
     name: order?.invoiceShipToName ?? location?.name ?? '',
@@ -333,7 +337,7 @@ export function getInvoiceableTotal(order) {
 }
 
 export function getBatchLabel(batches, batchId) {
-  return batches.find((batch) => batch.id === batchId)?.batchNumber ?? batchId;
+  return normalizeLotCode(batches.find((batch) => batch.id === batchId)?.batchNumber ?? batchId);
 }
 
 export function getClientPricingForProduct(clientPricing, clientId, productId, fallbackPrice = 0) {
