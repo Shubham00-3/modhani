@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Bell, Package, Search, ShoppingCart, X } from 'lucide-react';
+import { AlertTriangle, Bell, Menu, Package, Search, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { formatTime } from '../../data/phaseOneData';
 import { formatRelativeTime } from '../../lib/notifications';
@@ -95,6 +95,14 @@ export default function PhaseOneTopBar() {
   return (
     <header className={`topbar${state.sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <div className="topbar-left">
+        <button
+          className="topbar-menu-btn"
+          type="button"
+          onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
+          aria-label={state.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          <Menu size={20} />
+        </button>
         <div className="topbar-breadcrumb">
           <span className="topbar-breadcrumb-current">{currentTitle}</span>
         </div>

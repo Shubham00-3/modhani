@@ -3,8 +3,6 @@ import { NavLink } from 'react-router-dom';
 import {
   BarChart3,
   Building2,
-  ChevronLeft,
-  ChevronRight,
   FlaskConical,
   LayoutDashboard,
   Package,
@@ -29,7 +27,7 @@ const navItems = [
 ];
 
 export default function PhaseOneSidebar() {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const collapsed = state.sidebarCollapsed;
   const currentUser = state.currentUser ?? { initials: '?', name: 'Staff user', role: 'staff' };
 
@@ -54,15 +52,6 @@ export default function PhaseOneSidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <button
-          className="sidebar-collapse-btn"
-          type="button"
-          onClick={() => dispatch({ type: 'TOGGLE_SIDEBAR' })}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          {collapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
-        </button>
-
         <div className="sidebar-user">
           <div className="sidebar-user-avatar">{currentUser.initials}</div>
           {!collapsed && (
