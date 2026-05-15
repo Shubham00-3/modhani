@@ -4725,8 +4725,53 @@ input[type='checkbox']:disabled {
     grid-template-columns: 1fr;
   }
 
+  .driver-portal-layout {
+    gap: var(--space-4);
+  }
+
   .driver-order-list {
     max-height: none;
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .driver-list-heading {
+    display: none;
+  }
+
+  .driver-order-card {
+    flex: 0 0 200px;
+    min-height: 88px;
+    padding: var(--space-3);
+  }
+
+  .driver-delivery-panel {
+    padding: var(--space-4);
+  }
+
+  .driver-signature-canvas {
+    height: 160px;
+  }
+
+  .driver-portal-header {
+    gap: var(--space-3);
+  }
+
+  .driver-brand img {
+    width: 100px;
+  }
+
+  .driver-brand h1 {
+    font-size: var(--font-size-lg);
+  }
+
+  .driver-pod-form .btn-primary,
+  .driver-print-actions .btn {
+    min-height: 48px;
+    font-size: var(--font-size-base);
   }
 
   .product-image-editor,
@@ -4893,6 +4938,10 @@ input[type='checkbox']:disabled {
   }
 
   .topbar-avatar {
+    display: none;
+  }
+
+  .topbar-menu-btn {
     display: none;
   }
 
@@ -5074,6 +5123,118 @@ input[type='checkbox']:disabled {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  /* Driver portal — phone */
+  .driver-portal-page {
+    padding: var(--space-3);
+  }
+
+  .driver-portal-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+  }
+
+  .driver-portal-header .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 44px;
+  }
+
+  .driver-brand {
+    gap: var(--space-3);
+  }
+
+  .driver-brand img {
+    width: 80px;
+  }
+
+  .driver-brand h1 {
+    font-size: var(--font-size-base);
+  }
+
+  .driver-kicker {
+    font-size: var(--font-size-xs);
+  }
+
+  .driver-order-list {
+    padding: var(--space-2);
+    gap: var(--space-2);
+  }
+
+  .driver-order-card {
+    flex: 0 0 170px;
+    min-height: 76px;
+    padding: var(--space-3);
+    font-size: var(--font-size-sm);
+  }
+
+  .driver-delivery-panel {
+    padding: var(--space-3);
+  }
+
+  .driver-panel-header h2 {
+    font-size: var(--font-size-lg);
+  }
+
+  .driver-panel-header p {
+    font-size: var(--font-size-sm);
+  }
+
+  .driver-status-card strong {
+    font-size: var(--font-size-lg);
+  }
+
+  .driver-signature-canvas {
+    height: 140px;
+  }
+
+  .driver-line-item {
+    flex-direction: column;
+    gap: var(--space-1);
+  }
+
+  .driver-line-item > div:last-child {
+    text-align: left;
+  }
+
+  .driver-total-row {
+    font-size: var(--font-size-base);
+  }
+
+  .driver-print-actions {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .driver-print-actions .btn {
+    width: 100%;
+    justify-content: center;
+    min-height: 48px;
+  }
+
+  .driver-pod-form .btn-primary {
+    width: 100%;
+    justify-content: center;
+    min-height: 52px;
+    font-size: var(--font-size-base);
+  }
+
+  .driver-pod-form .form-input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .driver-pod-summary img {
+    max-height: 100px;
+  }
+
+  .driver-invoice-preview,
+  .driver-pod-form,
+  .driver-pod-summary {
+    padding: var(--space-3);
+  }
 }
 
 @keyframes authMobileProductSlide {
@@ -5127,5 +5288,77 @@ input[type='checkbox']:disabled {
   .notification-item-dismiss {
     grid-column: 2;
     justify-self: flex-start;
+  }
+}
+
+@media (max-width: 480px) {
+  .driver-order-card {
+    flex: 0 0 150px;
+    min-height: 68px;
+    font-size: var(--font-size-xs);
+  }
+
+  .driver-order-number {
+    font-size: var(--font-size-sm);
+  }
+
+  .driver-section-title {
+    font-size: var(--font-size-sm);
+  }
+
+  .driver-signature-canvas {
+    height: 120px;
+  }
+
+  .driver-brand img {
+    width: 64px;
+  }
+
+  .driver-portal-page {
+    padding: var(--space-2);
+  }
+}
+
+@media (pointer: coarse) {
+  .driver-order-card {
+    min-height: 80px;
+  }
+
+  .driver-pod-form .form-input,
+  .driver-pod-form .form-select {
+    min-height: 48px;
+    font-size: 16px;
+  }
+
+  .driver-pod-form textarea.form-input {
+    min-height: 80px;
+  }
+
+  .driver-signature-actions .btn {
+    min-height: 44px;
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .btn {
+    min-height: 40px;
+  }
+
+  .form-input,
+  .form-select {
+    min-height: 42px;
+  }
+}
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .driver-signature-canvas {
+    height: 100px;
+  }
+
+  .driver-portal-page {
+    padding: var(--space-2) var(--space-4);
+  }
+
+  .driver-portal-header {
+    margin-bottom: var(--space-3);
   }
 }

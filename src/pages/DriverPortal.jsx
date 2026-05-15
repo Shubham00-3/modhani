@@ -34,17 +34,30 @@ function SignaturePad({ onChange }) {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ratio = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = Math.floor(rect.width * ratio);
-    canvas.height = Math.floor(rect.height * ratio);
-    const context = canvas.getContext('2d');
-    context.scale(ratio, ratio);
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.lineWidth = 2.5;
-    context.strokeStyle = '#10261a';
-  }, []);
+    function initCanvas() {
+      const ratio = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = Math.floor(rect.width * ratio);
+      canvas.height = Math.floor(rect.height * ratio);
+      const context = canvas.getContext('2d');
+      context.scale(ratio, ratio);
+      context.lineCap = 'round';
+      context.lineJoin = 'round';
+      context.lineWidth = 2.5;
+      context.strokeStyle = '#10261a';
+    }
+
+    initCanvas();
+
+    function handleResize() {
+      initCanvas();
+      setIsEmpty(true);
+      onChange('');
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [onChange]);
 
   function getPoint(event) {
     const canvas = canvasRef.current;
