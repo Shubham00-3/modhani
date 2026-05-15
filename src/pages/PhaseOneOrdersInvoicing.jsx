@@ -1540,11 +1540,11 @@ function AddOrderModal({ onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={saving ? undefined : onClose}>
       <div className="modal modal-order" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Add Incoming Order</h3>
-          <button className="btn btn-ghost" type="button" onClick={onClose}>
+          <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving}>
             <X size={18} />
           </button>
         </div>
