@@ -337,6 +337,7 @@ export default function PhaseOneOverview() {
 
       <div className="card">
         <div className="card-title">Recent Orders</div>
+        <div className="table-scroll-wrapper">
         <table className="data-table">
           <thead>
             <tr>
@@ -376,6 +377,7 @@ export default function PhaseOneOverview() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
@@ -429,6 +431,7 @@ function DashboardOrderPanel({ title, description, orders, clients, locations })
         <span className="badge badge-active">{orders.length.toLocaleString()} orders</span>
       </div>
       {orders.length ? (
+        <div className="table-scroll-wrapper">
         <table className="data-table">
           <thead>
             <tr>
@@ -459,6 +462,7 @@ function DashboardOrderPanel({ title, description, orders, clients, locations })
               ))}
           </tbody>
         </table>
+        </div>
       ) : (
         <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
           <div className="empty-state-title">No matching orders</div>

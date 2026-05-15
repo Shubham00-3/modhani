@@ -137,38 +137,40 @@ export default function PhaseOneAuditTrail() {
 
       <div className="card">
         {filteredLog.length ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Timestamp</th>
-                <th>Action</th>
-                <th>Client</th>
-                <th>Order</th>
-                <th>User</th>
-                <th>Details</th>
-                <th>Previous</th>
-                <th>New Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLog.map((entry) => {
-                const order = entry.orderId ? state.orders.find((item) => item.id === entry.orderId) : null;
+          <div className="table-scroll-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                  <th>Client</th>
+                  <th>Order</th>
+                  <th>User</th>
+                  <th>Details</th>
+                  <th>Previous</th>
+                  <th>New Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLog.map((entry) => {
+                  const order = entry.orderId ? state.orders.find((item) => item.id === entry.orderId) : null;
 
-                return (
-                  <tr key={entry.id}>
-                    <td>{formatDateTime(entry.timestamp)}</td>
-                    <td><span className="badge badge-pending">{ACTION_LABELS[entry.action] ?? entry.action}</span></td>
-                    <td>{entry.clientId ? getClientName(state.clients, entry.clientId) : '-'}</td>
-                    <td className="cell-monospace">{order ? `#${order.orderNumber}` : '-'}</td>
-                    <td style={{ fontWeight: 600 }}>{entry.userName}</td>
-                    <td>{entry.details}</td>
-                    <td>{entry.previousValue ?? '-'}</td>
-                    <td>{entry.newValue ?? '-'}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  return (
+                    <tr key={entry.id}>
+                      <td>{formatDateTime(entry.timestamp)}</td>
+                      <td><span className="badge badge-pending">{ACTION_LABELS[entry.action] ?? entry.action}</span></td>
+                      <td>{entry.clientId ? getClientName(state.clients, entry.clientId) : '-'}</td>
+                      <td className="cell-monospace">{order ? `#${order.orderNumber}` : '-'}</td>
+                      <td style={{ fontWeight: 600 }}>{entry.userName}</td>
+                      <td>{entry.details}</td>
+                      <td>{entry.previousValue ?? '-'}</td>
+                      <td>{entry.newValue ?? '-'}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
             <div className="empty-state-title">No audit entries match these filters</div>

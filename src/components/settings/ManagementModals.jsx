@@ -560,7 +560,7 @@ function SimpleModal({ title, children, onClose, onSave }) {
         <div className="modal-footer">
           <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving}>Cancel</button>
           <button
-            className="btn btn-primary"
+            className={`btn btn-primary${saving ? ' btn-loading' : ''}`}
             type="button"
             disabled={saving}
             onClick={async () => {

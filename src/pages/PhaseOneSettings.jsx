@@ -86,6 +86,7 @@ export default function PhaseOneSettings() {
           <div className="card-title">
             <Users size={18} /> User Roles
           </div>
+          <div className="table-scroll-wrapper">
           <table className="data-table">
             <thead>
               <tr>
@@ -156,6 +157,7 @@ export default function PhaseOneSettings() {
               ))}
             </tbody>
           </table>
+          </div>
         </div>
 
         {showQuickBooksSettings ? (
@@ -173,6 +175,7 @@ export default function PhaseOneSettings() {
         <div className="card-title">
           <Mail size={18} /> Client Email Preferences
         </div>
+        <div className="table-scroll-wrapper">
         <table className="data-table">
           <thead>
             <tr>
@@ -218,6 +221,7 @@ export default function PhaseOneSettings() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

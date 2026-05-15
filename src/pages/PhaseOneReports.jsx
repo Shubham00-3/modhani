@@ -360,6 +360,7 @@ export default function PhaseOneReports() {
 
       <div className="card">
         <div className="card-title">Orders Table</div>
+        <div className="table-scroll-wrapper">
         <table className="data-table">
           <thead>
             <tr>
@@ -389,6 +390,7 @@ export default function PhaseOneReports() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
         </>
       )}

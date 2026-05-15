@@ -350,45 +350,47 @@ export default function PhaseOneOrdersInvoicing() {
 
       <div className="card">
         {filteredOrders.length ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Order</th>
-                <th>Status</th>
-                <th>Client</th>
-                <th>Location</th>
-                <th>Source</th>
-                <th>Total Value</th>
-                <th>QB Invoice</th>
-                <th>Packing Slip</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredOrders.map((order) => (
-                <tr key={order.id} onClick={() => openOrder(order.id)}>
-                  <td className="cell-monospace">#{order.orderNumber}</td>
-                  <td>
-                    <span className={`badge badge-${order.status}`}>{order.status}</span>
-                    {order.lockedBy && order.lockedBy !== state.currentUser.id ? (
-                      <span style={{ marginLeft: 8, color: 'var(--color-warning)' }}>
-                        <Lock size={14} style={{ verticalAlign: 'middle' }} />
-                      </span>
-                    ) : null}
-                  </td>
-                  <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
-                  <td>{getLocationName(state.locations, order.locationId)}</td>
-                  <td>
-                    <span className={`badge badge-${order.source}`}>{order.source.toUpperCase()}</span>
-                  </td>
-                  <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
-                  <td className="cell-monospace">{getQuickBooksSyncLabel(order)}</td>
-                  <td className="cell-monospace">{order.packingSlipNumber ?? '-'}</td>
-                  <td>{formatDate(order.createdAt)}</td>
+          <div className="table-scroll-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Status</th>
+                  <th>Client</th>
+                  <th>Location</th>
+                  <th>Source</th>
+                  <th>Total Value</th>
+                  <th>QB Invoice</th>
+                  <th>Packing Slip</th>
+                  <th>Created</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredOrders.map((order) => (
+                  <tr key={order.id} onClick={() => openOrder(order.id)}>
+                    <td className="cell-monospace">#{order.orderNumber}</td>
+                    <td>
+                      <span className={`badge badge-${order.status}`}>{order.status}</span>
+                      {order.lockedBy && order.lockedBy !== state.currentUser.id ? (
+                        <span style={{ marginLeft: 8, color: 'var(--color-warning)' }}>
+                          <Lock size={14} style={{ verticalAlign: 'middle' }} />
+                        </span>
+                      ) : null}
+                    </td>
+                    <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
+                    <td>{getLocationName(state.locations, order.locationId)}</td>
+                    <td>
+                      <span className={`badge badge-${order.source}`}>{order.source.toUpperCase()}</span>
+                    </td>
+                    <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
+                    <td className="cell-monospace">{getQuickBooksSyncLabel(order)}</td>
+                    <td className="cell-monospace">{order.packingSlipNumber ?? '-'}</td>
+                    <td>{formatDate(order.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
             <div className="empty-state-title">No orders match these filters</div>
@@ -906,6 +908,7 @@ function FulfilmentPanel({ order, onBack }) {
             </div>
 
             {availableBatches.length ? (
+              <div className="table-scroll-wrapper">
               <table className="data-table" style={{ marginTop: 'var(--space-4)' }}>
                 <thead>
                   <tr>
@@ -935,6 +938,7 @@ function FulfilmentPanel({ order, onBack }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             ) : (
               <div className="alert alert-warning" style={{ marginTop: 'var(--space-4)' }}>
                 <AlertTriangle size={18} />
@@ -1407,6 +1411,7 @@ function AddOrderModal({ onClose }) {
   );
   const [source, setSource] = useState('portal');
   const [lines, setLines] = useState([{ id: 'line-1', productId: '', quantity: '' }]);
+  const [saving, setSaving] = useState(false);
 
   const locationOptions = state.locations.filter((location) => location.clientId === clientId);
 
@@ -1426,6 +1431,7 @@ function AddOrderModal({ onClose }) {
   }
 
   async function saveOrder() {
+    if (saving) return;
     if (!clientId || !locationId) {
       addToast('Select a client and location.', 'warning');
       return;
@@ -1452,6 +1458,7 @@ function AddOrderModal({ onClose }) {
       duplicateProductIds.add(line.productId);
     }
 
+    setSaving(true);
     const nextOrderNumber = Math.max(1049, ...state.orders.map((order) => Number(order.orderNumber) || 0)) + 1;
     const timestamp = new Date().toISOString();
 
@@ -1516,7 +1523,10 @@ function AddOrderModal({ onClose }) {
     };
 
     const result = await dispatch({ type: 'ADD_ORDER', payload: order });
-    if (!result?.ok) return;
+    if (!result?.ok) {
+      setSaving(false);
+      return;
+    }
 
     addAudit({
       action: 'order_received',
@@ -1607,11 +1617,11 @@ function AddOrderModal({ onClose }) {
           </button>
         </div>
         <div className="modal-footer">
-          <button className="btn btn-ghost" type="button" onClick={onClose}>
+          <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving}>
             Cancel
           </button>
-          <button className="btn btn-primary" type="button" onClick={saveOrder}>
-            Save Order
+          <button className={`btn btn-primary${saving ? ' btn-loading' : ''}`} type="button" onClick={saveOrder} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Order'}
           </button>
         </div>
       </div>

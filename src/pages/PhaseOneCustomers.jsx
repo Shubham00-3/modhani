@@ -728,7 +728,7 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
             <button className="btn btn-ghost" type="button" onClick={onClose} disabled={submitting}>
               Cancel
             </button>
-            <button className="btn btn-primary" type="submit" disabled={submitting}>
+            <button className={`btn btn-primary${submitting ? ' btn-loading' : ''}`} type="submit" disabled={submitting}>
               <Mail size={16} />
               {submitting ? 'Sending Invite...' : 'Send Invitation'}
             </button>

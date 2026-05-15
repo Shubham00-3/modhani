@@ -153,30 +153,32 @@ export default function PhaseOneProductionBatches() {
         </div>
 
         {filteredBatches.length ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Lot Code</th>
-                <th>Product</th>
-                <th>Production Date</th>
-                <th>Produced</th>
-                <th>Remaining</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBatches.map((batch) => (
-                <tr key={batch.id}>
-                  <td className="cell-monospace">{batch.batchNumber}</td>
-                  <td>{getProductDisplayName(getProduct(state.products, batch.productId))}</td>
-                  <td>{formatDate(batch.productionDate)}</td>
-                  <td className="cell-monospace">{batch.qtyProduced.toLocaleString()}</td>
-                  <td className="cell-monospace">{batch.qtyRemaining.toLocaleString()}</td>
-                  <td><span className={`badge badge-${batch.status}`}>{batch.status}</span></td>
+          <div className="table-scroll-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Lot Code</th>
+                  <th>Product</th>
+                  <th>Production Date</th>
+                  <th>Produced</th>
+                  <th>Remaining</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filteredBatches.map((batch) => (
+                  <tr key={batch.id}>
+                    <td className="cell-monospace">{batch.batchNumber}</td>
+                    <td>{getProductDisplayName(getProduct(state.products, batch.productId))}</td>
+                    <td>{formatDate(batch.productionDate)}</td>
+                    <td className="cell-monospace">{batch.qtyProduced.toLocaleString()}</td>
+                    <td className="cell-monospace">{batch.qtyRemaining.toLocaleString()}</td>
+                    <td><span className={`badge badge-${batch.status}`}>{batch.status}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
             <div className="empty-state-title">No lots match these filters</div>

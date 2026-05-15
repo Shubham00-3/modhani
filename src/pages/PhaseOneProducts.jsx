@@ -98,6 +98,7 @@ export default function PhaseOneProducts() {
           </label>
         </div>
         {state.products.length ? (
+          <div className="table-scroll-wrapper">
           <table className="data-table">
             <thead>
               <tr>
@@ -155,6 +156,7 @@ export default function PhaseOneProducts() {
               )}
             </tbody>
           </table>
+          </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
             <div className="empty-state-title">No products yet</div>

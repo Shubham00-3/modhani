@@ -223,30 +223,32 @@ export default function PhaseOneInventory() {
       <div className="card">
         <div className="card-title">Inventory History</div>
         {historyRows.length ? (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Product</th>
-                <th>Lot Code</th>
-                <th>Quantity</th>
-                <th>Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {historyRows.map((row) => (
-                <tr key={row.id}>
-                  <td>{formatDateTime(row.date)}</td>
-                  <td><span className="badge badge-portal">{row.type}</span></td>
-                  <td>{row.productName}</td>
-                  <td className="cell-monospace">{row.lotCode}</td>
-                  <td className="cell-monospace">{row.quantity}</td>
-                  <td>{row.details}</td>
+          <div className="table-scroll-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th>Product</th>
+                  <th>Lot Code</th>
+                  <th>Quantity</th>
+                  <th>Details</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {historyRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>{formatDateTime(row.date)}</td>
+                    <td><span className="badge badge-portal">{row.type}</span></td>
+                    <td>{row.productName}</td>
+                    <td className="cell-monospace">{row.lotCode}</td>
+                    <td className="cell-monospace">{row.quantity}</td>
+                    <td>{row.details}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
             <div className="empty-state-title">No inventory history yet</div>
