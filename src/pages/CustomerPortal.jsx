@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Building2, CheckCircle2, Minus, Package, Plus, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Building2, CheckCircle2, Minus, Package, Plus, Search, ShoppingCart } from 'lucide-react';
 import { useApp } from '../context/useApp';
+import { useCart } from '../hooks/useCart';
 import {
   formatCurrency,
   getProductDisplayName,
@@ -11,50 +12,27 @@ import {
 } from '../data/phaseOneData';
 
 export default function CustomerPortal() {
-  const navigate = useNavigate();
-  const { state, completeCustomerProfile, submitPortalOrder } = useApp();
+  const { state, completeCustomerProfile } = useApp();
   const portal = state.customerPortal;
+
+  const {
+    quantities,
+    activeProducts,
+    cartItemCount,
+    orderTotal,
+    updateProductQuantity,
+    hasMultipleClients,
+    portalClients,
+    activeClientId,
+    handleClientChange,
+  } = useCart();
+
   const [fullName, setFullName] = useState('');
-  const [locationId, setLocationId] = useState('');
-  const [quantities, setQuantities] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-
-  // Multi-client support: if customer has multiple clients, show a company selector.
-  const portalClients = useMemo(() => portal?.clients ?? [], [portal?.clients]);
-  const portalProducts = useMemo(() => portal?.products ?? [], [portal?.products]);
-  const hasMultipleClients = portalClients.length > 1;
-  const [selectedClientId, setSelectedClientId] = useState('');
-
-  // Determine the active client.
-  const activeClient = useMemo(() => {
-    if (!portal) return null;
-    if (hasMultipleClients) {
-      return portalClients.find((c) => c.id === selectedClientId) || portalClients[0] || null;
-    }
-    // Single client or backward compat.
-    return portal.client ?? portalClients[0] ?? null;
-  }, [portal, hasMultipleClients, portalClients, selectedClientId]);
-
-  const activeClientId = activeClient?.id ?? '';
-
-  // Filter locations to the active client.
-  const activeLocations = useMemo(
-    () => (portal?.locations ?? []).filter((loc) => loc.clientId === activeClientId),
-    [portal?.locations, activeClientId]
-  );
-
-  const activeLocationId = locationId || activeLocations[0]?.id || '';
-  const activeLocationName = activeLocations.find((loc) => loc.id === activeLocationId)?.name ?? 'No location';
-
-  // Filter products to those priced for the active client.
-  const activeProducts = useMemo(() => {
-    if (!portalProducts.length || !activeClientId) return [];
-    return portalProducts.filter((p) => p.pricingClientId === activeClientId);
-  }, [portalProducts, activeClientId]);
 
   // Get unique categories for filter pills
   const categories = useMemo(() => {
@@ -88,18 +66,6 @@ export default function CustomerPortal() {
     return filtered;
   }, [activeProducts, selectedCategory, searchQuery]);
 
-  const selectedLines = useMemo(
-    () =>
-      activeProducts
-        .map((product) => ({
-          product,
-          quantity: Number(quantities[product.id] ?? 0),
-        }))
-        .filter((line) => line.quantity > 0),
-    [activeProducts, quantities]
-  );
-  const orderTotal = selectedLines.reduce((total, line) => total + line.quantity * line.product.clientPrice, 0);
-
   async function handleCompleteProfile(event) {
     event.preventDefault();
     setSubmitting(true);
@@ -116,60 +82,6 @@ export default function CustomerPortal() {
     }
 
     setSubmitting(false);
-  }
-
-  async function handleSubmitOrder(event) {
-    event.preventDefault();
-    setSubmitting(true);
-    setError('');
-    setMessage('');
-
-    if (!activeLocationId) {
-      setError('Select a delivery location.');
-      setSubmitting(false);
-      return;
-    }
-
-    if (!selectedLines.length) {
-      setError('Enter a quantity for at least one product.');
-      setSubmitting(false);
-      return;
-    }
-
-    const result = await submitPortalOrder({
-      clientId: activeClientId,
-      locationId: activeLocationId,
-      items: selectedLines.map((line) => ({
-        productId: line.product.id,
-        quantity: line.quantity,
-      })),
-    });
-
-    if (!result.ok) {
-      setError(result.error ?? 'Unable to submit order.');
-    } else {
-      setQuantities({});
-      navigate('/thank-you');
-      return;
-    }
-
-    setSubmitting(false);
-  }
-
-  function handleClientChange(newClientId) {
-    setSelectedClientId(newClientId);
-    setLocationId('');
-    setQuantities({});
-    setError('');
-    setMessage('');
-  }
-
-  function updateProductQuantity(productId, nextValue) {
-    const nextQuantity = Math.max(0, Number(nextValue) || 0);
-    setQuantities((current) => ({
-      ...current,
-      [productId]: nextQuantity ? String(nextQuantity) : '',
-    }));
   }
 
   if (!portal) {
@@ -202,7 +114,8 @@ export default function CustomerPortal() {
     );
   }
 
-  if (portal.contact.status !== 'active' || (!portal.client && portalClients.length === 0)) {
+  const portalClientsLocal = portal?.clients ?? [];
+  if (portal.contact.status !== 'active' || (!portal.client && portalClientsLocal.length === 0)) {
     return (
       <section className="customer-portal-panel customer-pending-panel">
         <CheckCircle2 size={34} />
@@ -240,6 +153,26 @@ export default function CustomerPortal() {
         </div>
       </section>
 
+      {/* Company selector (if multiple clients) */}
+      {hasMultipleClients && (
+        <div className="cp-delivery-location" style={{ maxWidth: 400 }}>
+          <div className="cp-delivery-label">
+            <span>COMPANY</span>
+          </div>
+          <select
+            className="form-select"
+            value={activeClientId}
+            onChange={(event) => handleClientChange(event.target.value)}
+          >
+            {portalClients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {/* Catalogue Header */}
       <section className="cp-catalogue-header">
         <h2 className="cp-catalogue-title">Catalogue</h2>
@@ -273,166 +206,80 @@ export default function CustomerPortal() {
         </div>
       </section>
 
-      <form className="customer-order-layout" onSubmit={handleSubmitOrder}>
-        {/* Product Grid */}
-        <section className="customer-products-list">
-          {filteredProducts.length ? (
-            filteredProducts.map((product) => {
-              const imageUrl = getProductImageUrl(product, { fallback: true });
-              const usesFallback = !hasProductImage(product);
-              const quantity = quantities[product.id] ?? '';
-              const numericQuantity = Number(quantity || 0);
-              const orderUnit = getProductOrderUnitLabel(product);
+      {/* Product Grid */}
+      <section className="customer-products-list">
+        {filteredProducts.length ? (
+          filteredProducts.map((product) => {
+            const imageUrl = getProductImageUrl(product, { fallback: true });
+            const usesFallback = !hasProductImage(product);
+            const quantity = quantities[product.id] ?? '';
+            const numericQuantity = Number(quantity || 0);
+            const orderUnit = getProductOrderUnitLabel(product);
 
-              return (
-                <article className="customer-product-card" key={product.id}>
-                  <div className="customer-product-image">
-                    <img
-                      className={usesFallback ? 'product-image-fallback' : ''}
-                      src={imageUrl}
-                      alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)}
-                    />
-                  </div>
-                  <div className="customer-product-info">
-                    <h3>{product.name}</h3>
-                    <span className="cp-product-unit">
-                      {[product.packagingDetails || product.unitSize, orderUnit].filter(Boolean).join(' - ')}
-                    </span>
-                    <strong>{formatCurrency(product.clientPrice)}</strong>
-                  </div>
-                  <div className="customer-product-actions">
-                    <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity - 1)} aria-label={`Decrease ${getProductDisplayName(product)}`}>
-                      <Minus size={16} />
-                    </button>
-                    <input
-                      className="form-input"
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={quantity}
-                      onChange={(event) => updateProductQuantity(product.id, event.target.value)}
-                      aria-label={`${getProductDisplayName(product)} quantity`}
-                    />
-                    <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity + 1)} aria-label={`Increase ${getProductDisplayName(product)}`}>
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </article>
-              );
-            })
-          ) : (
-            <div className="customer-portal-panel customer-pending-panel">
-              <Package size={34} />
-              <h2>No Products Available</h2>
-              <p>
-                {activeProducts.length
-                  ? 'No products match the current search or category filter.'
-                  : 'Modhani staff has not enabled products for this company catalogue yet.'}
-              </p>
-            </div>
-          )}
-        </section>
-
-        {/* Order Summary Sidebar */}
-        <aside className="cp-order-summary">
-          <div className="cp-summary-header">
-            <div>
-              <h2>Order summary</h2>
-              <p>Review selected products before sending to Modhani.</p>
-            </div>
-            <span className="cp-live-badge"><span className="cp-live-dot" /> Live cart</span>
-          </div>
-
-          {/* Delivery Location */}
-          <div className="cp-delivery-location">
-            <div className="cp-delivery-label">
-              <span>DELIVERY LOCATION</span>
-              {activeLocations.length > 1 && (
-                <select
-                  className="cp-delivery-edit"
-                  value={activeLocationId}
-                  onChange={(event) => {
-                    setLocationId(event.target.value);
-                  }}
-                >
-                  {activeLocations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-            <strong>{activeLocationName}</strong>
-          </div>
-
-          {hasMultipleClients ? (
-            <div className="cp-delivery-location">
-              <div className="cp-delivery-label">
-                <span>COMPANY</span>
-              </div>
-              <select
-                className="form-select"
-                value={activeClientId}
-                onChange={(event) => handleClientChange(event.target.value)}
-              >
-                {portalClients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {client.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          ) : null}
-
-          <PortalMessages error={error} />
-
-          {/* Cart Lines */}
-          <div className="cp-cart-lines">
-            {selectedLines.length ? (
-              selectedLines.map((line) => (
-                <div key={line.product.id} className="cp-cart-line">
-                  <span className="cp-cart-dot" style={{ background: getCategoryColor(line.product.category) }} />
-                  <div className="cp-cart-line-info">
-                    <strong>{getProductDisplayName(line.product)}</strong>
-                    <span>{line.quantity} x {getProductOrderUnitLabel(line.product)}</span>
-                  </div>
-                  <span className="cp-cart-line-price">{formatCurrency(line.quantity * line.product.clientPrice)}</span>
+            return (
+              <article className="customer-product-card" key={product.id}>
+                <div className="customer-product-image">
+                  <img
+                    className={usesFallback ? 'product-image-fallback' : ''}
+                    src={imageUrl}
+                    alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)}
+                  />
                 </div>
-              ))
-            ) : (
-              <div className="customer-empty-cart">No quantities entered yet</div>
-            )}
+                <div className="customer-product-info">
+                  <h3>{product.name}</h3>
+                  <span className="cp-product-unit">
+                    {[product.packagingDetails || product.unitSize, orderUnit].filter(Boolean).join(' - ')}
+                  </span>
+                  <strong>{formatCurrency(product.clientPrice)}</strong>
+                </div>
+                <div className="customer-product-actions">
+                  <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity - 1)} aria-label={`Decrease ${getProductDisplayName(product)}`}>
+                    <Minus size={16} />
+                  </button>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={quantity}
+                    onChange={(event) => updateProductQuantity(product.id, event.target.value)}
+                    aria-label={`${getProductDisplayName(product)} quantity`}
+                  />
+                  <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity + 1)} aria-label={`Increase ${getProductDisplayName(product)}`}>
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <div className="customer-portal-panel customer-pending-panel">
+            <Package size={34} />
+            <h2>No Products Available</h2>
+            <p>
+              {activeProducts.length
+                ? 'No products match the current search or category filter.'
+                : 'Modhani staff has not enabled products for this company catalogue yet.'}
+            </p>
           </div>
+        )}
+      </section>
 
-          {/* Total */}
-          <div className="cp-estimated-total">
-            <span>Estimated total</span>
+      {/* Floating cart bar */}
+      {cartItemCount > 0 && (
+        <div className="cp-floating-cart">
+          <div className="cp-floating-cart-info">
+            <ShoppingCart size={20} />
+            <span>{cartItemCount} item{cartItemCount !== 1 ? 's' : ''}</span>
             <strong>{formatCurrency(orderTotal)}</strong>
           </div>
-
-          {/* Submit */}
-          <button className="cp-submit-btn" type="submit" disabled={submitting || !activeProducts.length || !selectedLines.length}>
-            {submitting ? 'Submitting...' : 'Submit Order'}
-          </button>
-
-        </aside>
-      </form>
+          <Link to="/cart" className="btn btn-primary cp-floating-cart-btn">
+            View Cart &rarr;
+          </Link>
+        </div>
+      )}
     </>
   );
-}
-
-/* Utility to get a color for each product category */
-function getCategoryColor(category) {
-  const colors = {
-    'Dahi': '#D4B896',
-    'Milk': '#B5CDB6',
-    'Yogurt': '#C5D8C5',
-    'Butter': '#E8D5A3',
-    'Paneer': '#BDDBB5',
-    'Lassi': '#EBC48E',
-  };
-  return colors[category] || '#C5CCC7';
 }
 
 function PortalMessages({ error, message }) {

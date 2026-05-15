@@ -14,9 +14,11 @@ import PhaseOneClientsLocations from './pages/PhaseOneClientsLocations';
 import PhaseOneProducts from './pages/PhaseOneProducts';
 import PhaseOneCustomers from './pages/PhaseOneCustomers';
 import CustomerPortal from './pages/CustomerPortal';
+import CustomerCart from './pages/CustomerCart';
 import CustomerThankYou from './pages/CustomerThankYou';
 import CustomerRecentOrders from './pages/CustomerRecentOrders';
 import CustomerPortalShell from './pages/CustomerPortalShell';
+import CartProvider from './context/CartProvider';
 import DriverPortal from './pages/DriverPortal';
 
 export default function App() {
@@ -57,13 +59,16 @@ export default function App() {
 
   if (state.authConfigured && state.authRole === 'customer') {
     return (
-      <CustomerPortalShell>
-        <Routes>
-          <Route path="/thank-you" element={<CustomerThankYou />} />
-          <Route path="/recent-orders" element={<CustomerRecentOrders />} />
-          <Route path="*" element={<CustomerPortal />} />
-        </Routes>
-      </CustomerPortalShell>
+      <CartProvider>
+        <CustomerPortalShell>
+          <Routes>
+            <Route path="/cart" element={<CustomerCart />} />
+            <Route path="/thank-you" element={<CustomerThankYou />} />
+            <Route path="/recent-orders" element={<CustomerRecentOrders />} />
+            <Route path="*" element={<CustomerPortal />} />
+          </Routes>
+        </CustomerPortalShell>
+      </CartProvider>
     );
   }
 
