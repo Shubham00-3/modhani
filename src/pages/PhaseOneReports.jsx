@@ -151,9 +151,13 @@ export default function PhaseOneReports() {
   }, [filteredReportRows]);
 
   const topProducts = useMemo(() => {
+    // Count any order that has reached or passed the shipped milestone.
+    // After driver POD, an order's status flips from 'shipped' to 'delivered',
+    // but the units were still shipped — so we include both here.
+    const SHIPPED_STATUSES = new Set(['shipped', 'delivered']);
     const grouped = new Map();
     filteredReportRows
-      .filter((row) => row.status === 'shipped')
+      .filter((row) => SHIPPED_STATUSES.has(row.status))
       .forEach((row) => {
         grouped.set(row.productDisplayName, (grouped.get(row.productDisplayName) ?? 0) + row.fulfilledQty);
       });
