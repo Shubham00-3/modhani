@@ -87,76 +87,76 @@ export default function PhaseOneSettings() {
             <Users size={18} /> User Roles
           </div>
           <div className="table-scroll-wrapper">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>User</th>
-                <th>Fulfil Orders</th>
-                <th>Override Prices</th>
-                <th>Edit Invoices</th>
-                <th>Manage Settings</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleUsers.map((user) => (
-                <tr key={user.id}>
-                  <td style={{ fontWeight: 600 }}>{user.name}</td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={user.permissions.fulfilOrders}
-                      disabled={!canManage}
-                      onChange={(event) =>
-                        dispatch({
-                          type: 'UPDATE_USER',
-                          payload: { id: user.id, permissions: { fulfilOrders: event.target.checked } },
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={user.permissions.overridePrices}
-                      disabled={!canManage}
-                      onChange={(event) =>
-                        dispatch({
-                          type: 'UPDATE_USER',
-                          payload: { id: user.id, permissions: { overridePrices: event.target.checked } },
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(user.permissions.editInvoices)}
-                      disabled={!canManage}
-                      onChange={(event) =>
-                        dispatch({
-                          type: 'UPDATE_USER',
-                          payload: { id: user.id, permissions: { editInvoices: event.target.checked } },
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={user.permissions.manageSettings}
-                      disabled={!canManage}
-                      onChange={(event) =>
-                        dispatch({
-                          type: 'UPDATE_USER',
-                          payload: { id: user.id, permissions: { manageSettings: event.target.checked } },
-                        })
-                      }
-                    />
-                  </td>
+            <table className="data-table data-table-compact data-table-permissions">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th title="Fulfil Orders">Fulfil</th>
+                  <th title="Override Prices">Override</th>
+                  <th title="Edit Invoices">Invoices</th>
+                  <th title="Manage Settings">Settings</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visibleUsers.map((user) => (
+                  <tr key={user.id}>
+                    <td style={{ fontWeight: 600 }}>{user.name}</td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={user.permissions.fulfilOrders}
+                        disabled={!canManage}
+                        onChange={(event) =>
+                          dispatch({
+                            type: 'UPDATE_USER',
+                            payload: { id: user.id, permissions: { fulfilOrders: event.target.checked } },
+                          })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={user.permissions.overridePrices}
+                        disabled={!canManage}
+                        onChange={(event) =>
+                          dispatch({
+                            type: 'UPDATE_USER',
+                            payload: { id: user.id, permissions: { overridePrices: event.target.checked } },
+                          })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(user.permissions.editInvoices)}
+                        disabled={!canManage}
+                        onChange={(event) =>
+                          dispatch({
+                            type: 'UPDATE_USER',
+                            payload: { id: user.id, permissions: { editInvoices: event.target.checked } },
+                          })
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={user.permissions.manageSettings}
+                        disabled={!canManage}
+                        onChange={(event) =>
+                          dispatch({
+                            type: 'UPDATE_USER',
+                            payload: { id: user.id, permissions: { manageSettings: event.target.checked } },
+                          })
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -238,20 +238,37 @@ function SummaryCard({ label, value }) {
   );
 }
 
+function QbStat({ label, value, tone, dot }) {
+  return (
+    <div className={`qb-stat${tone ? ` qb-stat-${tone}` : ''}`}>
+      <div className="qb-stat-label">{label}</div>
+      <div className="qb-stat-value">
+        {dot ? <span className="qb-stat-dot" /> : null}
+        <span>{value}</span>
+      </div>
+    </div>
+  );
+}
+
 function QuickBooksSettingsCard({ canManage, quickBooks, dispatch, addToast }) {
   const [qbDraft, setQbDraft] = useState({
     companyName: quickBooks.companyName,
     connectorName: quickBooks.connectorName,
   });
 
+  const rawStatus = quickBooks.status?.replaceAll('_', ' ') ?? 'Not configured';
+  const statusLabel = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1);
+  const isHealthy = quickBooks.connected && quickBooks.status === 'connected';
+  const failedCount = quickBooks.failedSyncCount ?? 0;
+
   return (
-      <div className="card">
-        <div className="card-title">QuickBooks Connection</div>
-      <div className="grid-2" style={{ marginBottom: 'var(--space-4)' }}>
-        <SummaryCard label="Connector Status" value={quickBooks.status?.replaceAll('_', ' ') ?? 'Not configured'} />
-        <SummaryCard label="Last Check-In" value={formatDateTime(quickBooks.connectorLastSeenAt)} />
-        <SummaryCard label="Last Successful Sync" value={formatDateTime(quickBooks.lastSyncAt)} />
-        <SummaryCard label="Failed Sync Count" value={String(quickBooks.failedSyncCount ?? 0)} />
+    <div className="card">
+      <div className="card-title">QuickBooks Connection</div>
+      <div className="qb-stat-grid">
+        <QbStat label="Connector Status" value={statusLabel} tone={isHealthy ? 'success' : 'warning'} dot />
+        <QbStat label="Last Check-In" value={formatDateTime(quickBooks.connectorLastSeenAt) || '-'} />
+        <QbStat label="Last Successful Sync" value={formatDateTime(quickBooks.lastSyncAt) || '-'} />
+        <QbStat label="Failed Sync Count" value={String(failedCount)} tone={failedCount > 0 ? 'warning' : 'muted'} />
       </div>
       <div className="form-group">
         <label className="form-label">Company Name</label>

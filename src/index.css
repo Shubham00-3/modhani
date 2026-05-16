@@ -2091,6 +2091,91 @@ img {
   min-width: 680px;
 }
 
+/* Compact variant: no min-width — fits into a half-width card without scrolling. */
+.data-table-compact {
+  min-width: 0;
+}
+
+/* User Roles permissions table — name on left, checkbox columns evenly centered. */
+.data-table-permissions th:not(:first-child),
+.data-table-permissions td:not(:first-child) {
+  text-align: center;
+  width: 70px;
+}
+
+.data-table-permissions input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  margin: 0;
+}
+
+.data-table-permissions input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* QuickBooks Connection — flat stat grid (no nested cards). */
+.qb-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.qb-stat {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-bg-secondary, #f8f9f7);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--color-border);
+}
+
+.qb-stat-label {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.qb-stat-value {
+  margin-top: 4px;
+  font-weight: 700;
+  font-size: var(--font-size-base, 15px);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qb-stat-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+}
+
+.qb-stat-success {
+  border-left-color: var(--color-success, #16a34a);
+}
+.qb-stat-success .qb-stat-dot {
+  background: var(--color-success, #16a34a);
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+.qb-stat-warning {
+  border-left-color: var(--color-warning, #d97706);
+}
+.qb-stat-warning .qb-stat-dot {
+  background: var(--color-warning, #d97706);
+  box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.15);
+}
+
+.qb-stat-muted .qb-stat-dot {
+  background: var(--color-text-muted);
+}
+
 .data-table thead th {
   text-align: left;
   padding: var(--space-3) var(--space-4);
