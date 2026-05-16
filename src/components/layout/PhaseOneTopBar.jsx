@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Bell, Menu, Package, Search, ShoppingCart, X } from 'lucide-react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, Bell, LogOut, Menu, Package, Search, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { formatTime } from '../../data/phaseOneData';
 import { formatRelativeTime } from '../../lib/notifications';
@@ -43,9 +43,12 @@ function getNotificationIcon(notification) {
 export default function PhaseOneTopBar() {
   const { state, dispatch, logout, dismissNotification, clearNotifications } = useApp();
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [notificationPanelPath, setNotificationPanelPath] = useState(null);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const notificationPanelRef = useRef(null);
+  const userMenuRef = useRef(null);
   const currentTitle = pageTitles[location.pathname] || 'ModhaniOS';
   const dashboardSearchValue = searchParams.get('q') ?? '';
   const qbHealthy = state.quickBooks.connected && state.quickBooks.status === 'connected';
@@ -92,6 +95,31 @@ export default function PhaseOneTopBar() {
     };
   }, [notificationsOpen]);
 
+  useEffect(() => {
+    if (!userMenuOpen) return undefined;
+
+    function handlePointerDown(event) {
+      if (!userMenuRef.current?.contains(event.target)) {
+        setUserMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') setUserMenuOpen(false);
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [userMenuOpen]);
+
+  function capitalize(str) {
+    return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
+  }
+
   return (
     <header className={`topbar${state.sidebarCollapsed ? ' sidebar-collapsed' : ''}`}>
       <div className="topbar-left">
@@ -109,7 +137,12 @@ export default function PhaseOneTopBar() {
       </div>
 
       <div className="topbar-center">
-        <div className="topbar-qb-status">
+        <button
+          className="topbar-qb-status topbar-qb-status-btn"
+          type="button"
+          onClick={() => navigate('/settings')}
+          title="Open QuickBooks settings"
+        >
           <span
             className="topbar-qb-dot"
             style={{ background: qbHealthy ? 'var(--color-success)' : 'var(--color-warning)' }}
@@ -119,7 +152,7 @@ export default function PhaseOneTopBar() {
           <span style={{ color: 'var(--color-text-muted)' }}>
             Last sync: {qbSyncLabel}
           </span>
-        </div>
+        </button>
       </div>
 
       <div className="topbar-right">
@@ -133,30 +166,7 @@ export default function PhaseOneTopBar() {
           />
         </label>
 
-        {state.authConfigured ? (
-          <div
-            className="topbar-user-control"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '8px 12px',
-              border: '1px solid var(--color-border)',
-              borderRadius: 'var(--radius-md)',
-              background: 'var(--color-card)',
-            }}
-          >
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: '14px', whiteSpace: 'nowrap' }}>{currentUser.name}</div>
-              <div style={{ color: 'var(--color-text-secondary)', fontSize: '12px' }}>
-                {currentUser.role} account
-              </div>
-            </div>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={logout}>
-              Sign Out
-            </button>
-          </div>
-        ) : (
+        {!state.authConfigured ? (
           <select
             className="form-select"
             style={{ minWidth: 180 }}
@@ -169,7 +179,7 @@ export default function PhaseOneTopBar() {
               </option>
             ))}
           </select>
-        )}
+        ) : null}
 
         <div className="topbar-notifications" ref={notificationPanelRef}>
           <button
@@ -253,7 +263,41 @@ export default function PhaseOneTopBar() {
           ) : null}
         </div>
 
-        <div className="topbar-avatar">{currentUser.initials}</div>
+        {state.authConfigured ? (
+          <div className="topbar-user-menu" ref={userMenuRef}>
+            <button
+              className="topbar-avatar-btn"
+              type="button"
+              aria-label="Open user menu"
+              aria-expanded={userMenuOpen}
+              onClick={() => setUserMenuOpen((open) => !open)}
+            >
+              <span className="topbar-avatar">{currentUser.initials}</span>
+            </button>
+            {userMenuOpen ? (
+              <div className="topbar-user-menu-panel" role="menu">
+                <div className="topbar-user-menu-header">
+                  <div className="topbar-user-menu-name">{currentUser.name}</div>
+                  <div className="topbar-user-menu-role">{capitalize(currentUser.role)} account</div>
+                </div>
+                <button
+                  className="topbar-user-menu-item topbar-user-menu-item-danger"
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setUserMenuOpen(false);
+                    logout();
+                  }}
+                >
+                  <LogOut size={16} />
+                  <span>Sign out</span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <div className="topbar-avatar">{currentUser.initials}</div>
+        )}
       </div>
     </header>
   );

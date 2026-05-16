@@ -752,6 +752,119 @@ img {
   min-width: 0;
 }
 
+/* ---------- User menu dropdown ---------- */
+.topbar-user-menu {
+  position: relative;
+}
+
+.topbar-avatar-btn {
+  display: inline-flex;
+  padding: 0;
+  border: 2px solid transparent;
+  background: transparent;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+}
+
+.topbar-avatar-btn:hover {
+  border-color: var(--color-primary-light, rgba(16, 38, 26, 0.15));
+}
+
+.topbar-avatar-btn:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.topbar-avatar-btn[aria-expanded="true"] {
+  border-color: var(--color-primary);
+}
+
+.topbar-user-menu-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  z-index: 50;
+  animation: fadeInDown 0.15s ease;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.topbar-user-menu-header {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.topbar-user-menu-name {
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-user-menu-role {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.topbar-user-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.topbar-user-menu-item:hover {
+  background: var(--color-bg-secondary);
+}
+
+.topbar-user-menu-item-danger {
+  color: #b91c1c;
+}
+
+.topbar-user-menu-item-danger:hover {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+/* Make QuickBooks status pill clickable */
+.topbar-qb-status-btn {
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  font: inherit;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.topbar-qb-status-btn:hover {
+  border-color: var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.topbar-qb-status-btn:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
 /* ---------- Auth ---------- */
 .auth-screen,
 .auth-shell {
