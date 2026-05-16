@@ -970,12 +970,16 @@ export function AppProvider({ children }) {
     };
   }, [handleRemoteBootstrapError, loadAuthenticatedUser]);
 
-  // Realtime: keep staff/admin and driver views in sync as orders change
-  // (e.g. when the driver captures POD, the admin's order panel auto-updates).
+  // Realtime: keep all role views in sync without manual refresh.
+  // Staff/admin, driver, and customer portals each subscribe to the tables
+  // that another role's actions can mutate behind their back.
   useEffect(() => {
     if (!supabase) return undefined;
     if (!state.isAuthenticated || !state.currentUserId) return undefined;
-    if (state.authRole !== 'staff' && state.authRole !== 'driver') return undefined;
+    if (!state.authRole) return undefined;
+    // Don't subscribe while a customer is still in the password-setup flow —
+    // a realtime refresh would clobber the needsPasswordSetup flag.
+    if (state.authRole === 'customer' && state.needsPasswordSetup) return undefined;
 
     let refreshTimer = null;
     const userId = state.currentUserId;
@@ -988,6 +992,8 @@ export function AppProvider({ children }) {
         try {
           if (role === 'driver') {
             await loadDriverPortalData(userId);
+          } else if (role === 'customer') {
+            await loadCustomerPortalData({ id: userId });
           } else {
             await loadRemoteData(userId);
           }
@@ -998,18 +1004,43 @@ export function AppProvider({ children }) {
       }, 400); // small debounce to coalesce bursts of changes
     };
 
-    const channel = supabase
-      .channel(`modhanios-orders-${role}-${userId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_events' }, scheduleRefresh)
-      .subscribe();
+    // Tables each role needs to watch for cross-role mutations.
+    let tables;
+    if (role === 'staff') {
+      tables = [
+        'orders', 'order_items', 'audit_events',
+        'customer_contacts', 'customer_client_assignments', 'customer_location_assignments',
+        'batches', 'batch_assignments',
+        'clients', 'locations', 'products', 'client_product_prices',
+        'quickbooks_sync_jobs', 'quickbooks_settings',
+      ];
+    } else if (role === 'driver') {
+      tables = ['orders', 'order_items', 'audit_events', 'locations'];
+    } else if (role === 'customer') {
+      tables = [
+        'orders', 'order_items',
+        'customer_contacts', 'customer_client_assignments', 'customer_location_assignments',
+        'clients', 'locations', 'products', 'client_product_prices',
+      ];
+    } else {
+      return undefined;
+    }
+
+    let channel = supabase.channel(`modhanios-realtime-${role}-${userId}`);
+    tables.forEach((table) => {
+      channel = channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table },
+        scheduleRefresh
+      );
+    });
+    channel.subscribe();
 
     return () => {
       if (refreshTimer) clearTimeout(refreshTimer);
       supabase.removeChannel(channel);
     };
-  }, [state.isAuthenticated, state.currentUserId, state.authRole, loadRemoteData, loadDriverPortalData]);
+  }, [state.isAuthenticated, state.currentUserId, state.authRole, state.needsPasswordSetup, loadRemoteData, loadDriverPortalData, loadCustomerPortalData]);
 
   const addToast = useCallback((message, type = 'success') => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
