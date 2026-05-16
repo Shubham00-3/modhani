@@ -970,6 +970,47 @@ export function AppProvider({ children }) {
     };
   }, [handleRemoteBootstrapError, loadAuthenticatedUser]);
 
+  // Realtime: keep staff/admin and driver views in sync as orders change
+  // (e.g. when the driver captures POD, the admin's order panel auto-updates).
+  useEffect(() => {
+    if (!supabase) return undefined;
+    if (!state.isAuthenticated || !state.currentUserId) return undefined;
+    if (state.authRole !== 'staff' && state.authRole !== 'driver') return undefined;
+
+    let refreshTimer = null;
+    const userId = state.currentUserId;
+    const role = state.authRole;
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) return;
+      refreshTimer = setTimeout(async () => {
+        refreshTimer = null;
+        try {
+          if (role === 'driver') {
+            await loadDriverPortalData(userId);
+          } else {
+            await loadRemoteData(userId);
+          }
+        } catch (err) {
+          // Silent — next change or manual refresh will retry.
+          console.warn('Realtime refresh failed:', err);
+        }
+      }, 400); // small debounce to coalesce bursts of changes
+    };
+
+    const channel = supabase
+      .channel(`modhanios-orders-${role}-${userId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_items' }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'audit_events' }, scheduleRefresh)
+      .subscribe();
+
+    return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [state.isAuthenticated, state.currentUserId, state.authRole, loadRemoteData, loadDriverPortalData]);
+
   const addToast = useCallback((message, type = 'success') => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     baseDispatch({ type: 'ADD_TOAST', payload: { id, message, type } });
