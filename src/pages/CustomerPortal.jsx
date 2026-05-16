@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, CheckCircle2, Minus, Package, Plus, Search, ShoppingCart, X, ZoomIn } from 'lucide-react';
+import { Building2, CheckCircle2, Droplets, Milk, Minus, Package, Plus, Search, ShoppingCart, Truck, X, ZoomIn } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { useCart } from '../hooks/useCart';
 import {
@@ -146,24 +146,22 @@ export default function CustomerPortal() {
           <h1>Order dairy inventory</h1>
           <p>Fast case entry, clean cart review, recent orders, and delivery location control in one focused screen.</p>
         </div>
-        <div className="cp-hero-visual">
-          {activeProducts
-            // Only showcase products that have a real image — the Modhani logo
-            // fallback doesn't read as "product" in the hero and looks off.
-            .filter((product) => hasProductImage(product))
-            .slice(0, 3)
-            .map((product, i) => (
-              <div
-                key={product.id}
-                className="cp-hero-product-card"
-                style={{ '--card-index': i }}
-              >
-                <img
-                  src={getProductImageUrl(product, { fallback: false })}
-                  alt={getProductDisplayName(product)}
-                />
-              </div>
-            ))}
+        <div className="cp-hero-visual" aria-hidden="true">
+          {/* Three stylized service tiles. Independent of the catalogue so the
+              hero always reads the same regardless of how many product images
+              have been uploaded. */}
+          <div className="cp-hero-product-card cp-hero-card-milk" style={{ '--card-index': 0 }}>
+            <Milk size={42} strokeWidth={1.6} />
+            <span className="cp-hero-card-label">Fresh Milk</span>
+          </div>
+          <div className="cp-hero-product-card cp-hero-card-yogurt" style={{ '--card-index': 1 }}>
+            <Droplets size={42} strokeWidth={1.6} />
+            <span className="cp-hero-card-label">Yogurt &amp; Dahi</span>
+          </div>
+          <div className="cp-hero-product-card cp-hero-card-delivery" style={{ '--card-index': 2 }}>
+            <Truck size={42} strokeWidth={1.6} />
+            <span className="cp-hero-card-label">Fast Dispatch</span>
+          </div>
         </div>
       </section>
 
