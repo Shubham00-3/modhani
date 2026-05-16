@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ImageOff, PackageSearch, RotateCcw } from 'lucide-react';
+import { History, ImageOff, PackageSearch, RotateCcw } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatDate,
@@ -109,6 +109,11 @@ export default function PhaseOneInventory() {
   const historyRows = useMemo(() => buildInventoryHistory(state), [state]);
   const hasActiveFilters = Boolean(search || categoryFilter || stockFilter || lotStatusFilter);
 
+  function scrollToHistory() {
+    const el = document.getElementById('inventory-history');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
     <div>
       <div className="page-header">
@@ -116,6 +121,18 @@ export default function PhaseOneInventory() {
           <h1 className="page-title">Inventory</h1>
           <p className="page-subtitle">Product stock, lot codes, warehouse status, and inventory movement history.</p>
         </div>
+        <button
+          className="btn btn-secondary"
+          type="button"
+          onClick={scrollToHistory}
+          disabled={!historyRows.length}
+          title={historyRows.length ? 'Jump to Inventory History' : 'No inventory history yet'}
+        >
+          <History size={16} /> View Inventory History
+          {historyRows.length ? (
+            <span className="inventory-history-count">{historyRows.length}</span>
+          ) : null}
+        </button>
       </div>
 
       <div className="card section">
@@ -233,7 +250,7 @@ export default function PhaseOneInventory() {
         )}
       </div>
 
-      <div className="card">
+      <div className="card" id="inventory-history" style={{ scrollMarginTop: 'var(--space-6)' }}>
         <div className="card-title">Inventory History</div>
         {historyRows.length ? (
           <div className="table-scroll-wrapper">
