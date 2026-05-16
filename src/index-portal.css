@@ -1373,17 +1373,22 @@
   justify-content: space-between;
   gap: var(--space-4);
   margin-bottom: var(--space-6);
+  /* Tiny top padding so the Modhani logo's underline curve doesn't bump up
+     against the page edge or the kicker/title block beside it. */
+  padding-top: var(--space-2);
 }
 
 .driver-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--space-5);
+  min-width: 0;
 }
 
 .driver-brand img {
   width: 132px;
   height: auto;
+  max-height: 68px; /* prevent the oval logo curve from bleeding into the kicker row */
   object-fit: contain;
 }
 

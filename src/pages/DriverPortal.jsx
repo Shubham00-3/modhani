@@ -15,15 +15,37 @@ import {
 import { printInvoice, printProofOfDelivery } from '../utils/printDocuments';
 
 function formatAddress(shipTo) {
-  return [
-    shipTo.name,
-    shipTo.addressLine1,
-    shipTo.addressLine2,
-    [shipTo.city, shipTo.province, shipTo.postalCode].filter(Boolean).join(' '),
-    shipTo.country,
-  ]
+  // Clean each part: trim, strip trailing commas/whitespace.
+  const clean = (s) => String(s ?? '').trim().replace(/[,\s]+$/, '');
+  // Build the city/province/postal line, then assemble all parts and drop
+  // any part that duplicates one already included (data sometimes ships
+  // the full address baked into addressLine1/2 plus separate city fields).
+  const cityLine = [shipTo.city, shipTo.province, shipTo.postalCode]
+    .map(clean)
     .filter(Boolean)
-    .join(', ');
+    .join(' ');
+
+  const parts = [
+    clean(shipTo.name),
+    clean(shipTo.addressLine1),
+    clean(shipTo.addressLine2),
+    cityLine,
+    clean(shipTo.country),
+  ].filter(Boolean);
+
+  const seen = new Set();
+  const deduped = [];
+  for (const part of parts) {
+    const key = part.toLowerCase().replace(/\s+/g, ' ');
+    // Skip a part if we've already seen it, or if it's a substring of a
+    // previously kept part (catches name vs addressLine1 dupes).
+    if (seen.has(key)) continue;
+    const isSubstring = deduped.some((prev) => prev.toLowerCase().includes(key));
+    if (isSubstring) continue;
+    seen.add(key);
+    deduped.push(part);
+  }
+  return deduped.join(', ');
 }
 
 function SignaturePad({ onChange }) {
@@ -325,7 +347,7 @@ export default function DriverPortal() {
                           <span>{lotCodes || 'No lot assignment'}</span>
                         </div>
                         <div>
-                          <strong>{qty.toLocaleString()} units</strong>
+                          <strong>{qty.toLocaleString()} {qty === 1 ? 'unit' : 'units'}</strong>
                           <span>${(qty * getEffectiveItemPrice(item)).toFixed(2)}</span>
                         </div>
                       </div>
