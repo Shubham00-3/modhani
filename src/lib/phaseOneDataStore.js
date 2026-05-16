@@ -608,14 +608,28 @@ export async function fetchAuthIdentity(supabase, userId) {
 
 export async function fetchDriverPortalState(supabase, userId) {
   const data = await fetchRemoteState(supabase, userId);
-  const deliveryStatuses = new Set(['shipped']);
+  // Include shipped (still need POD) and recently delivered (POD captured) orders
+  // so the driver can still see their completed deliveries for the day.
+  const RECENT_DELIVERED_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
+  const now = Date.now();
+  const isDriverVisible = (order) => {
+    if (order.status === 'shipped') return true;
+    if (order.status === 'delivered' && order.podSignedAt) {
+      const signedAt = new Date(order.podSignedAt).getTime();
+      if (!Number.isNaN(signedAt) && now - signedAt <= RECENT_DELIVERED_WINDOW_MS) return true;
+    }
+    return false;
+  };
+
+  const driverOrders = data.orders.filter(isDriverVisible);
+  const visibleOrderIds = new Set(driverOrders.map((order) => order.id));
 
   return {
     ...data,
-    orders: data.orders.filter((order) => deliveryStatuses.has(order.status)),
+    orders: driverOrders,
     auditLog: data.auditLog.filter((entry) => {
       if (!entry.orderId) return false;
-      return data.orders.some((order) => deliveryStatuses.has(order.status) && order.id === entry.orderId);
+      return visibleOrderIds.has(entry.orderId);
     }),
     quickBooksJobs: [],
     reportRows: [],

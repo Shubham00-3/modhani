@@ -1444,6 +1444,16 @@
   font-weight: 700;
 }
 
+.driver-order-card.driver-order-completed {
+  background: rgba(34, 197, 94, 0.06);
+  border-color: rgba(34, 197, 94, 0.25);
+}
+
+.driver-order-card.driver-order-completed.active {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: var(--color-success);
+}
+
 .driver-delivery-panel {
   padding: clamp(18px, 3vw, 28px);
 }

@@ -132,6 +132,16 @@ export default function DriverPortal() {
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Split orders into pending (still need POD) and completed (POD captured)
+  const pendingOrders = useMemo(
+    () => state.orders.filter((order) => !order.podSignedAt),
+    [state.orders]
+  );
+  const completedOrders = useMemo(
+    () => state.orders.filter((order) => order.podSignedAt),
+    [state.orders]
+  );
+
   const selectedOrder = useMemo(
     () => state.orders.find((order) => order.id === selectedOrderId) ?? state.orders[0] ?? null,
     [selectedOrderId, state.orders]
@@ -163,10 +173,11 @@ export default function DriverPortal() {
     }
 
     setSaving(true);
+    const justPoddedOrderId = selectedOrder.id;
     const result = await dispatch({
       type: 'COMPLETE_DELIVERY_POD',
       payload: {
-        orderId: selectedOrder.id,
+        orderId: justPoddedOrderId,
         signedBy: signedBy.trim(),
         signatureDataUrl,
         notes: notes.trim(),
@@ -178,6 +189,11 @@ export default function DriverPortal() {
 
     if (result?.ok) {
       addToast(`POD saved for order #${selectedOrder.orderNumber}.`);
+      // Keep the just-POD'd order selected so the driver sees the confirmation panel
+      setSelectedOrderId(justPoddedOrderId);
+      setSignedBy('');
+      setSignatureDataUrl('');
+      setNotes('');
     }
   }
 
@@ -200,11 +216,11 @@ export default function DriverPortal() {
         <aside className="driver-order-list" aria-label="Delivery orders">
           <div className="driver-list-heading">
             <Truck size={18} />
-            <span>Shipped Orders</span>
-            <strong>{state.orders.length}</strong>
+            <span>Pending Delivery</span>
+            <strong>{pendingOrders.length}</strong>
           </div>
-          {state.orders.length ? (
-            state.orders.map((order) => {
+          {pendingOrders.length ? (
+            pendingOrders.map((order) => {
               const locationName = getLocationName(state.locations, order.locationId);
               const clientName = getClientName(state.clients, order.clientId);
               return (
@@ -217,16 +233,40 @@ export default function DriverPortal() {
                   <span className="driver-order-number">Order #{order.orderNumber}</span>
                   <span>{clientName}</span>
                   <small>{locationName}</small>
-                  {order.podSignedAt ? (
-                    <span className="driver-pod-complete">
-                      <CheckCircle2 size={14} /> POD saved
-                    </span>
-                  ) : null}
                 </button>
               );
             })
           ) : (
             <div className="driver-empty-state">No shipped orders are ready for driver POD.</div>
+          )}
+
+          {completedOrders.length > 0 && (
+            <>
+              <div className="driver-list-heading" style={{ marginTop: 16 }}>
+                <CheckCircle2 size={18} />
+                <span>Delivered (24h)</span>
+                <strong>{completedOrders.length}</strong>
+              </div>
+              {completedOrders.map((order) => {
+                const locationName = getLocationName(state.locations, order.locationId);
+                const clientName = getClientName(state.clients, order.clientId);
+                return (
+                  <button
+                    className={`driver-order-card driver-order-completed ${order.id === selectedOrder?.id ? 'active' : ''}`}
+                    key={order.id}
+                    type="button"
+                    onClick={() => handleSelectOrder(order.id)}
+                  >
+                    <span className="driver-order-number">Order #{order.orderNumber}</span>
+                    <span>{clientName}</span>
+                    <small>{locationName}</small>
+                    <span className="driver-pod-complete">
+                      <CheckCircle2 size={14} /> POD saved
+                    </span>
+                  </button>
+                );
+              })}
+            </>
           )}
         </aside>
 
