@@ -147,18 +147,23 @@ export default function CustomerPortal() {
           <p>Fast case entry, clean cart review, recent orders, and delivery location control in one focused screen.</p>
         </div>
         <div className="cp-hero-visual">
-          {activeProducts.slice(0, 3).map((product, i) => {
-            const imageUrl = getProductImageUrl(product, { fallback: true });
-            return (
+          {activeProducts
+            // Only showcase products that have a real image — the Modhani logo
+            // fallback doesn't read as "product" in the hero and looks off.
+            .filter((product) => hasProductImage(product))
+            .slice(0, 3)
+            .map((product, i) => (
               <div
                 key={product.id}
                 className="cp-hero-product-card"
                 style={{ '--card-index': i }}
               >
-                <img src={imageUrl} alt={getProductDisplayName(product)} />
+                <img
+                  src={getProductImageUrl(product, { fallback: false })}
+                  alt={getProductDisplayName(product)}
+                />
               </div>
-            );
-          })}
+            ))}
         </div>
       </section>
 
