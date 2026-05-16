@@ -199,32 +199,47 @@ export default function PhaseOneCustomers() {
 function SearchableChipList({ items, selectedIds, onToggle, disabled, searchPlaceholder, renderLabel }) {
   const [search, setSearch] = useState('');
 
+  // Selected first, then alphabetical by label. All items always shown.
+  const sortedItems = useMemo(() => {
+    const labelOf = (item) => (renderLabel ? renderLabel(item) : item.name || item.id) || '';
+    const selectedSet = new Set(selectedIds);
+    return [...items].sort((a, b) => {
+      const aSel = selectedSet.has(a.id) ? 0 : 1;
+      const bSel = selectedSet.has(b.id) ? 0 : 1;
+      if (aSel !== bSel) return aSel - bSel;
+      return labelOf(a).localeCompare(labelOf(b));
+    });
+  }, [items, selectedIds, renderLabel]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => {
+    if (!q) return sortedItems;
+    return sortedItems.filter((item) => {
       const label = renderLabel ? renderLabel(item) : item.name || item.id;
       return label.toLowerCase().includes(q);
     });
-  }, [items, search, renderLabel]);
+  }, [sortedItems, search, renderLabel]);
 
   const selectedCount = items.filter((item) => selectedIds.includes(item.id)).length;
+  const showSearch = items.length > 5;
 
   return (
     <div className="searchable-chip-list">
-      <div className="searchable-chip-search">
-        <Search size={14} />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={searchPlaceholder || 'Search...'}
-          onClick={(e) => e.stopPropagation()}
-        />
-        {selectedCount > 0 ? (
-          <span className="searchable-chip-badge">{selectedCount} selected</span>
-        ) : null}
-      </div>
+      {showSearch ? (
+        <div className="searchable-chip-search">
+          <Search size={14} />
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={searchPlaceholder || 'Search...'}
+            onClick={(e) => e.stopPropagation()}
+          />
+          {selectedCount > 0 ? (
+            <span className="searchable-chip-badge">{selectedCount} selected</span>
+          ) : null}
+        </div>
+      ) : null}
       <div className="customer-multi-select">
         {filtered.map((item) => {
           const checked = selectedIds.includes(item.id);
