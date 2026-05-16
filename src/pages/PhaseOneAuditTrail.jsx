@@ -28,6 +28,65 @@ const ACTION_LABELS = {
   order_balance_declined: 'Remaining Balance Declined',
 };
 
+// The server writes permission audits in a compact format like
+// "F:f O:f E:t M:f". Expand that into grouped, readable text for the UI.
+const PERMISSIONS = [
+  ['F', 'Fulfil orders'],
+  ['O', 'Override prices'],
+  ['E', 'Edit invoices'],
+  ['M', 'Manage settings'],
+];
+const PERMISSION_LABELS = Object.fromEntries(PERMISSIONS);
+const PERMISSION_AUDIT_RE = /^\s*(?:[FOEM]:[tf]\s*)+$/;
+
+function renderAuditValue(value) {
+  if (value == null || value === '') return '-';
+  if (typeof value !== 'string' || !PERMISSION_AUDIT_RE.test(value)) return value;
+
+  const permissionState = Object.fromEntries(
+    value
+      .trim()
+      .split(/\s+/)
+      .map((token) => token.split(':'))
+  );
+  const enabled = [];
+  const disabled = [];
+
+  PERMISSIONS.forEach(([key, label]) => {
+    if (permissionState[key] === 't') {
+      enabled.push(label);
+    } else {
+      disabled.push(label);
+    }
+  });
+
+  return (
+    <span className="audit-permission-summary">
+      <span className="audit-permission-row audit-permission-row-on">
+        <span className="audit-permission-label">Enabled</span>
+        <span>{enabled.length ? enabled.join(', ') : 'None'}</span>
+      </span>
+      <span className="audit-permission-row audit-permission-row-off">
+        <span className="audit-permission-label">Disabled</span>
+        <span>{disabled.length ? disabled.join(', ') : 'None'}</span>
+      </span>
+    </span>
+  );
+}
+
+function getAuditSearchValue(value) {
+  if (typeof value !== 'string' || !PERMISSION_AUDIT_RE.test(value)) return value;
+
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((token) => {
+      const [k, v] = token.split(':');
+      return `${PERMISSION_LABELS[k] ?? k} ${v === 't' ? 'enabled' : 'disabled'}`;
+    })
+    .join(' ');
+}
+
 export default function PhaseOneAuditTrail() {
   const { state } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -56,8 +115,8 @@ export default function PhaseOneAuditTrail() {
           ACTION_LABELS[entry.action] ?? entry.action,
           entry.details,
           entry.userName,
-          entry.previousValue,
-          entry.newValue,
+          getAuditSearchValue(entry.previousValue),
+          getAuditSearchValue(entry.newValue),
           entry.timestamp,
           entry.clientId ? getClientName(state.clients, entry.clientId) : '',
           order ? order.orderNumber : '',
@@ -163,8 +222,8 @@ export default function PhaseOneAuditTrail() {
                       <td className="cell-monospace">{order ? `#${order.orderNumber}` : '-'}</td>
                       <td style={{ fontWeight: 600 }}>{entry.userName}</td>
                       <td>{entry.details}</td>
-                      <td>{entry.previousValue ?? '-'}</td>
-                      <td>{entry.newValue ?? '-'}</td>
+                      <td>{renderAuditValue(entry.previousValue)}</td>
+                      <td>{renderAuditValue(entry.newValue)}</td>
                     </tr>
                   );
                 })}
