@@ -735,6 +735,11 @@ const serverAdminActions = new Set([
   'UPDATE_CUSTOMER_ASSIGNMENTS',
   'UPDATE_USER',
   'UPDATE_QB_SETTINGS',
+  // Production batch mutations — LOG_PRODUCTION_BATCH is the canonical RPC path
+  // in serverWorkflowActions; these keep legacy/manual dispatches routed
+  // through executeAdminAction instead of the generic optimistic fallback.
+  'ADD_BATCH',
+  'UPDATE_BATCH',
 ]);
 
 function buildLocalNotificationDismissals(userId, notificationKeys) {
@@ -756,6 +761,10 @@ function isMissingNotificationDismissalsTable(error) {
 export function AppProvider({ children }) {
   const [state, baseDispatch] = useReducer(reducer, initialState);
   const stateRef = useRef(state);
+  // Timestamp of the last manual full-state reload (after a dispatch). The
+  // realtime subscription consults this and skips its own debounced refresh
+  // if it would fire too close behind — avoids a fetchRemoteState double-pull.
+  const lastManualReloadAtRef = useRef(0);
 
   useEffect(() => {
     stateRef.current = state;
@@ -808,6 +817,11 @@ export function AppProvider({ children }) {
         currentUserId: user.id,
       },
     });
+
+    // Only touch the needsPasswordSetup flag during the initial login flow.
+    // A silent realtime refresh shouldn't be able to clobber a legit
+    // password-setup state that came in via the original auth event.
+    if (options.skipPasswordSetupCheck) return;
 
     if (options.needsPasswordSetup || user.user_metadata?.must_change_password === true) {
       baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: true } });
@@ -989,11 +1003,14 @@ export function AppProvider({ children }) {
       if (refreshTimer) return;
       refreshTimer = setTimeout(async () => {
         refreshTimer = null;
+        // If the user's own dispatch just reloaded the full state, skip
+        // this realtime refresh — it would just be a duplicate fetch.
+        if (Date.now() - lastManualReloadAtRef.current < 800) return;
         try {
           if (role === 'driver') {
             await loadDriverPortalData(userId);
           } else if (role === 'customer') {
-            await loadCustomerPortalData({ id: userId });
+            await loadCustomerPortalData({ id: userId }, { skipPasswordSetupCheck: true });
           } else {
             await loadRemoteData(userId);
           }
@@ -1276,6 +1293,7 @@ export function AppProvider({ children }) {
             } else {
               await loadRemoteData(previousState.currentUserId);
             }
+            lastManualReloadAtRef.current = Date.now();
           } catch (reloadError) {
             addToast(`Reload failed: ${reloadError.message}`, 'warning');
             return { ok: false, error: reloadError };

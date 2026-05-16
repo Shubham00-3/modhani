@@ -64,6 +64,9 @@ export default function CustomerCart() {
       setSubmitting(false);
     } else {
       clearCart();
+      // Reset before navigating so if the user hits browser back the
+      // submit button isn't stuck in a permanently disabled state.
+      setSubmitting(false);
       navigate('/thank-you');
     }
   }
@@ -126,7 +129,16 @@ export default function CustomerCart() {
                   <button
                     className="btn btn-secondary btn-icon"
                     type="button"
-                    onClick={() => updateProductQuantity(product.id, quantity - 1)}
+                    onClick={() => {
+                      if (quantity <= 1) {
+                        // Confirm before silently removing the line from the cart.
+                        const ok = window.confirm(
+                          `Remove ${getProductDisplayName(product)} from your cart?`
+                        );
+                        if (!ok) return;
+                      }
+                      updateProductQuantity(product.id, quantity - 1);
+                    }}
                     aria-label={`Decrease ${getProductDisplayName(product)}`}
                   >
                     <Minus size={16} />
@@ -155,7 +167,12 @@ export default function CustomerCart() {
                 <button
                   className="cp-cart-item-remove"
                   type="button"
-                  onClick={() => updateProductQuantity(product.id, 0)}
+                  onClick={() => {
+                    const ok = window.confirm(
+                      `Remove ${getProductDisplayName(product)} from your cart?`
+                    );
+                    if (ok) updateProductQuantity(product.id, 0);
+                  }}
                   aria-label={`Remove ${getProductDisplayName(product)}`}
                 >
                   <Trash2 size={18} />

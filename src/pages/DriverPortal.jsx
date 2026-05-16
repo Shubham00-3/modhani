@@ -126,11 +126,23 @@ function SignaturePad({ onChange }) {
 
 export default function DriverPortal() {
   const { state, dispatch, addToast, logout } = useApp();
-  const [selectedOrderId, setSelectedOrderId] = useState(state.orders[0]?.id ?? null);
+  // Start with no explicit selection; derived state below picks a sensible
+  // fallback and ignores stale IDs after realtime refreshes.
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [signedBy, setSignedBy] = useState('');
   const [signatureDataUrl, setSignatureDataUrl] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+
+  const fallbackSelectedOrderId = useMemo(() => {
+    if (state.orders.length === 0) return null;
+    const firstPending = state.orders.find((order) => !order.podSignedAt);
+    return (firstPending ?? state.orders[0]).id;
+  }, [state.orders]);
+
+  const effectiveSelectedOrderId = state.orders.some((order) => order.id === selectedOrderId)
+    ? selectedOrderId
+    : fallbackSelectedOrderId;
 
   // Split orders into pending (still need POD) and completed (POD captured)
   const pendingOrders = useMemo(
@@ -143,8 +155,8 @@ export default function DriverPortal() {
   );
 
   const selectedOrder = useMemo(
-    () => state.orders.find((order) => order.id === selectedOrderId) ?? state.orders[0] ?? null,
-    [selectedOrderId, state.orders]
+    () => state.orders.find((order) => order.id === effectiveSelectedOrderId) ?? null,
+    [effectiveSelectedOrderId, state.orders]
   );
   const selectedLocation = selectedOrder
     ? state.locations.find((location) => location.id === selectedOrder.locationId)

@@ -5,9 +5,11 @@ import {
   getProduct,
   getProductDisplayName,
 } from '../data/phaseOneData';
+import { LOW_STOCK_THRESHOLD } from './inventoryThresholds';
 
-const LOW_STOCK_THRESHOLD = 150;
-const CRITICAL_STOCK_THRESHOLD = 50;
+// Below this number we treat the lot as "critical" (a stronger nudge than low).
+// Keeping it well below LOW_STOCK_THRESHOLD ensures both severity levels can fire.
+const CRITICAL_STOCK_THRESHOLD = Math.max(5, Math.floor(LOW_STOCK_THRESHOLD / 4));
 const LATE_PENDING_HOURS = 24;
 const LATE_NEXT_STEP_HOURS = 12;
 const RECENT_ORDER_WINDOW_HOURS = 24;

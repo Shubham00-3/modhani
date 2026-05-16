@@ -987,6 +987,17 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_price_tier: normalizePriceTier(action.payload.priceTier),
         p_enabled_product_ids: action.payload.enabledProductIds ?? [],
       });
+    case 'ADD_BATCH':
+      return callRpc(supabase, 'modhanios_log_production_batch', {
+        p_batch_id: action.payload.id,
+        p_batch_number: action.payload.batchNumber,
+        p_product_id: action.payload.productId,
+        p_production_date: action.payload.productionDate,
+        p_qty_produced: action.payload.qtyProduced,
+        p_user_id: currentUser.id,
+      });
+    case 'UPDATE_BATCH':
+      return upsertRow(supabase, 'batches', batchToDb(action.payload));
     case 'UPDATE_CUSTOMER_CONTACT': {
       const contact = action.payload;
       return callRpc(supabase, 'modhanios_update_customer_contact', {
@@ -1000,8 +1011,59 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
     case 'UPDATE_CUSTOMER_ASSIGNMENTS': {
       const { customerUserId, clientIds, locationIds } = action.payload;
 
-      // Delete existing assignments, then insert new ones.
-      // Using service_role via staff RLS, so staff can do all operations.
+      // Snapshot the existing rows BEFORE deleting so we can rollback if
+      // any subsequent step fails. Supabase doesn't expose multi-table
+      // transactions to the client, so this is a best-effort manual undo.
+      const [existingClientsResult, existingLocationsResult, existingContactResult] =
+        await Promise.all([
+          supabase
+            .from('customer_client_assignments')
+            .select('customer_user_id, client_id')
+            .eq('customer_user_id', customerUserId),
+          supabase
+            .from('customer_location_assignments')
+            .select('customer_user_id, location_id')
+            .eq('customer_user_id', customerUserId),
+          supabase
+            .from('customer_contacts')
+            .select('client_id')
+            .eq('user_id', customerUserId)
+            .maybeSingle(),
+        ]);
+
+      if (existingClientsResult.error) return { error: existingClientsResult.error };
+      if (existingLocationsResult.error) return { error: existingLocationsResult.error };
+      if (existingContactResult.error) return { error: existingContactResult.error };
+
+      const existingClients = existingClientsResult.data ?? [];
+      const existingLocations = existingLocationsResult.data ?? [];
+      const existingContact = existingContactResult.data ?? null;
+
+      const rollback = async () => {
+        // Try to restore previous state; ignore errors so we don't mask the
+        // original failure that triggered the rollback.
+        await supabase
+          .from('customer_client_assignments')
+          .delete()
+          .eq('customer_user_id', customerUserId);
+        await supabase
+          .from('customer_location_assignments')
+          .delete()
+          .eq('customer_user_id', customerUserId);
+        if (existingClients?.length) {
+          await supabase.from('customer_client_assignments').insert(existingClients);
+        }
+        if (existingLocations?.length) {
+          await supabase.from('customer_location_assignments').insert(existingLocations);
+        }
+        if (existingContact) {
+          await supabase
+            .from('customer_contacts')
+            .update({ client_id: existingContact.client_id ?? null })
+            .eq('user_id', customerUserId);
+        }
+      };
+
       const { error: delClientErr } = await supabase
         .from('customer_client_assignments')
         .delete()
@@ -1012,7 +1074,10 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         .from('customer_location_assignments')
         .delete()
         .eq('customer_user_id', customerUserId);
-      if (delLocErr) return { error: delLocErr };
+      if (delLocErr) {
+        await rollback();
+        return { error: delLocErr };
+      }
 
       if (clientIds.length > 0) {
         const clientRows = clientIds.map((cid) => ({
@@ -1022,7 +1087,10 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         const { error: insClientErr } = await supabase
           .from('customer_client_assignments')
           .insert(clientRows);
-        if (insClientErr) return { error: insClientErr };
+        if (insClientErr) {
+          await rollback();
+          return { error: insClientErr };
+        }
       }
 
       if (locationIds.length > 0) {
@@ -1033,7 +1101,10 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         const { error: insLocErr } = await supabase
           .from('customer_location_assignments')
           .insert(locationRows);
-        if (insLocErr) return { error: insLocErr };
+        if (insLocErr) {
+          await rollback();
+          return { error: insLocErr };
+        }
       }
 
       // Also update the legacy client_id on customer_contacts for backward compat.
@@ -1041,7 +1112,10 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         .from('customer_contacts')
         .update({ client_id: clientIds[0] || null })
         .eq('user_id', customerUserId);
-      if (contactUpdateErr) return { error: contactUpdateErr };
+      if (contactUpdateErr) {
+        await rollback();
+        return { error: contactUpdateErr };
+      }
 
       return { error: null };
     }

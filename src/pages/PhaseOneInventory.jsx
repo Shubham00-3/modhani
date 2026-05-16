@@ -11,14 +11,7 @@ import {
   getProductOrderUnitLabel,
   hasProductImage,
 } from '../data/phaseOneData';
-
-const LOW_STOCK_THRESHOLD = 20;
-
-function getStockStatus(totalRemaining) {
-  if (totalRemaining <= 0) return 'out';
-  if (totalRemaining <= LOW_STOCK_THRESHOLD) return 'low';
-  return 'in';
-}
+import { LOW_STOCK_THRESHOLD, getStockStatus } from '../lib/inventoryThresholds';
 
 function getStockStatusLabel(status) {
   if (status === 'out') return 'Out of stock';

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { AlertTriangle, FlaskConical, Plus, RotateCcw, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
+import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
 import {
   formatDate,
   getItemOutstandingQty,
@@ -206,6 +207,7 @@ export default function PhaseOneProductionBatches() {
 }
 
 function LogProductionModal({ onClose, onSave }) {
+  useModalBehavior(onClose);
   const { state, addToast } = useApp();
   const [productId, setProductId] = useState('');
   const [productSearch, setProductSearch] = useState('');
@@ -244,7 +246,7 @@ function LogProductionModal({ onClose, onSave }) {
   const showProductSuggestions = isProductSearchFocused && productSearch.trim() && !productId;
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">

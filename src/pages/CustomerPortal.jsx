@@ -88,7 +88,13 @@ export default function CustomerPortal() {
   }
 
   if (!portal) {
-    return <div>Loading customer portal...</div>;
+    return (
+      <section className="customer-portal-panel customer-pending-panel">
+        <div className="cp-loading-spinner" aria-hidden="true" />
+        <h2>Loading your portal…</h2>
+        <p>Fetching your catalogue and recent orders.</p>
+      </section>
+    );
   }
 
   if (!portal.contact) {
@@ -242,7 +248,13 @@ export default function CustomerPortal() {
                   <strong>{formatCurrency(product.clientPrice)}</strong>
                 </div>
                 <div className="customer-product-actions">
-                  <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity - 1)} aria-label={`Decrease ${getProductDisplayName(product)}`}>
+                  <button
+                    className="btn btn-secondary btn-icon"
+                    type="button"
+                    onClick={() => updateProductQuantity(product.id, numericQuantity - 1)}
+                    disabled={numericQuantity <= 0}
+                    aria-label={`Decrease ${getProductDisplayName(product)}`}
+                  >
                     <Minus size={16} />
                   </button>
                   <input
@@ -379,7 +391,13 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
 
           <div className="cp-detail-actions">
             <div className="cp-detail-qty">
-              <button className="btn btn-secondary btn-icon" type="button" onClick={() => onQuantityChange(numericQuantity - 1)}>
+              <button
+                className="btn btn-secondary btn-icon"
+                type="button"
+                onClick={() => onQuantityChange(numericQuantity - 1)}
+                disabled={numericQuantity <= 0}
+                aria-label="Decrease quantity"
+              >
                 <Minus size={18} />
               </button>
               <input
@@ -390,7 +408,12 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
                 value={quantity}
                 onChange={(e) => onQuantityChange(e.target.value)}
               />
-              <button className="btn btn-secondary btn-icon" type="button" onClick={() => onQuantityChange(numericQuantity + 1)}>
+              <button
+                className="btn btn-secondary btn-icon"
+                type="button"
+                onClick={() => onQuantityChange(numericQuantity + 1)}
+                aria-label="Increase quantity"
+              >
                 <Plus size={18} />
               </button>
             </div>

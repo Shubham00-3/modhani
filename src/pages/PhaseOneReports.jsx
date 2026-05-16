@@ -233,6 +233,7 @@ export default function PhaseOneReports() {
           <option value="fulfilled">Fulfilled</option>
           <option value="invoiced">Invoiced</option>
           <option value="shipped">Shipped</option>
+          <option value="delivered">Delivered</option>
           <option value="declined">Declined</option>
         </select>
         <input className="form-input" type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
@@ -381,6 +382,14 @@ export default function PhaseOneReports() {
               <tr
                 key={order.id}
                 onClick={() => setSelectedOrderId(order.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setSelectedOrderId(order.id);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
                 style={{ cursor: 'pointer' }}
                 title={`Open drill-down for Order #${order.orderNumber}`}
               >

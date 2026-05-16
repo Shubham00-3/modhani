@@ -1039,6 +1039,19 @@
   color: var(--color-secondary);
   width: 48px; height: 48px;
 }
+
+.cp-loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--color-border, #e5e7eb);
+  border-top-color: var(--color-primary, #10261a);
+  border-radius: 50%;
+  animation: cpLoadingSpin 0.9s linear infinite;
+}
+
+@keyframes cpLoadingSpin {
+  to { transform: rotate(360deg); }
+}
 .customer-profile-form {
   max-width: 400px;
   display: flex;

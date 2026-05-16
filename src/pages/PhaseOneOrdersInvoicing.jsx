@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { useApp } from '../context/useApp';
+import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
 import {
   formatCurrency,
   formatDate,
@@ -368,7 +369,19 @@ export default function PhaseOneOrdersInvoicing() {
               </thead>
               <tbody>
                 {filteredOrders.map((order) => (
-                  <tr key={order.id} onClick={() => openOrder(order.id)}>
+                  <tr
+                    key={order.id}
+                    onClick={() => openOrder(order.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openOrder(order.id);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <td className="cell-monospace">#{order.orderNumber}</td>
                     <td>
                       <span className={`badge badge-${order.status}`}>{order.status}</span>
@@ -422,12 +435,18 @@ export default function PhaseOneOrdersInvoicing() {
 
             <div className="slide-panel-body">
               {showFulfilment ? (
-                <FulfilmentPanel order={selectedOrder} onBack={() => {
-                  dispatch({
+                <FulfilmentPanel order={selectedOrder} onBack={async () => {
+                  // Await the unlock so we surface server errors as toasts
+                  // (dispatch already does that on failure) instead of
+                  // silently leaving the order locked.
+                  const result = await dispatch({
                     type: 'UNLOCK_ORDER',
                     payload: { orderId: selectedOrder.id, userId: state.currentUser.id },
                   });
+                  // Even if unlock failed, drop out of the fulfilment view so
+                  // the user isn't stuck; the toast tells them what happened.
                   setShowFulfilment(false);
+                  return result;
                 }} />
               ) : (
                 <OrderDetailPanel
@@ -1014,6 +1033,7 @@ function FulfilmentPanel({ order, onBack }) {
 }
 
 function InvoiceModal({ order, onClose }) {
+  useModalBehavior(onClose);
   const { state, dispatch, addToast } = useApp();
   const client = state.clients.find((entry) => entry.id === order.clientId);
   const location = state.locations.find((entry) => entry.id === order.locationId);
@@ -1080,7 +1100,7 @@ function InvoiceModal({ order, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Create Invoice</h3>
@@ -1168,6 +1188,7 @@ function InvoiceModal({ order, onClose }) {
 }
 
 function EditInvoiceModal({ order, onClose }) {
+  useModalBehavior(onClose);
   const { state, dispatch, addToast } = useApp();
   const location = state.locations.find((entry) => entry.id === order.locationId);
   const invoiceLines = order.items.filter((item) => item.fulfilledQty > 0);
@@ -1271,7 +1292,7 @@ function EditInvoiceModal({ order, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
       <div className="modal modal-order" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Edit Invoice {order.invoiceNumber}</h3>
@@ -1414,8 +1435,12 @@ function AddOrderModal({ onClose }) {
     () => state.locations.find((location) => location.clientId === (state.clients[0]?.id ?? ''))?.id ?? ''
   );
   const [source, setSource] = useState('portal');
+  // Skip Escape-close while a save is in flight so a stray keypress can't
+  // dismiss the modal mid-save (overlay click is already gated by `saving`).
+  // The `saving` ref is read below — we wire it after the state is declared.
   const [lines, setLines] = useState([{ id: 'line-1', productId: '', quantity: '' }]);
   const [saving, setSaving] = useState(false);
+  useModalBehavior(onClose, { enabled: !saving });
 
   const locationOptions = state.locations.filter((location) => location.clientId === clientId);
 
@@ -1544,7 +1569,7 @@ function AddOrderModal({ onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={saving ? undefined : onClose}>
+    <div className="modal-overlay" onClick={saving ? undefined : handleOverlayClick(onClose)}>
       <div className="modal modal-order" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">Add Incoming Order</h3>

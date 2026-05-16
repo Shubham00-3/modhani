@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { supabase } from '../lib/supabaseClient';
+import { useModalBehavior } from '../hooks/useModalBehavior';
 
 export default function PhaseOneCustomers() {
   const { state, dispatch, addToast } = useApp();
@@ -396,10 +397,10 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
         addToast(`Customer ${contact.email} has been permanently removed.`);
       }
 
-      // Navigate to root to reflect the deletion.
-      setTimeout(() => {
-        window.location.href = '/';
-      }, 800);
+      // Realtime subscription on customer_contacts will refresh the list
+      // automatically; no need to hard-reload the page.
+      setShowDeleteConfirm(false);
+      setDeleting(false);
     } catch (fetchError) {
       addToast(fetchError.message || 'Network error.', 'warning');
       setDeleting(false);
@@ -546,6 +547,7 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
   const [selectedLocationIds, setSelectedLocationIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  useModalBehavior(onClose, { enabled: !submitting });
 
   const filteredLocations = useMemo(
     () => locations.filter((loc) => selectedClientIds.includes(loc.clientId)),
@@ -627,10 +629,8 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
 
       onSuccess();
 
-      // Force a page reload to pick up the new customer contact from the server.
-      setTimeout(() => {
-        window.location.reload();
-      }, 1200);
+      // Realtime subscription on customer_contacts will pick up the new
+      // contact automatically. No need for a hard page reload.
     } catch (fetchError) {
       setError(fetchError.message || 'Network error. Please try again.');
     }

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
+import { useModalBehavior, handleOverlayClick } from '../../hooks/useModalBehavior';
 import {
   PRICE_TIERS,
   formatCurrency,
@@ -546,9 +547,10 @@ export function PricingModal({ clientId, onClose }) {
 
 function SimpleModal({ title, children, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
+  useModalBehavior(onClose, { enabled: !saving });
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={saving ? undefined : handleOverlayClick(onClose)}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
           <h3 className="modal-title">{title}</h3>
