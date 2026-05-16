@@ -7,6 +7,7 @@ import {
   Package,
   Plus,
   Printer,
+  Trash2,
   Truck,
   X,
 } from 'lucide-react';
@@ -1615,7 +1616,7 @@ function AddOrderModal({ onClose }) {
             ))}
           </div>
 
-          <button className="btn btn-secondary" type="button" onClick={addLine}>
+          <button className="add-line-item-btn" type="button" onClick={addLine}>
             <Plus size={16} /> Add Line Item
           </button>
         </div>
@@ -1633,12 +1634,13 @@ function AddOrderModal({ onClose }) {
 }
 
 function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) {
+  const selectedProduct = getProduct(products, line.productId);
   return (
     <div className="order-line-editor">
       <div className="form-group">
         <label className="form-label">Product</label>
         <div className="product-select-with-thumb">
-          <ProductThumbnail product={getProduct(products, line.productId)} />
+          <ProductThumbnail product={selectedProduct} />
           <SearchableSelect
             value={line.productId}
             options={products}
@@ -1673,14 +1675,16 @@ function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) 
           onChange={(event) => onUpdateLine({ quantity: event.target.value })}
         />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'end', paddingBottom: '2px' }}>
+      <div className="order-line-remove-wrap">
         <button
-          className="btn btn-ghost btn-sm"
+          className="order-line-remove"
           type="button"
           disabled={lines.length === 1}
           onClick={onRemoveLine}
+          aria-label="Remove line item"
+          title="Remove line item"
         >
-          Remove Line
+          <Trash2 size={16} />
         </button>
       </div>
     </div>
@@ -1766,6 +1770,16 @@ function SearchableSelect({
 }
 
 function ProductThumbnail({ product }) {
+  // When no product is selected, render a neutral package icon instead of
+  // a stranded image — keeps the row visually balanced.
+  if (!product) {
+    return (
+      <div className="product-thumb product-thumb-sm product-thumb-empty" title="Select a product">
+        <Package size={18} />
+      </div>
+    );
+  }
+
   const imageUrl = getProductImageUrl(product, { fallback: true });
   const usesFallback = !hasProductImage(product);
 
