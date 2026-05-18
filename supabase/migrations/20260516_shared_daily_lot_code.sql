@@ -18,8 +18,19 @@
 alter table public.batches
   drop constraint if exists batches_batch_number_key;
 
-alter table public.batches
-  add constraint batches_product_batch_unique unique (product_id, batch_number);
+-- Idempotent add: skip if a previous run already created the compound unique.
+do $$
+begin
+  if not exists (
+    select 1
+      from pg_constraint
+     where conname = 'batches_product_batch_unique'
+       and conrelid = 'public.batches'::regclass
+  ) then
+    alter table public.batches
+      add constraint batches_product_batch_unique unique (product_id, batch_number);
+  end if;
+end$$;
 
 create index if not exists batches_batch_number_production_date_idx
   on public.batches (batch_number, production_date);
