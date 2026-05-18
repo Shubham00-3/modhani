@@ -850,16 +850,23 @@ export function AppProvider({ children }) {
       const identity = await fetchAuthIdentity(supabase, user.id);
       const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
       const tokenType = hashParams.get('type');
-      const needsPasswordSetup = tokenType === 'invite' || tokenType === 'recovery';
+      // Two signals point at "the user just clicked an invite or reset email
+      // and still needs to choose a password":
+      //   - URL hash carries `type=invite` (new invite) or `type=recovery` (reset)
+      //   - the user metadata flag we set on invite (cleared after they submit)
+      const needsPasswordSetup =
+        tokenType === 'invite'
+        || tokenType === 'recovery'
+        || user.user_metadata?.must_change_password === true;
 
       if (identity === 'staff') {
-        baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } });
+        baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup } });
         await loadRemoteData(user.id);
         return;
       }
 
       if (identity === 'driver') {
-        baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } });
+        baseDispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup } });
         await loadDriverPortalData(user.id);
         return;
       }
@@ -991,9 +998,9 @@ export function AppProvider({ children }) {
     if (!supabase) return undefined;
     if (!state.isAuthenticated || !state.currentUserId) return undefined;
     if (!state.authRole) return undefined;
-    // Don't subscribe while a customer is still in the password-setup flow —
+    // Don't subscribe while a user is still in the password-setup flow —
     // a realtime refresh would clobber the needsPasswordSetup flag.
-    if (state.authRole === 'customer' && state.needsPasswordSetup) return undefined;
+    if (state.needsPasswordSetup) return undefined;
 
     let refreshTimer = null;
     const userId = state.currentUserId;

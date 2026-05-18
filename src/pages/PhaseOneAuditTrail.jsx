@@ -24,6 +24,13 @@ const ACTION_LABELS = {
   location_saved: 'Location Saved',
   client_pricing_updated: 'Client Pricing Updated',
   user_permissions_updated: 'User Permissions Updated',
+  staff_invited: 'Staff Invited',
+  driver_invited: 'Driver Invited',
+  customer_invited: 'Customer Invited',
+  staff_removed: 'Staff Removed',
+  driver_removed: 'Driver Removed',
+  customer_removed: 'Customer Removed',
+  password_reset_sent: 'Password Reset Sent',
   quickbooks_settings_updated: 'QuickBooks Settings Updated',
   order_balance_declined: 'Remaining Balance Declined',
 };

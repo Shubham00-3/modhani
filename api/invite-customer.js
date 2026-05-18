@@ -63,7 +63,7 @@ export default async function handler(req, res) {
 
   const { data: staffProfile, error: staffError } = await supabase
     .from('profiles')
-    .select('user_id, manage_settings')
+    .select('user_id, manage_settings, full_name')
     .eq('user_id', caller.id)
     .maybeSingle();
 
@@ -134,6 +134,7 @@ export default async function handler(req, res) {
     });
 
   if (insertError) {
+    await writeCustomerInviteAudit(supabase, caller, staffProfile, trimmedEmail, trimmedName, 'Invite sent, contact record failed');
     return res.status(207).json({
       ok: true,
       userId,
@@ -152,6 +153,7 @@ export default async function handler(req, res) {
       .insert(clientRows);
 
     if (clientAssignError) {
+      await writeCustomerInviteAudit(supabase, caller, staffProfile, trimmedEmail, trimmedName, 'Invite sent, company assignments failed');
       return res.status(207).json({
         ok: true,
         userId,
@@ -171,6 +173,7 @@ export default async function handler(req, res) {
       .insert(locationRows);
 
     if (locationAssignError) {
+      await writeCustomerInviteAudit(supabase, caller, staffProfile, trimmedEmail, trimmedName, 'Invite sent, location assignments failed');
       return res.status(207).json({
         ok: true,
         userId,
@@ -178,6 +181,8 @@ export default async function handler(req, res) {
       });
     }
   }
+
+  await writeCustomerInviteAudit(supabase, caller, staffProfile, trimmedEmail, trimmedName, 'Customer invited');
 
   return res.status(200).json({
     ok: true,
@@ -209,4 +214,17 @@ function normalizeIdArray(arrayValue, legacySingleValue) {
   }
 
   return [...new Set(combined.map((id) => String(id).trim()).filter(Boolean))];
+}
+
+async function writeCustomerInviteAudit(supabase, caller, staffProfile, email, fullName, outcome) {
+  await supabase.rpc('modhanios_insert_audit', {
+    p_action: 'customer_invited',
+    p_order_id: null,
+    p_client_id: null,
+    p_user_id: caller.id,
+    p_user_name: staffProfile.full_name ?? caller.email ?? 'Unknown user',
+    p_details: `${outcome}: ${fullName} (${email})`,
+    p_previous_value: null,
+    p_new_value: email,
+  }).then(() => null, () => null);
 }

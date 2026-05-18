@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ArrowRight, CheckCircle2, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 
-export default function SetPasswordScreen({ onComplete }) {
+export default function SetPasswordScreen({ authRole, onComplete }) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -27,11 +27,14 @@ export default function SetPasswordScreen({ onComplete }) {
 
     const { data: userResult, error: userError } = await supabase.auth.getUser();
     const user = userResult?.user;
-    const isCustomerPasswordSetupSession = user?.user_metadata?.account_type === 'customer';
+    const accountType = user?.user_metadata?.account_type;
+    const isValidSetupSession =
+      ['customer', 'staff', 'driver'].includes(accountType)
+      || ['customer', 'staff', 'driver'].includes(authRole);
 
-    if (userError || !user || !isCustomerPasswordSetupSession) {
+    if (userError || !user || !isValidSetupSession) {
       await supabase.auth.signOut();
-      setError('Password setup is only available for customer invite or password-reset sessions. Open the customer email link and try again.');
+      setError('Password setup is only available from an invite or password-reset email link. Open that email and try again.');
       setSubmitting(false);
       return;
     }
@@ -68,7 +71,7 @@ export default function SetPasswordScreen({ onComplete }) {
               Set Your <span>Password</span>
             </h1>
             <p>
-              Create a secure password to access your Modhani customer portal.
+              Create a secure password to access your Modhani account.
             </p>
           </div>
 
@@ -112,7 +115,7 @@ export default function SetPasswordScreen({ onComplete }) {
             <div>
               <div className="auth-form-title">Create Your Password</div>
               <div className="auth-form-subtitle">
-                You'll use this password to sign in to the Customer Portal
+                You'll use this password to sign in to Modhani
               </div>
             </div>
           </div>

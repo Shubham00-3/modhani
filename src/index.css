@@ -3182,6 +3182,202 @@ input[type='checkbox']:disabled {
   font-weight: 500;
 }
 
+/* ---------- User Management section (Settings) ---------- */
+.user-mgmt-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.user-mgmt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.user-mgmt-tabs {
+  display: flex;
+  gap: var(--space-2);
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+  margin-bottom: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.user-mgmt-tab {
+  background: transparent;
+  border: 0;
+  padding: 8px 14px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.user-mgmt-tab:hover { color: var(--color-text); }
+.user-mgmt-tab.active {
+  color: var(--color-primary, #10261a);
+  border-bottom-color: var(--color-primary, #10261a);
+}
+.user-mgmt-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-bg-secondary, #f3f4f6);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+}
+.user-mgmt-tab.active .user-mgmt-tab-count {
+  background: var(--color-primary, #10261a);
+  color: #fff;
+}
+
+.user-mgmt-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.user-mgmt-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(160px, auto) auto;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 12px var(--space-2);
+  border-bottom: 1px solid var(--color-border-light, #f3f4f6);
+}
+.user-mgmt-row.expanded { background: var(--color-bg-secondary, #fafafa); }
+
+.user-mgmt-cell-main { min-width: 0; }
+.user-mgmt-name { font-weight: 700; }
+.user-mgmt-email {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  word-break: break-all;
+}
+
+.user-mgmt-cell-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.user-mgmt-self-tag {
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  color: var(--color-text-muted);
+  padding: 2px 8px;
+  border: 1px dashed var(--color-border, #e5e7eb);
+  border-radius: var(--radius-full);
+}
+
+.user-mgmt-cell-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.user-mgmt-remove:not(:disabled):hover {
+  color: #b91c1c;
+  background: #fef2f2;
+}
+
+.user-mgmt-perms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 var(--space-2) 14px;
+  background: var(--color-bg-secondary, #fafafa);
+}
+
+.user-mgmt-perm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-card, #fff);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.user-mgmt-perm-chip:disabled { cursor: not-allowed; opacity: 0.6; }
+.user-mgmt-perm-chip.on {
+  background: rgba(34, 197, 94, 0.10);
+  color: #15803d;
+  border-color: rgba(34, 197, 94, 0.30);
+}
+.user-mgmt-perm-chip.off { color: var(--color-text-muted); }
+.user-mgmt-perm-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: currentColor;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+/* Role radio group inside Add User modal */
+.role-radio-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.role-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  user-select: none;
+}
+.role-radio input { margin: 0; }
+.role-radio.active {
+  background: var(--color-primary-light, rgba(16, 38, 26, 0.08));
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.invite-perm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-2) 0;
+}
+.invite-perm-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Small visual helper used by table/list rows on narrow screens. */
+@media (max-width: 720px) {
+  .hidden-sm { display: none; }
+  .user-mgmt-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .user-mgmt-cell-actions { justify-content: flex-start; }
+}
+
 /* ---------- Form section divider (inside modals) ---------- */
 .form-section-divider {
   height: 1px;

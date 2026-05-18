@@ -48,10 +48,12 @@ export default function App() {
     return <AuthScreen />;
   }
 
-  // Only customer temp-password accounts should ever see this screen.
-  if (state.authRole === 'customer' && state.needsPasswordSetup) {
+  // Any newly invited user (staff, driver, or customer) lands here once on
+  // first sign-in to choose a password before reaching their portal.
+  if (state.needsPasswordSetup && ['customer', 'staff', 'driver'].includes(state.authRole)) {
     return (
       <SetPasswordScreen
+        authRole={state.authRole}
         onComplete={() => dispatch({ type: 'SET_AUTH_STATUS', payload: { needsPasswordSetup: false } })}
       />
     );

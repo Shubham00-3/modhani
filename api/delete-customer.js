@@ -50,7 +50,7 @@ export default async function handler(req, res) {
 
   const { data: staffProfile, error: staffError } = await supabase
     .from('profiles')
-    .select('user_id, manage_settings')
+    .select('user_id, manage_settings, full_name')
     .eq('user_id', caller.id)
     .maybeSingle();
 
@@ -106,6 +106,7 @@ export default async function handler(req, res) {
   const { error: deleteAuthError } = await supabase.auth.admin.deleteUser(customerUserId);
 
   if (deleteAuthError) {
+    await writeCustomerDeleteAudit(supabase, caller, staffProfile, contact, 'Customer record deleted, auth cleanup failed');
     // The contact record is already gone, warn about the auth orphan.
     return res.status(207).json({
       ok: true,
@@ -113,9 +114,24 @@ export default async function handler(req, res) {
     });
   }
 
+  await writeCustomerDeleteAudit(supabase, caller, staffProfile, contact, 'Customer removed');
+
   return res.status(200).json({
     ok: true,
     deletedUserId: customerUserId,
     deletedEmail: contact.email,
   });
+}
+
+async function writeCustomerDeleteAudit(supabase, caller, staffProfile, contact, outcome) {
+  await supabase.rpc('modhanios_insert_audit', {
+    p_action: 'customer_removed',
+    p_order_id: null,
+    p_client_id: null,
+    p_user_id: caller.id,
+    p_user_name: staffProfile.full_name ?? caller.email ?? 'Unknown user',
+    p_details: `${outcome}: ${contact.full_name} (${contact.email})`,
+    p_previous_value: contact.email,
+    p_new_value: null,
+  }).then(() => null, () => null);
 }

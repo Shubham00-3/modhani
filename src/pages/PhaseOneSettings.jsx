@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Mail, Settings2, Users } from 'lucide-react';
+import { Mail, Settings2 } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatDateTime } from '../data/phaseOneData';
+import UserManagementSection from '../components/settings/UserManagementSection';
 
 export default function PhaseOneSettings() {
   const { state, dispatch, addToast } = useApp();
@@ -17,15 +18,6 @@ export default function PhaseOneSettings() {
       .toLowerCase()
       .includes(dashboardSearch);
   };
-  const visibleUsers = state.users.filter((user) =>
-    settingSearchMatches([
-      'user roles staff permissions fulfil orders override prices manage settings',
-      'edit invoices',
-      user.name,
-      user.role,
-      user.email,
-    ])
-  );
   const visibleEmailClients = state.clients.filter((client) =>
     settingSearchMatches([
       'client email preferences packing slip invoice delivery method',
@@ -81,95 +73,17 @@ export default function PhaseOneSettings() {
         <SummaryCard label="Settings Admins" value={`${staffSummary.settings} staff`} />
       </div>
 
-      <div className="grid-2">
-        <div className="card">
-          <div className="card-title">
-            <Users size={18} /> User Roles
-          </div>
-          <div className="table-scroll-wrapper">
-            <table className="data-table data-table-compact data-table-permissions">
-              <thead>
-                <tr>
-                  <th>User</th>
-                  <th title="Fulfil Orders">Fulfil</th>
-                  <th title="Override Prices">Override</th>
-                  <th title="Edit Invoices">Invoices</th>
-                  <th title="Manage Settings">Settings</th>
-                </tr>
-              </thead>
-              <tbody>
-                {visibleUsers.map((user) => (
-                  <tr key={user.id}>
-                    <td style={{ fontWeight: 600 }}>{user.name}</td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={user.permissions.fulfilOrders}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                          dispatch({
-                            type: 'UPDATE_USER',
-                            payload: { id: user.id, permissions: { fulfilOrders: event.target.checked } },
-                          })
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={user.permissions.overridePrices}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                          dispatch({
-                            type: 'UPDATE_USER',
-                            payload: { id: user.id, permissions: { overridePrices: event.target.checked } },
-                          })
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(user.permissions.editInvoices)}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                          dispatch({
-                            type: 'UPDATE_USER',
-                            payload: { id: user.id, permissions: { editInvoices: event.target.checked } },
-                          })
-                        }
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={user.permissions.manageSettings}
-                        disabled={!canManage}
-                        onChange={(event) =>
-                          dispatch({
-                            type: 'UPDATE_USER',
-                            payload: { id: user.id, permissions: { manageSettings: event.target.checked } },
-                          })
-                        }
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      <UserManagementSection canManage={canManage} />
 
-        {showQuickBooksSettings ? (
-          <QuickBooksSettingsCard
-            key={`${state.quickBooks.companyName}:${state.quickBooks.connectorName}`}
-            canManage={canManage}
-            quickBooks={state.quickBooks}
-            dispatch={dispatch}
-            addToast={addToast}
-          />
-        ) : null}
-      </div>
+      {showQuickBooksSettings ? (
+        <QuickBooksSettingsCard
+          key={`${state.quickBooks.companyName}:${state.quickBooks.connectorName}`}
+          canManage={canManage}
+          quickBooks={state.quickBooks}
+          dispatch={dispatch}
+          addToast={addToast}
+        />
+      ) : null}
 
       <div className="card">
         <div className="card-title">
