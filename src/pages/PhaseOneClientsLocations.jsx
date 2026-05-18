@@ -24,6 +24,7 @@ export default function PhaseOneClientsLocations() {
       const clientLocations = state.locations.filter((location) => location.clientId === client.id);
       const searchableText = [
         client.name,
+        client.operatingAs,
         client.qbCustomerName,
         ...clientLocations.flatMap((location) => [
           location.name,
@@ -31,6 +32,9 @@ export default function PhaseOneClientsLocations() {
           location.addressLine1,
           location.addressLine2,
           location.postalCode,
+          location.repName,
+          location.repEmail,
+          location.repPhone,
         ]),
       ]
         .filter(Boolean)
@@ -104,7 +108,14 @@ export default function PhaseOneClientsLocations() {
                 <div key={client.id} className="card" style={{ padding: 'var(--space-4)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
                   <div>
-                    <div style={{ fontWeight: 700 }}>{client.name}</div>
+                    <div style={{ fontWeight: 700 }}>
+                      {client.operatingAs?.trim() || client.name}
+                    </div>
+                    {client.operatingAs?.trim() ? (
+                      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', marginTop: 2 }}>
+                        Legal name: {client.name}
+                      </div>
+                    ) : null}
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
                       {formatClientLocationScale(client, clientLocations.length)}
                     </div>
@@ -130,13 +141,23 @@ export default function PhaseOneClientsLocations() {
                       .map((location) => (
                         <button
                           key={location.id}
-                          className="btn btn-ghost btn-sm"
+                          className="btn btn-ghost btn-sm location-pill"
                           type="button"
                           disabled={!canManage}
                           onClick={() => setEditingLocation(location)}
+                          title={
+                            location.repName
+                              ? `Rep: ${location.repName}${location.repPhone ? ` • ${location.repPhone}` : ''}${location.repEmail ? ` • ${location.repEmail}` : ''}`
+                              : undefined
+                          }
                         >
-                          {location.name}
-                          {location.qbMappingStatus !== 'ready' ? ' - needs address' : ''}
+                          <span>
+                            {location.name}
+                            {location.qbMappingStatus !== 'ready' ? ' - needs address' : ''}
+                          </span>
+                          {location.repName ? (
+                            <span className="location-pill-rep">Rep: {location.repName}</span>
+                          ) : null}
                         </button>
                       ))
                   ) : (

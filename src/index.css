@@ -2398,6 +2398,18 @@ input[type='checkbox']:disabled {
   max-width: 760px;
 }
 
+/* Order detail modal — wider than the form modals so the line table fits. */
+.modal-order-detail {
+  max-width: 880px;
+  width: 92vw;
+}
+.modal-order-detail .modal-body {
+  /* Order panel can be long; allow scroll inside the body instead of growing
+     the viewport. The .modal already has max-height: 85vh so this just lets
+     long content scroll. */
+  overflow-y: auto;
+}
+
 .modal-header {
   display: flex;
   align-items: center;
@@ -3151,6 +3163,42 @@ input[type='checkbox']:disabled {
   accent-color: var(--color-primary);
   cursor: pointer;
   margin: 0;
+}
+
+/* ---------- Location pill with rep subtitle ---------- */
+.location-pill {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  text-align: left;
+  height: auto;
+}
+.location-pill-rep {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* ---------- Form section divider (inside modals) ---------- */
+.form-section-divider {
+  height: 1px;
+  background: var(--color-border-light, #e5e7eb);
+  margin: var(--space-4) 0 var(--space-3);
+}
+.form-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+}
+.form-section-hint {
+  margin-left: 6px;
+  font-weight: 500;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
 }
 
 /* ---------- Audit permission summaries ---------- */

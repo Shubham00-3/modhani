@@ -104,8 +104,8 @@ export function printPackingSlip({ order, clients, locations, products, batches 
   const shipTo = getOrderShipToSnapshot(order, location);
   const shipToAddress = formatAddressBlock(shipTo.name, shipTo);
   const logoSrc = getLogoSrc();
-  const lotCodes = getOrderLotCodes(order, batches);
-  const lotCodeLabel = lotCodes.length ? lotCodes.join(', ') : 'Not assigned';
+  // Lot codes are listed per line item below; no single value belongs in the
+  // packing slip header since one order can span many production lots.
   const rows = order.items
     .filter((item) => item.fulfilledQty > 0)
     .map((item) => {
@@ -144,7 +144,6 @@ export function printPackingSlip({ order, clients, locations, products, batches 
               </div>
             </div>
             <div style="text-align:right;">
-              <div><strong>Lot Code:</strong> ${lotCodeLabel}</div>
               <div><strong>Order #:</strong> ${order.orderNumber}</div>
               <div><strong>Date:</strong> ${formatDate(order.shippedAt ?? new Date().toISOString())}</div>
             </div>

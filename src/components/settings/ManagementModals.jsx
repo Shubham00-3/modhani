@@ -235,6 +235,7 @@ export function ClientModal({ client, onClose }) {
   const [form, setForm] = useState(
     client ?? {
       name: '',
+      operatingAs: '',
       locationCount: 1,
       deliveryMethod: 'email',
       emailPackingSlip: true,
@@ -292,6 +293,7 @@ export function ClientModal({ client, onClose }) {
             ...form,
             id: client?.id ?? `client-${Date.now()}`,
             name,
+            operatingAs: form.operatingAs?.trim() || '',
             locationCount,
             packingSlipEmail,
             invoiceEmail,
@@ -307,7 +309,17 @@ export function ClientModal({ client, onClose }) {
         return result.ok;
       }}
     >
-      <FormInput label="Client Name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
+      <FormInput
+        label="Client Name (Legal)"
+        value={form.name}
+        onChange={(value) => setForm((current) => ({ ...current, name: value }))}
+      />
+      <FormInput
+        label="Operating As (Friendly Name)"
+        placeholder="e.g. Bharat Bazaar"
+        value={form.operatingAs ?? ''}
+        onChange={(value) => setForm((current) => ({ ...current, operatingAs: value }))}
+      />
       <FormInput label="Location Count" type="number" value={form.locationCount} onChange={(value) => setForm((current) => ({ ...current, locationCount: Number(value) }))} />
       <FormInput label="Packing Slip Email" value={form.packingSlipEmail ?? ''} onChange={(value) => setForm((current) => ({ ...current, packingSlipEmail: value }))} />
       <FormInput label="Invoice Email" value={form.invoiceEmail ?? ''} onChange={(value) => setForm((current) => ({ ...current, invoiceEmail: value }))} />
@@ -330,6 +342,9 @@ export function LocationModal({ location, onClose }) {
       postalCode: '',
       country: 'Canada',
       qbShipToName: '',
+      repName: '',
+      repEmail: '',
+      repPhone: '',
     }
   );
 
@@ -347,9 +362,17 @@ export function LocationModal({ location, onClose }) {
         const postalCode = form.postalCode?.trim() ?? '';
         const country = (form.country || 'Canada').trim();
         const qbShipToName = (form.qbShipToName || name).trim();
+        const repName = form.repName?.trim() ?? '';
+        const repEmail = form.repEmail?.trim() ?? '';
+        const repPhone = form.repPhone?.trim() ?? '';
 
         if (!form.clientId || !name) {
           addToast('Select a client and location name.', 'warning');
+          return false;
+        }
+
+        if (repEmail && !isValidEmail(repEmail)) {
+          addToast('Enter a valid representative email.', 'warning');
           return false;
         }
 
@@ -380,6 +403,9 @@ export function LocationModal({ location, onClose }) {
             postalCode,
             country,
             qbShipToName,
+            repName,
+            repEmail,
+            repPhone,
             qbMappingStatus: addressLine1 && city && province && postalCode ? 'ready' : 'needs_address',
           },
         });
@@ -408,6 +434,28 @@ export function LocationModal({ location, onClose }) {
       <FormInput label="Province" value={form.province ?? ''} onChange={(value) => setForm((current) => ({ ...current, province: value }))} />
       <FormInput label="Postal Code" value={form.postalCode ?? ''} onChange={(value) => setForm((current) => ({ ...current, postalCode: value }))} />
       <FormInput label="Country" value={form.country ?? 'Canada'} onChange={(value) => setForm((current) => ({ ...current, country: value }))} />
+
+      <div className="form-section-divider" />
+      <div className="form-section-title">Location Representative <span className="form-section-hint">(optional)</span></div>
+      <FormInput
+        label="Rep Name"
+        placeholder="Person to contact for this location"
+        value={form.repName ?? ''}
+        onChange={(value) => setForm((current) => ({ ...current, repName: value }))}
+      />
+      <FormInput
+        label="Rep Email"
+        type="email"
+        value={form.repEmail ?? ''}
+        onChange={(value) => setForm((current) => ({ ...current, repEmail: value }))}
+      />
+      <FormInput
+        label="Rep Phone"
+        type="tel"
+        placeholder="e.g. (905) 555-0123"
+        value={form.repPhone ?? ''}
+        onChange={(value) => setForm((current) => ({ ...current, repPhone: value }))}
+      />
     </SimpleModal>
   );
 }
@@ -582,11 +630,17 @@ function SimpleModal({ title, children, onClose, onSave }) {
   );
 }
 
-function FormInput({ label, value, onChange, type = 'text' }) {
+function FormInput({ label, value, onChange, type = 'text', placeholder }) {
   return (
     <div className="form-group">
       <label className="form-label">{label}</label>
-      <input className="form-input" type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input
+        className="form-input"
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   );
 }

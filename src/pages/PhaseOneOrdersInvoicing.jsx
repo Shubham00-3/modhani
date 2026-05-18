@@ -159,6 +159,10 @@ export default function PhaseOneOrdersInvoicing() {
     setSelectedOrderId(null);
   }
 
+  // Wire up Escape-to-close + body-scroll-lock whenever the order detail
+  // modal is open. The hook is a no-op when the order isn't open.
+  useModalBehavior(closePanel, { enabled: Boolean(selectedOrder) });
+
   async function beginFulfilment(order) {
     if (!state.currentUser.permissions.fulfilOrders) {
       addToast('This user cannot fulfil orders.', 'warning');
@@ -416,24 +420,21 @@ export default function PhaseOneOrdersInvoicing() {
       </div>
 
       {selectedOrder ? (
-        <>
-          <div className="slide-panel-overlay" onClick={closePanel} />
-          <div className="slide-panel">
-            <div className="slide-panel-header">
+        <div className="modal-overlay" onClick={handleOverlayClick(closePanel)}>
+          <div className="modal modal-order-detail" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
               <div>
-                <h2 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700 }}>
-                  Order #{selectedOrder.orderNumber}
-                </h2>
-                <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                <h2 className="modal-title">Order #{selectedOrder.orderNumber}</h2>
+                <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 2 }}>
                   {getClientName(state.clients, selectedOrder.clientId)} - {getLocationName(state.locations, selectedOrder.locationId)}
                 </div>
               </div>
-              <button className="btn btn-ghost" type="button" onClick={closePanel}>
+              <button className="btn btn-ghost" type="button" onClick={closePanel} aria-label="Close order details">
                 <X size={18} />
               </button>
             </div>
 
-            <div className="slide-panel-body">
+            <div className="modal-body">
               {showFulfilment ? (
                 <FulfilmentPanel order={selectedOrder} onBack={async () => {
                   // Await the unlock so we surface server errors as toasts
@@ -487,7 +488,7 @@ export default function PhaseOneOrdersInvoicing() {
               )}
             </div>
           </div>
-        </>
+        </div>
       ) : null}
 
       {showInvoiceModal && selectedOrder ? <InvoiceModal order={selectedOrder} onClose={() => setShowInvoiceModal(false)} /> : null}

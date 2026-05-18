@@ -36,6 +36,7 @@ function clientToUi(client) {
     invoiceEmail: client.invoice_email,
     qbCustomerName: client.qb_customer_name ?? client.name,
     qbMappingStatus: client.qb_mapping_status ?? 'ready',
+    operatingAs: client.operating_as ?? '',
   };
 }
 
@@ -53,6 +54,9 @@ function locationToUi(location) {
     country: location.country ?? 'Canada',
     qbShipToName: location.qb_ship_to_name ?? location.name,
     qbMappingStatus: location.qb_mapping_status ?? 'needs_address',
+    repName: location.rep_name ?? '',
+    repEmail: location.rep_email ?? '',
+    repPhone: location.rep_phone ?? '',
   };
 }
 
@@ -227,6 +231,7 @@ function clientToDb(client) {
     invoice_email: client.invoiceEmail ?? null,
     qb_customer_name: client.qbCustomerName ?? client.name,
     qb_mapping_status: client.qbMappingStatus ?? 'ready',
+    operating_as: client.operatingAs?.trim() || null,
   };
 }
 
@@ -244,6 +249,9 @@ function locationToDb(location) {
     country: location.country ?? 'Canada',
     qb_ship_to_name: location.qbShipToName ?? location.name,
     qb_mapping_status: location.qbMappingStatus ?? 'needs_address',
+    rep_name: location.repName?.trim() || null,
+    rep_email: location.repEmail?.trim() || null,
+    rep_phone: location.repPhone?.trim() || null,
   };
 }
 
@@ -949,6 +957,7 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_packing_slip_email: client.packingSlipEmail ?? null,
         p_invoice_email: client.invoiceEmail ?? null,
         p_qb_customer_name: client.qbCustomerName ?? client.name,
+        p_operating_as: client.operatingAs?.trim() || null,
       });
     }
     case 'ADD_LOCATION':
@@ -967,6 +976,9 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_postal_code: location.postalCode ?? null,
         p_country: location.country ?? 'Canada',
         p_qb_ship_to_name: location.qbShipToName ?? location.name,
+        p_rep_name: location.repName?.trim() || null,
+        p_rep_email: location.repEmail?.trim() || null,
+        p_rep_phone: location.repPhone?.trim() || null,
       });
     }
     case 'SET_CLIENT_PRICING': {

@@ -1,9 +1,8 @@
 import { createElement, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { BarChart3, ClipboardList, ImageOff, Package, RefreshCw, ScrollText, Truck } from 'lucide-react';
+import { ClipboardList, ImageOff, Package, RefreshCw, ScrollText, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
-  formatClientLocationScale,
   formatCurrency,
   formatDate,
   formatTime,
@@ -144,49 +143,6 @@ export default function PhaseOneOverview() {
         || b.newestActivity - a.newestActivity;
     })
     .slice(0, 4);
-  const topClients = state.clients
-    .map((client) => {
-      const clientOrders = state.orders.filter((order) => order.clientId === client.id);
-      const clientLocations = state.locations.filter((location) => location.clientId === client.id);
-      const searchableText = [
-        client.name,
-        client.qbCustomerName,
-        ...clientLocations.flatMap((location) => [
-          location.name,
-          location.city,
-          location.province,
-          location.postalCode,
-          location.addressLine1,
-          location.addressLine2,
-        ]),
-        ...clientOrders.flatMap((order) => [
-          order.orderNumber,
-          order.status,
-          order.invoiceNumber,
-          order.qbInvoiceNumber,
-        ]),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
-
-      return {
-        id: client.id,
-        name: client.name,
-        orders: clientOrders.length,
-        value: clientOrders.reduce((sum, order) => sum + getOrderValue(order), 0),
-        locationCount: clientLocations.length,
-        locationLabel: formatClientLocationScale(
-          client,
-          clientLocations.length
-        ),
-        searchableText,
-      };
-    })
-    .filter((client) => !dashboardSearch || client.searchableText.includes(dashboardSearch))
-    .sort((a, b) => b.value - a.value || b.orders - a.orders)
-    .slice(0, 5);
-
   return (
     <div>
       <div className="dashboard-brand section">
@@ -242,35 +198,7 @@ export default function PhaseOneOverview() {
         />
       ) : null}
 
-      <div className="grid-2 section">
-        <div className="card">
-          <div className="card-title">
-            <BarChart3 size={18} /> Client Snapshot
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {topClients.length ? (
-              topClients.map((client) => (
-                <div key={client.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)' }}>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{client.name}</div>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      {client.orders} orders • {client.locationLabel}
-                    </div>
-                  </div>
-                  <div className="cell-monospace">{formatCurrency(client.value)}</div>
-                </div>
-              ))
-            ) : (
-              <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
-                <div className="empty-state-title">No client activity yet</div>
-                <div className="empty-state-description">
-                  Client revenue and order mix will appear here once incoming orders are created.
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
+      <div className="section">
         <div className="card">
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-4)', alignItems: 'center' }}>
             <div>
@@ -329,7 +257,10 @@ export default function PhaseOneOverview() {
       </div>
 
       <div className="card">
-        <div className="card-title">Recent Orders</div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-4)' }}>
+          <div className="card-title">Recent Orders</div>
+          <Link className="btn btn-secondary" to="/orders">View all</Link>
+        </div>
         <div className="table-scroll-wrapper">
         <table className="data-table">
           <thead>

@@ -201,6 +201,20 @@ export function getClientName(clients, clientId) {
   return clients.find((client) => client.id === clientId)?.name ?? 'Unknown client';
 }
 
+/**
+ * Friendly client label for pickers, tables, and reports. Returns the
+ * Operating-As name when set; falls back to the legal name. Pass a client
+ * object directly or a (clients, clientId) pair.
+ */
+export function getClientDisplayName(clientOrClients, maybeClientId) {
+  const client = Array.isArray(clientOrClients)
+    ? clientOrClients.find((entry) => entry.id === maybeClientId)
+    : clientOrClients;
+  if (!client) return 'Unknown client';
+  const operatingAs = client.operatingAs?.trim();
+  return operatingAs || client.name;
+}
+
 export function getLocationName(locations, locationId) {
   return locations.find((location) => location.id === locationId)?.name ?? 'Unknown location';
 }
