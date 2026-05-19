@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ChevronDown,
-  ChevronUp,
+  ChevronRight,
   DollarSign,
   Mail,
   MapPin,
@@ -11,11 +11,37 @@ import {
   Plus,
   Search,
   Settings2,
+  User,
   Users,
 } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatClientLocationScale } from '../data/phaseOneData';
 import { ClientModal, LocationModal, PricingModal } from '../components/settings/ManagementModals';
+
+function initialsOf(name) {
+  if (!name) return '?';
+  const parts = name.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// Stable pastel accent so each client has its own subtle identity color
+// while staying within the brand palette. Deterministic so the same client
+// keeps the same color on every page load.
+const ACCENT_PALETTE = [
+  { bg: '#dde7d7', fg: '#2e5a1c' }, // sage
+  { bg: '#e7d9c4', fg: '#7a4e1a' }, // wheat
+  { bg: '#d4dfe6', fg: '#1e4e6b' }, // dusty blue
+  { bg: '#e9d5d5', fg: '#8a3530' }, // rose
+  { bg: '#dcd9e9', fg: '#473a7a' }, // lavender
+  { bg: '#e2e2cd', fg: '#5c6020' }, // olive
+];
+function accentFor(id) {
+  let hash = 0;
+  for (let i = 0; i < (id ?? '').length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  return ACCENT_PALETTE[hash % ACCENT_PALETTE.length];
+}
 
 export default function PhaseOneClientsLocations() {
   const { state } = useApp();
@@ -43,19 +69,10 @@ export default function PhaseOneClientsLocations() {
         client.operatingAs,
         client.qbCustomerName,
         ...clientLocations.flatMap((location) => [
-          location.name,
-          location.city,
-          location.addressLine1,
-          location.addressLine2,
-          location.postalCode,
-          location.repName,
-          location.repEmail,
-          location.repPhone,
+          location.name, location.city, location.addressLine1, location.addressLine2,
+          location.postalCode, location.repName, location.repEmail, location.repPhone,
         ]),
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase();
+      ].filter(Boolean).join(' ').toLowerCase();
       return searchableText.includes(query);
     });
   }, [query, state.clients, state.locations]);
@@ -68,12 +85,10 @@ export default function PhaseOneClientsLocations() {
       return next;
     });
   }
-
   function isExpanded(clientId) {
     if (searching) return true;
     return expandedClientIds.has(clientId);
   }
-
   function handleAddLocationForClient(clientId) {
     setAddLocationClientId(clientId);
     setShowLocationModal(true);
@@ -115,29 +130,30 @@ export default function PhaseOneClientsLocations() {
         </div>
       ) : null}
 
-      <div className="card">
-        <div className="client-directory-header">
+      <div className="clients-directory">
+        <div className="clients-toolbar">
           <div>
-            <div className="card-title">
-              <Users size={18} /> Client Directory
+            <div className="clients-toolbar-title">
+              <Users size={18} />
+              <span>Client Directory</span>
             </div>
-            <div className="client-directory-count">
-              Showing {filteredClients.length.toLocaleString()} of {state.clients.length.toLocaleString()} clients
+            <div className="clients-toolbar-count">
+              {filteredClients.length.toLocaleString()} of {state.clients.length.toLocaleString()}
             </div>
           </div>
-          <label className="client-directory-search">
-            <Search size={16} />
+          <label className="clients-toolbar-search">
+            <Search size={15} />
             <input
               type="search"
               value={clientSearch}
               onChange={(event) => setClientSearch(event.target.value)}
-              placeholder="Search clients or locations..."
+              placeholder="Search clients, locations, contacts..."
             />
           </label>
         </div>
 
         {filteredClients.length ? (
-          <div className="cl-list">
+          <div className="clients-list">
             {filteredClients.map((client) => {
               const clientLocations = state.locations.filter((l) => l.clientId === client.id);
               const enabledProductCount = state.clientPricing.filter(
@@ -146,62 +162,54 @@ export default function PhaseOneClientsLocations() {
               const open = isExpanded(client.id);
               const displayName = client.operatingAs?.trim() || client.name;
               const hasOperatingAs = Boolean(client.operatingAs?.trim());
+              const accent = accentFor(client.id);
 
               return (
-                <article key={client.id} className={`cl-card ${open ? 'is-open' : ''}`}>
+                <article key={client.id} className={`client-row ${open ? 'is-open' : ''}`}>
                   <button
                     type="button"
-                    className="cl-card-header"
+                    className="client-row-header"
                     onClick={() => toggleClient(client.id)}
                     aria-expanded={open}
                   >
-                    <div className="cl-card-header-text">
-                      <h3 className="cl-card-name">{displayName}</h3>
-                      <div className="cl-card-subtitle">
-                        {hasOperatingAs ? <span>{client.name}</span> : null}
-                        {hasOperatingAs ? <span className="cl-dot" /> : null}
+                    <span
+                      className="client-avatar"
+                      style={{ background: accent.bg, color: accent.fg }}
+                      aria-hidden="true"
+                    >
+                      {initialsOf(displayName)}
+                    </span>
+
+                    <div className="client-row-text">
+                      <div className="client-row-title">
+                        <span className="client-row-name">{displayName}</span>
+                        {hasOperatingAs ? (
+                          <span className="client-row-legal">{client.name}</span>
+                        ) : null}
+                      </div>
+                      <div className="client-row-meta">
                         <span>
-                          {clientLocations.length}{' '}
-                          {clientLocations.length === 1 ? 'location' : 'locations'}
+                          <MapPin size={12} />
+                          {clientLocations.length} {clientLocations.length === 1 ? 'location' : 'locations'}
                         </span>
-                        <span className="cl-dot" />
+                        <span className="client-row-divider" />
                         <span>Tier {client.priceTier ?? 1}</span>
+                        <span className="client-row-divider" />
+                        <span>{enabledProductCount.toLocaleString()} products</span>
                       </div>
                     </div>
-                    <span className="cl-chev" aria-hidden="true">
-                      {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+
+                    <span className={`client-row-chev ${open ? 'is-open' : ''}`} aria-hidden="true">
+                      <ChevronRight size={18} />
                     </span>
                   </button>
 
                   {open ? (
-                    <div className="cl-card-body">
-                      {/* Quick-facts row + actions */}
-                      <div className="cl-facts">
-                        <div className="cl-fact">
-                          <span className="cl-fact-label">Legal name</span>
-                          <span className="cl-fact-value">{client.name}</span>
-                        </div>
-                        <div className="cl-fact">
-                          <span className="cl-fact-label">QuickBooks customer</span>
-                          <span className="cl-fact-value">{client.qbCustomerName || client.name}</span>
-                        </div>
-                        <div className="cl-fact">
-                          <span className="cl-fact-label">Scale</span>
-                          <span className="cl-fact-value">
-                            {formatClientLocationScale(client, clientLocations.length)}
-                          </span>
-                        </div>
-                        <div className="cl-fact">
-                          <span className="cl-fact-label">Pricing</span>
-                          <span className="cl-fact-value">
-                            Tier {client.priceTier ?? 1} - {enabledProductCount.toLocaleString()} products
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="cl-actions">
+                    <div className="client-row-detail">
+                      {/* Primary actions, prominent */}
+                      <div className="client-detail-actions">
                         <button
-                          className="btn btn-secondary btn-sm"
+                          className="btn btn-primary btn-sm"
                           type="button"
                           disabled={!canManage}
                           onClick={() => setPricingClientId(client.id)}
@@ -209,18 +217,39 @@ export default function PhaseOneClientsLocations() {
                           <DollarSign size={14} /> Pricing &amp; Products
                         </button>
                         <button
-                          className="btn btn-ghost btn-sm"
+                          className="btn btn-secondary btn-sm"
                           type="button"
                           disabled={!canManage}
                           onClick={() => setEditingClient(client)}
                         >
-                          <Pencil size={14} /> Edit client info
+                          <Pencil size={14} /> Edit details
                         </button>
                       </div>
 
-                      {/* Locations */}
-                      <div className="cl-locations">
-                        <div className="cl-locations-header">
+                      {/* Clean key/value details with no shouty caps */}
+                      <dl className="client-detail-meta">
+                        <div>
+                          <dt>Legal name</dt>
+                          <dd>{client.name}</dd>
+                        </div>
+                        <div>
+                          <dt>QuickBooks customer</dt>
+                          <dd>{client.qbCustomerName || client.name}</dd>
+                        </div>
+                        <div>
+                          <dt>Scale</dt>
+                          <dd>{formatClientLocationScale(client, clientLocations.length)}</dd>
+                        </div>
+                        <div>
+                          <dt>Pricing tier</dt>
+                          <dd>
+                            Tier {client.priceTier ?? 1} - {enabledProductCount.toLocaleString()} visible products
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <div className="client-locations-block">
+                        <div className="client-locations-heading">
                           <h4>Locations</h4>
                           <button
                             className="btn btn-ghost btn-sm"
@@ -233,21 +262,20 @@ export default function PhaseOneClientsLocations() {
                         </div>
 
                         {clientLocations.length === 0 ? (
-                          <p className="cl-locations-empty">
-                            No locations yet. Use <em>Add Location</em> to create the first one.
-                          </p>
+                          <div className="client-locations-empty">
+                            No locations yet for this client.
+                          </div>
                         ) : (
-                          <ul className="cl-location-list">
+                          <div className="client-locations-grid">
                             {clientLocations.map((location) => (
-                              <li key={location.id}>
-                                <LocationRow
-                                  location={location}
-                                  canManage={canManage}
-                                  onEdit={() => setEditingLocation(location)}
-                                />
-                              </li>
+                              <LocationTile
+                                key={location.id}
+                                location={location}
+                                canManage={canManage}
+                                onEdit={() => setEditingLocation(location)}
+                              />
                             ))}
-                          </ul>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -258,7 +286,9 @@ export default function PhaseOneClientsLocations() {
           </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
-            <div className="empty-state-title">{state.clients.length ? 'No clients match that search' : 'No clients configured yet'}</div>
+            <div className="empty-state-title">
+              {state.clients.length ? 'No clients match that search' : 'No clients configured yet'}
+            </div>
             <div className="empty-state-description">
               {state.clients.length
                 ? 'Try searching by customer name, location, city, address, or postal code.'
@@ -271,10 +301,7 @@ export default function PhaseOneClientsLocations() {
       {showClientModal || editingClient ? (
         <ClientModal
           client={editingClient}
-          onClose={() => {
-            setShowClientModal(false);
-            setEditingClient(null);
-          }}
+          onClose={() => { setShowClientModal(false); setEditingClient(null); }}
         />
       ) : null}
 
@@ -295,10 +322,11 @@ export default function PhaseOneClientsLocations() {
 }
 
 /**
- * Single location rendered as a clean row: name + address + contact info
- * inline; edit pencil on the right. No nested boxed card.
+ * Compact, visually distinct tile for a single delivery location. Includes
+ * the address and (optionally) the on-site representative contact. Designed
+ * to read at a glance; edit is an explicit pencil button.
  */
-function LocationRow({ location, canManage, onEdit }) {
+function LocationTile({ location, canManage, onEdit }) {
   const street = [location.addressLine1, location.addressLine2].filter(Boolean).join(' ');
   const cityPostal = [location.city, location.province, location.postalCode].filter(Boolean).join(' ');
   const fullAddress = [street, cityPostal].filter(Boolean).join(', ');
@@ -306,49 +334,53 @@ function LocationRow({ location, canManage, onEdit }) {
   const hasContact = Boolean(location.repName || location.repEmail || location.repPhone);
 
   return (
-    <div className={`cl-location-row ${needsAddress ? 'is-warning' : ''}`}>
-      <div className="cl-location-main">
-        <div className="cl-location-name-row">
-          <span className="cl-location-name">{location.name}</span>
-          {needsAddress ? <span className="cl-tag cl-tag-warn">Needs address</span> : null}
+    <div className={`location-tile ${needsAddress ? 'is-warning' : ''}`}>
+      <header className="location-tile-header">
+        <div className="location-tile-title">
+          <span className="location-tile-name">{location.name}</span>
+          {needsAddress ? <span className="location-tile-tag">Needs address</span> : null}
         </div>
-        <div className="cl-location-address">
-          <MapPin size={13} />
-          <span>{fullAddress || 'No address set yet'}</span>
+        <button
+          className="location-tile-edit"
+          type="button"
+          disabled={!canManage}
+          onClick={onEdit}
+          aria-label={`Edit ${location.name}`}
+          title="Edit location"
+        >
+          <Pencil size={13} />
+        </button>
+      </header>
+
+      <p className="location-tile-address">
+        <MapPin size={13} />
+        <span>{fullAddress || 'No address set yet'}</span>
+      </p>
+
+      {hasContact ? (
+        <div className="location-tile-contact">
+          {location.repName ? (
+            <div className="location-tile-contact-name">
+              <User size={12} />
+              {location.repName}
+            </div>
+          ) : null}
+          {(location.repPhone || location.repEmail) ? (
+            <div className="location-tile-contact-lines">
+              {location.repPhone ? (
+                <a href={`tel:${location.repPhone}`} className="location-tile-contact-link">
+                  <Phone size={11} /> {location.repPhone}
+                </a>
+              ) : null}
+              {location.repEmail ? (
+                <a href={`mailto:${location.repEmail}`} className="location-tile-contact-link">
+                  <Mail size={11} /> {location.repEmail}
+                </a>
+              ) : null}
+            </div>
+          ) : null}
         </div>
-        {hasContact ? (
-          <div className="cl-location-contact">
-            {location.repName ? (
-              <span className="cl-location-contact-item">
-                <strong>{location.repName}</strong>
-              </span>
-            ) : null}
-            {location.repPhone ? (
-              <span className="cl-location-contact-item">
-                <Phone size={12} /> {location.repPhone}
-              </span>
-            ) : null}
-            {location.repEmail ? (
-              <a
-                className="cl-location-contact-item cl-location-contact-link"
-                href={`mailto:${location.repEmail}`}
-              >
-                <Mail size={12} /> {location.repEmail}
-              </a>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-      <button
-        className="btn btn-ghost btn-sm cl-location-edit"
-        type="button"
-        disabled={!canManage}
-        onClick={onEdit}
-        aria-label={`Edit ${location.name}`}
-        title={`Edit ${location.name}`}
-      >
-        <Pencil size={14} /> Edit
-      </button>
+      ) : null}
     </div>
   );
 }
