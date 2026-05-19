@@ -1744,19 +1744,21 @@
 /* Image area — fixed aspect ratio so the grid stays even regardless of which
    products have images vs. fallback icons. Border is removed (the card itself
    is the frame); background is neutral so white source photos don't get
-   double-framed inside a tinted box. */
+   double-framed inside a tinted box. Padding sits on the *container*, not the
+   img, otherwise `width:100% + padding` overflows the box and clips the
+   bottom of tall product photos. */
 .inventory-card-main .product-thumb,
 .inventory-card-main .product-thumb-button {
   width: 100% !important;
   height: auto !important;
-  aspect-ratio: 1.3 / 1;
+  aspect-ratio: 1 / 1;
   background: #fafaf7;
   border: 0;
   border-radius: var(--radius-md);
   display: grid;
   place-items: center;
   overflow: hidden;
-  padding: 0;
+  padding: var(--space-2);
   cursor: pointer;
   transition: transform var(--transition-fast);
 }
@@ -1766,20 +1768,21 @@
 }
 
 .inventory-card-main .product-thumb img {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   object-fit: contain;
-  padding: var(--space-2);
+  padding: 0;
   transition: transform var(--transition-fast);
 }
 
 /* When there's no real image yet, the Modhani logo shouldn't fill the slot. */
 .inventory-card-main .product-thumb-fallback img,
 .inventory-card-main .product-thumb .product-image-fallback {
-  width: 50%;
-  height: 50%;
+  max-width: 55%;
+  max-height: 55%;
   opacity: 0.55;
-  padding: 0;
 }
 
 .inventory-card-info {
