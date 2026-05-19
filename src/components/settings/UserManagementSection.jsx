@@ -1,16 +1,31 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronUp, KeyRound, Trash2, UserPlus, Users } from 'lucide-react';
+import {
+  Briefcase,
+  ChevronDown,
+  ChevronUp,
+  KeyRound,
+  ShoppingBag,
+  Trash2,
+  Truck,
+  UserPlus,
+  Users,
+} from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { supabase } from '../../lib/supabaseClient';
 import { useModalBehavior, handleOverlayClick } from '../../hooks/useModalBehavior';
 
 const ROLE_LABEL = { staff: 'Staff', driver: 'Driver', customer: 'Customer' };
-const ROLE_BADGE_CLASS = {
-  staff: 'badge-fulfilled',
-  driver: 'badge-partial',
-  customer: 'badge-pending',
-};
+const ROLE_ICON = { staff: Briefcase, driver: Truck, customer: ShoppingBag };
+
+// Single-line permission summary for staff: small chips, on = brand-green tint,
+// off = muted. Lets admins see at a glance who can do what without expanding.
+const STAFF_PERM_FIELDS = [
+  { key: 'fulfilOrders', short: 'Fulfil', full: 'Fulfil orders' },
+  { key: 'overridePrices', short: 'Override', full: 'Override prices' },
+  { key: 'editInvoices', short: 'Invoices', full: 'Edit invoices' },
+  { key: 'manageSettings', short: 'Settings', full: 'Manage settings' },
+];
 
 const TABS = [
   { value: 'all', label: 'All' },
@@ -196,59 +211,75 @@ export default function UserManagementSection({ canManage }) {
             const isBusy = pendingActionUserId === row.userId;
             const canEditPerms = row.role === 'staff' && canManage;
 
+            const RoleIcon = ROLE_ICON[row.role] ?? Briefcase;
+
             return (
-              <div key={`${row.role}:${row.id}`}>
-                <div className={`user-mgmt-row ${isExpanded ? 'expanded' : ''}`}>
-                  <div className="user-mgmt-cell-main">
-                    <div className="user-mgmt-name">{row.name}</div>
-                    <div className="user-mgmt-email">{row.email}</div>
+              <div key={`${row.role}:${row.id}`} className="um-row-wrap">
+                <div className={`um-row um-row-${row.role} ${isExpanded ? 'is-expanded' : ''}`}>
+                  <div className={`um-role-pill um-role-${row.role}`} aria-hidden="true">
+                    <RoleIcon size={13} />
+                    <span>{ROLE_LABEL[row.role]}</span>
                   </div>
-                  <div className="user-mgmt-cell-role">
-                    <span className={`badge ${ROLE_BADGE_CLASS[row.role]}`}>
-                      {ROLE_LABEL[row.role]}
-                    </span>
-                    {row.role === 'customer' ? (
-                      <span className={`badge badge-${row.status === 'active' ? 'fulfilled' : row.status === 'pending' ? 'pending' : 'declined'}`}>
-                        {row.status}
-                      </span>
+
+                  <div className="um-identity">
+                    <div className="um-name-line">
+                      <span className="um-name">{row.name}</span>
+                      {row.isSelf ? <span className="um-self-chip">You</span> : null}
+                      {row.role === 'customer' ? (
+                        <span className={`um-status um-status-${row.status}`}>
+                          {row.status}
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="um-email">{row.email}</div>
+                    {row.role === 'staff' && row.permissions ? (
+                      <div className="um-perm-summary">
+                        {STAFF_PERM_FIELDS.map((p) => (
+                          <span
+                            key={p.key}
+                            className={`um-perm-chip ${row.permissions[p.key] ? 'is-on' : 'is-off'}`}
+                            title={`${p.full}: ${row.permissions[p.key] ? 'On' : 'Off'}`}
+                          >
+                            {p.short}
+                          </span>
+                        ))}
+                      </div>
                     ) : null}
-                    {row.isSelf ? <span className="user-mgmt-self-tag">You</span> : null}
                   </div>
-                  <div className="user-mgmt-cell-actions">
+
+                  <div className="um-actions">
                     {canEditPerms ? (
                       <button
-                        className="btn btn-ghost btn-sm"
+                        className={`um-icon-btn ${isExpanded ? 'is-active' : ''}`}
                         type="button"
                         onClick={() => setExpandedUserId(isExpanded ? null : row.userId)}
                         aria-label="Edit permissions"
                         title="Edit permissions"
                       >
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                        <span className="hidden-sm">Permissions</span>
+                        {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                       </button>
                     ) : null}
                     {row.role === 'customer' ? (
                       <Link
                         to="/customers"
-                        className="btn btn-ghost btn-sm"
+                        className="um-link-btn"
                         title="Manage company and location assignments"
                       >
                         Assignments
                       </Link>
                     ) : null}
                     <button
-                      className="btn btn-ghost btn-sm"
+                      className="um-icon-btn"
                       type="button"
                       disabled={!canManage || isBusy}
                       onClick={() => handleSendReset(row)}
                       aria-label="Send password reset email"
                       title="Send password reset email"
                     >
-                      <KeyRound size={16} />
-                      <span className="hidden-sm">Reset</span>
+                      <KeyRound size={15} />
                     </button>
                     <button
-                      className="btn btn-ghost btn-sm user-mgmt-remove"
+                      className="um-icon-btn um-icon-btn-danger"
                       type="button"
                       disabled={!canManage || isBusy || row.isSelf || row.isLastAdmin}
                       onClick={() => handleRemove(row)}
@@ -261,7 +292,7 @@ export default function UserManagementSection({ canManage }) {
                             : 'Remove user'
                       }
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>

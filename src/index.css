@@ -3468,6 +3468,196 @@ input[type='checkbox']:disabled {
 }
 
 /* ---------- User Management section (Settings) ---------- */
+/* ============================================================
+   User Management - polished list (um-* classes)
+   ============================================================ */
+
+/* Each row: role pill | identity (name + email + perm chips) | actions. */
+.um-row-wrap {
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+.um-row-wrap:first-child { border-top: 0; }
+
+.um-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 4px;
+  transition: background 0.15s ease;
+}
+.um-row:hover { background: rgba(0, 0, 0, 0.02); }
+.um-row.is-expanded { background: rgba(0, 0, 0, 0.015); }
+
+/* Role pill: consistent for every role, colored by role */
+.um-role-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  width: max-content;
+  white-space: nowrap;
+}
+.um-role-pill svg { stroke-width: 2; }
+
+.um-role-staff {
+  background: rgba(16, 38, 26, 0.08);
+  color: var(--color-primary, #10261a);
+}
+.um-role-driver {
+  background: rgba(212, 161, 78, 0.18);
+  color: #8a5a1c;
+}
+.um-role-customer {
+  background: rgba(180, 215, 240, 0.32);
+  color: #1e4e6b;
+}
+
+/* Identity column */
+.um-identity {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.um-name-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.um-name {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--color-text);
+  letter-spacing: -0.005em;
+}
+.um-self-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(16, 38, 26, 0.08);
+  color: var(--color-primary, #10261a);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+/* Customer status badge */
+.um-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.um-status-active   { background: rgba(34, 197, 94, 0.13);  color: #15803d; }
+.um-status-pending  { background: rgba(245, 158, 11, 0.15); color: #92500e; }
+.um-status-disabled { background: rgba(0, 0, 0, 0.07);      color: var(--color-text-muted); }
+
+/* Email: muted text, never a link (override default <a>-like colors) */
+.um-email {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+/* Permission chip row under staff names */
+.um-perm-summary {
+  margin-top: 4px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.um-perm-chip {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+.um-perm-chip.is-on {
+  background: rgba(34, 197, 94, 0.13);
+  color: #15803d;
+}
+.um-perm-chip.is-off {
+  background: rgba(0, 0, 0, 0.05);
+  color: var(--color-text-muted);
+}
+
+/* Actions */
+.um-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.um-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.um-icon-btn:hover:not(:disabled) {
+  background: rgba(16, 38, 26, 0.08);
+  color: var(--color-primary, #10261a);
+}
+.um-icon-btn.is-active {
+  background: rgba(16, 38, 26, 0.10);
+  color: var(--color-primary, #10261a);
+}
+.um-icon-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+.um-icon-btn-danger:hover:not(:disabled) {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.um-link-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.um-link-btn:hover {
+  background: rgba(16, 38, 26, 0.08);
+  color: var(--color-primary, #10261a);
+}
+
+@media (max-width: 720px) {
+  .um-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .um-actions { justify-content: flex-start; }
+}
+
+/* ---- legacy user-mgmt-* classes kept below (header / tabs still use these) ---- */
 .user-mgmt-card {
   display: flex;
   flex-direction: column;
