@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Package, Plus, Search, Settings2, X } from 'lucide-react';
+import { Package, Plus, Search, Settings2 } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatCurrency,
@@ -11,6 +11,7 @@ import {
   hasProductImage,
 } from '../data/phaseOneData';
 import { ProductModal } from '../components/settings/ManagementModals';
+import ProductImageLightbox from '../components/ProductImageLightbox';
 
 export default function PhaseOneProducts() {
   const { state } = useApp();
@@ -198,31 +199,5 @@ function ProductThumbnail({ product, onPreview }) {
     >
       <img src={imageUrl} alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)} />
     </button>
-  );
-}
-
-function ProductImageLightbox({ product, onClose }) {
-  const imageUrl = getProductImageUrl(product, { fallback: true });
-  const usesFallback = !hasProductImage(product);
-
-  return (
-    <div className="modal-overlay product-image-lightbox-overlay" onClick={onClose}>
-      <div className="product-image-lightbox" onClick={(event) => event.stopPropagation()}>
-        <div className="product-image-lightbox-header">
-          <div>
-            <div className="product-image-lightbox-title">{getProductDisplayName(product)}</div>
-            <div className="product-image-lightbox-meta">
-              {usesFallback ? 'No product photo yet. Showing Modhani logo placeholder.' : product.category || 'Product image'}
-            </div>
-          </div>
-          <button className="btn btn-ghost" type="button" onClick={onClose} aria-label="Close product image">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="product-image-lightbox-body">
-          <img src={imageUrl} alt={getProductDisplayName(product)} />
-        </div>
-      </div>
-    </div>
   );
 }

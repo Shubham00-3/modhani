@@ -12,6 +12,7 @@ import {
   hasProductImage,
 } from '../data/phaseOneData';
 import { LOW_STOCK_THRESHOLD, getStockStatus } from '../lib/inventoryThresholds';
+import ProductImageLightbox from '../components/ProductImageLightbox';
 
 function getStockStatusLabel(status) {
   if (status === 'out') return 'Out of stock';
@@ -26,6 +27,7 @@ export default function PhaseOneInventory() {
   const [stockFilter, setStockFilter] = useState('');
   const [lotStatusFilter, setLotStatusFilter] = useState('');
   const [sortBy, setSortBy] = useState('product');
+  const [previewProduct, setPreviewProduct] = useState(null);
   const categories = useMemo(
     () => [...new Set(state.products.map((product) => product.category).filter(Boolean))].sort(),
     [state.products]
@@ -191,7 +193,7 @@ export default function PhaseOneInventory() {
             {inventoryRows.map(({ product, batches, activeBatches, totalProduced, totalRemaining, oldestLot, stockStatus }) => (
               <div key={product.id} className={`inventory-card inventory-card-${stockStatus}`}>
                 <div className="inventory-card-main">
-                  <ProductImage product={product} />
+                  <ProductImage product={product} onPreview={setPreviewProduct} />
                   <div className="inventory-card-info">
                     <div className="inventory-card-name">{getProductDisplayName(product)}</div>
                     <div className="inventory-card-meta">
@@ -279,18 +281,29 @@ export default function PhaseOneInventory() {
           </div>
         )}
       </div>
+
+      {previewProduct ? (
+        <ProductImageLightbox product={previewProduct} onClose={() => setPreviewProduct(null)} />
+      ) : null}
     </div>
   );
 }
 
-function ProductImage({ product }) {
+function ProductImage({ product, onPreview }) {
   const imageUrl = getProductImageUrl(product, { fallback: true });
   const usesFallback = !hasProductImage(product);
+  const label = getProductDisplayName(product);
 
   return (
-    <div className={`product-thumb ${usesFallback ? 'product-thumb-fallback' : ''}`} style={{ width: 72, height: 72 }}>
-      {imageUrl ? <img src={imageUrl} alt={getProductDisplayName(product)} /> : <ImageOff size={22} />}
-    </div>
+    <button
+      type="button"
+      className={`product-thumb product-thumb-button ${usesFallback ? 'product-thumb-fallback' : ''}`}
+      onClick={() => onPreview?.(product)}
+      aria-label={`Open ${usesFallback ? 'Modhani logo placeholder for ' : ''}${label} image`}
+      title={usesFallback ? 'No product image yet. Click to view the placeholder.' : `Open ${label} image`}
+    >
+      {imageUrl ? <img src={imageUrl} alt={label} /> : <ImageOff size={22} />}
+    </button>
   );
 }
 
