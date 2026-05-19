@@ -372,7 +372,7 @@ export function LocationModal({ location, onClose }) {
         }
 
         if (repEmail && !isValidEmail(repEmail)) {
-          addToast('Enter a valid representative email.', 'warning');
+          addToast('Enter a valid representative email address.', 'warning');
           return false;
         }
 
@@ -438,19 +438,19 @@ export function LocationModal({ location, onClose }) {
       <div className="form-section-divider" />
       <div className="form-section-title">Location Representative <span className="form-section-hint">(optional)</span></div>
       <FormInput
-        label="Rep Name"
+        label="Representative Name"
         placeholder="Person to contact for this location"
         value={form.repName ?? ''}
         onChange={(value) => setForm((current) => ({ ...current, repName: value }))}
       />
       <FormInput
-        label="Rep Email"
+        label="Representative Email"
         type="email"
         value={form.repEmail ?? ''}
         onChange={(value) => setForm((current) => ({ ...current, repEmail: value }))}
       />
       <FormInput
-        label="Rep Phone"
+        label="Representative Phone"
         type="tel"
         placeholder="e.g. (905) 555-0123"
         value={form.repPhone ?? ''}
