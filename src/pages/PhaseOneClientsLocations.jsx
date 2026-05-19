@@ -2,9 +2,8 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ChevronDown,
-  ChevronRight,
+  ChevronUp,
   DollarSign,
-  Mail,
   MapPin,
   Pencil,
   Phone,
@@ -18,31 +17,6 @@ import { useApp } from '../context/useApp';
 import { formatClientLocationScale } from '../data/phaseOneData';
 import { ClientModal, LocationModal, PricingModal } from '../components/settings/ManagementModals';
 
-function initialsOf(name) {
-  if (!name) return '?';
-  const parts = name.replace(/[^a-zA-Z0-9\s]/g, '').trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return '?';
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
-// Stable pastel accent so each client has its own subtle identity color
-// while staying within the brand palette. Deterministic so the same client
-// keeps the same color on every page load.
-const ACCENT_PALETTE = [
-  { bg: '#dde7d7', fg: '#2e5a1c' }, // sage
-  { bg: '#e7d9c4', fg: '#7a4e1a' }, // wheat
-  { bg: '#d4dfe6', fg: '#1e4e6b' }, // dusty blue
-  { bg: '#e9d5d5', fg: '#8a3530' }, // rose
-  { bg: '#dcd9e9', fg: '#473a7a' }, // lavender
-  { bg: '#e2e2cd', fg: '#5c6020' }, // olive
-];
-function accentFor(id) {
-  let hash = 0;
-  for (let i = 0; i < (id ?? '').length; i += 1) hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
-  return ACCENT_PALETTE[hash % ACCENT_PALETTE.length];
-}
-
 export default function PhaseOneClientsLocations() {
   const { state } = useApp();
   const [searchParams] = useSearchParams();
@@ -54,7 +28,9 @@ export default function PhaseOneClientsLocations() {
   const dashboardSearch = searchParams.get('q') ?? '';
   const [showClientModal, setShowClientModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  // Set of clientIds that the user has manually expanded.
   const [expandedClientIds, setExpandedClientIds] = useState(() => new Set());
+  // When a new location is being added, pre-select this client in the form.
   const [addLocationClientId, setAddLocationClientId] = useState(null);
 
   const query = (clientSearch || dashboardSearch).trim().toLowerCase();
@@ -63,16 +39,25 @@ export default function PhaseOneClientsLocations() {
   const filteredClients = useMemo(() => {
     if (!query) return state.clients;
     return state.clients.filter((client) => {
-      const clientLocations = state.locations.filter((l) => l.clientId === client.id);
+      const clientLocations = state.locations.filter((location) => location.clientId === client.id);
       const searchableText = [
         client.name,
         client.operatingAs,
         client.qbCustomerName,
         ...clientLocations.flatMap((location) => [
-          location.name, location.city, location.addressLine1, location.addressLine2,
-          location.postalCode, location.repName, location.repEmail, location.repPhone,
+          location.name,
+          location.city,
+          location.addressLine1,
+          location.addressLine2,
+          location.postalCode,
+          location.repName,
+          location.repEmail,
+          location.repPhone,
         ]),
-      ].filter(Boolean).join(' ').toLowerCase();
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
       return searchableText.includes(query);
     });
   }, [query, state.clients, state.locations]);
@@ -85,10 +70,13 @@ export default function PhaseOneClientsLocations() {
       return next;
     });
   }
+
   function isExpanded(clientId) {
+    // Auto-expand search matches so results stay visible.
     if (searching) return true;
     return expandedClientIds.has(clientId);
   }
+
   function handleAddLocationForClient(clientId) {
     setAddLocationClientId(clientId);
     setShowLocationModal(true);
@@ -130,30 +118,29 @@ export default function PhaseOneClientsLocations() {
         </div>
       ) : null}
 
-      <div className="clients-directory">
-        <div className="clients-toolbar">
+      <div className="card">
+        <div className="client-directory-header">
           <div>
-            <div className="clients-toolbar-title">
-              <Users size={18} />
-              <span>Client Directory</span>
+            <div className="card-title">
+              <Users size={18} /> Client Directory
             </div>
-            <div className="clients-toolbar-count">
-              {filteredClients.length.toLocaleString()} of {state.clients.length.toLocaleString()}
+            <div className="client-directory-count">
+              Showing {filteredClients.length.toLocaleString()} of {state.clients.length.toLocaleString()} clients
             </div>
           </div>
-          <label className="clients-toolbar-search">
-            <Search size={15} />
+          <label className="client-directory-search">
+            <Search size={16} />
             <input
               type="search"
               value={clientSearch}
               onChange={(event) => setClientSearch(event.target.value)}
-              placeholder="Search clients, locations, contacts..."
+              placeholder="Search clients or locations..."
             />
           </label>
         </div>
 
         {filteredClients.length ? (
-          <div className="clients-list">
+          <div className="client-accordion">
             {filteredClients.map((client) => {
               const clientLocations = state.locations.filter((l) => l.clientId === client.id);
               const enabledProductCount = state.clientPricing.filter(
@@ -162,95 +149,97 @@ export default function PhaseOneClientsLocations() {
               const open = isExpanded(client.id);
               const displayName = client.operatingAs?.trim() || client.name;
               const hasOperatingAs = Boolean(client.operatingAs?.trim());
-              const accent = accentFor(client.id);
 
               return (
-                <article key={client.id} className={`client-row ${open ? 'is-open' : ''}`}>
+                <div key={client.id} className={`client-accordion-card ${open ? 'open' : ''}`}>
+                  {/* Collapsed header — clickable */}
                   <button
                     type="button"
-                    className="client-row-header"
+                    className="client-accordion-header"
                     onClick={() => toggleClient(client.id)}
                     aria-expanded={open}
                   >
-                    <span
-                      className="client-avatar"
-                      style={{ background: accent.bg, color: accent.fg }}
-                      aria-hidden="true"
-                    >
-                      {initialsOf(displayName)}
-                    </span>
-
-                    <div className="client-row-text">
-                      <div className="client-row-title">
-                        <span className="client-row-name">{displayName}</span>
-                        {hasOperatingAs ? (
-                          <span className="client-row-legal">{client.name}</span>
-                        ) : null}
-                      </div>
-                      <div className="client-row-meta">
-                        <span>
-                          <MapPin size={12} />
-                          {clientLocations.length} {clientLocations.length === 1 ? 'location' : 'locations'}
-                        </span>
-                        <span className="client-row-divider" />
-                        <span>Tier {client.priceTier ?? 1}</span>
-                        <span className="client-row-divider" />
-                        <span>{enabledProductCount.toLocaleString()} products</span>
-                      </div>
+                    <div className="client-accordion-title-wrap">
+                      <div className="client-accordion-title">{displayName}</div>
+                      {hasOperatingAs ? (
+                        <div className="client-accordion-legal">Legal name: {client.name}</div>
+                      ) : null}
                     </div>
-
-                    <span className={`client-row-chev ${open ? 'is-open' : ''}`} aria-hidden="true">
-                      <ChevronRight size={18} />
-                    </span>
+                    <div className="client-accordion-summary">
+                      <span className="client-accordion-pill">
+                        <MapPin size={13} />
+                        {clientLocations.length} {clientLocations.length === 1 ? 'location' : 'locations'}
+                      </span>
+                      <span className="client-accordion-pill">
+                        Tier {client.priceTier ?? 1}
+                      </span>
+                      <span className="client-accordion-chev">
+                        {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                      </span>
+                    </div>
                   </button>
 
+                  {/* Expanded body */}
                   {open ? (
-                    <div className="client-row-detail">
-                      {/* Primary actions, prominent */}
-                      <div className="client-detail-actions">
-                        <button
-                          className="btn btn-primary btn-sm"
-                          type="button"
-                          disabled={!canManage}
-                          onClick={() => setPricingClientId(client.id)}
-                        >
-                          <DollarSign size={14} /> Pricing &amp; Products
-                        </button>
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          type="button"
-                          disabled={!canManage}
-                          onClick={() => setEditingClient(client)}
-                        >
-                          <Pencil size={14} /> Edit details
-                        </button>
-                      </div>
+                    <div className="client-accordion-body">
+                      {/* Client info section */}
+                      <section className="client-info-section">
+                        <header className="client-info-header">
+                          <h4>Client info</h4>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            type="button"
+                            disabled={!canManage}
+                            onClick={() => setEditingClient(client)}
+                          >
+                            <Pencil size={14} /> Edit info
+                          </button>
+                        </header>
+                        <dl className="client-info-grid">
+                          <div>
+                            <dt>Legal name</dt>
+                            <dd>{client.name}</dd>
+                          </div>
+                          {hasOperatingAs ? (
+                            <div>
+                              <dt>Operating as</dt>
+                              <dd>{client.operatingAs}</dd>
+                            </div>
+                          ) : null}
+                          <div>
+                            <dt>QuickBooks customer</dt>
+                            <dd>{client.qbCustomerName || client.name}</dd>
+                          </div>
+                          <div>
+                            <dt>Scale</dt>
+                            <dd>{formatClientLocationScale(client, clientLocations.length)}</dd>
+                          </div>
+                          <div>
+                            <dt>Pricing tier</dt>
+                            <dd>
+                              Tier {client.priceTier ?? 1} · {enabledProductCount.toLocaleString()} visible products
+                            </dd>
+                          </div>
+                        </dl>
+                        <div className="client-info-actions">
+                          <button
+                            className="btn btn-secondary btn-sm"
+                            type="button"
+                            disabled={!canManage}
+                            onClick={() => setPricingClientId(client.id)}
+                          >
+                            <DollarSign size={14} /> Manage Pricing & Products
+                          </button>
+                        </div>
+                      </section>
 
-                      {/* Clean key/value details with no shouty caps */}
-                      <dl className="client-detail-meta">
-                        <div>
-                          <dt>Legal name</dt>
-                          <dd>{client.name}</dd>
-                        </div>
-                        <div>
-                          <dt>QuickBooks customer</dt>
-                          <dd>{client.qbCustomerName || client.name}</dd>
-                        </div>
-                        <div>
-                          <dt>Scale</dt>
-                          <dd>{formatClientLocationScale(client, clientLocations.length)}</dd>
-                        </div>
-                        <div>
-                          <dt>Pricing tier</dt>
-                          <dd>
-                            Tier {client.priceTier ?? 1} - {enabledProductCount.toLocaleString()} visible products
-                          </dd>
-                        </div>
-                      </dl>
-
-                      <div className="client-locations-block">
-                        <div className="client-locations-heading">
-                          <h4>Locations</h4>
+                      {/* Locations section */}
+                      <section className="client-locations-section">
+                        <header className="client-locations-header">
+                          <h4>
+                            Locations
+                            <span className="client-locations-count">{clientLocations.length}</span>
+                          </h4>
                           <button
                             className="btn btn-ghost btn-sm"
                             type="button"
@@ -259,16 +248,16 @@ export default function PhaseOneClientsLocations() {
                           >
                             <Plus size={14} /> Add Location
                           </button>
-                        </div>
+                        </header>
 
                         {clientLocations.length === 0 ? (
                           <div className="client-locations-empty">
-                            No locations yet for this client.
+                            No locations yet. Click <strong>Add Location</strong> to create the first one.
                           </div>
                         ) : (
-                          <div className="client-locations-grid">
+                          <div className="client-location-grid">
                             {clientLocations.map((location) => (
-                              <LocationTile
+                              <LocationCard
                                 key={location.id}
                                 location={location}
                                 canManage={canManage}
@@ -277,18 +266,16 @@ export default function PhaseOneClientsLocations() {
                             ))}
                           </div>
                         )}
-                      </div>
+                      </section>
                     </div>
                   ) : null}
-                </article>
+                </div>
               );
             })}
           </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
-            <div className="empty-state-title">
-              {state.clients.length ? 'No clients match that search' : 'No clients configured yet'}
-            </div>
+            <div className="empty-state-title">{state.clients.length ? 'No clients match that search' : 'No clients configured yet'}</div>
             <div className="empty-state-description">
               {state.clients.length
                 ? 'Try searching by customer name, location, city, address, or postal code.'
@@ -301,7 +288,10 @@ export default function PhaseOneClientsLocations() {
       {showClientModal || editingClient ? (
         <ClientModal
           client={editingClient}
-          onClose={() => { setShowClientModal(false); setEditingClient(null); }}
+          onClose={() => {
+            setShowClientModal(false);
+            setEditingClient(null);
+          }}
         />
       ) : null}
 
@@ -322,60 +312,66 @@ export default function PhaseOneClientsLocations() {
 }
 
 /**
- * Compact, visually distinct tile for a single delivery location. Includes
- * the address and (optionally) the on-site representative contact. Designed
- * to read at a glance; edit is an explicit pencil button.
+ * Read-first card for a single location. Address, QB ship-to name, and
+ * representative contact info all visible without clicking — Edit is its own
+ * explicit pencil button in the top-right.
  */
-function LocationTile({ location, canManage, onEdit }) {
-  const street = [location.addressLine1, location.addressLine2].filter(Boolean).join(' ');
-  const cityPostal = [location.city, location.province, location.postalCode].filter(Boolean).join(' ');
-  const fullAddress = [street, cityPostal].filter(Boolean).join(', ');
+function LocationCard({ location, canManage, onEdit }) {
+  const addressLine = [location.addressLine1, location.addressLine2].filter(Boolean).join(' ');
+  const cityLine = [location.city, location.province, location.postalCode].filter(Boolean).join(' ');
+  const fullAddress = [addressLine, cityLine].filter(Boolean).join(', ');
   const needsAddress = location.qbMappingStatus !== 'ready';
-  const hasContact = Boolean(location.repName || location.repEmail || location.repPhone);
+  const hasRep = Boolean(location.repName || location.repEmail || location.repPhone);
 
   return (
-    <div className={`location-tile ${needsAddress ? 'is-warning' : ''}`}>
-      <header className="location-tile-header">
-        <div className="location-tile-title">
-          <span className="location-tile-name">{location.name}</span>
-          {needsAddress ? <span className="location-tile-tag">Needs address</span> : null}
+    <div className={`location-card ${needsAddress ? 'location-card-needs-address' : ''}`}>
+      <div className="location-card-header">
+        <div className="location-card-title-wrap">
+          <div className="location-card-title">{location.name}</div>
+          {needsAddress ? <span className="location-card-warn">Needs address</span> : null}
         </div>
         <button
-          className="location-tile-edit"
+          className="btn btn-ghost btn-icon"
           type="button"
           disabled={!canManage}
           onClick={onEdit}
           aria-label={`Edit ${location.name}`}
-          title="Edit location"
+          title={`Edit ${location.name}`}
         >
-          <Pencil size={13} />
+          <Pencil size={14} />
         </button>
-      </header>
+      </div>
 
-      <p className="location-tile-address">
-        <MapPin size={13} />
+      <div className="location-card-row">
+        <MapPin size={14} className="location-card-icon" />
         <span>{fullAddress || 'No address set yet'}</span>
-      </p>
+      </div>
 
-      {hasContact ? (
-        <div className="location-tile-contact">
-          {location.repName ? (
-            <div className="location-tile-contact-name">
-              <User size={12} />
-              {location.repName}
-            </div>
-          ) : null}
-          {(location.repPhone || location.repEmail) ? (
-            <div className="location-tile-contact-lines">
+      {location.qbShipToName && location.qbShipToName !== location.name ? (
+        <div className="location-card-row location-card-muted">
+          <span className="location-card-key">QB ship-to:</span>
+          <span>{location.qbShipToName}</span>
+        </div>
+      ) : null}
+
+      {hasRep ? (
+        <div className="location-card-rep">
+          <div className="location-card-rep-header">
+            <User size={14} />
+            <span>
+              Representative
+              {location.repName ? <>: <strong>{location.repName}</strong></> : null}
+            </span>
+          </div>
+          {location.repPhone || location.repEmail ? (
+            <div className="location-card-rep-contact">
               {location.repPhone ? (
-                <a href={`tel:${location.repPhone}`} className="location-tile-contact-link">
-                  <Phone size={11} /> {location.repPhone}
-                </a>
+                <span>
+                  <Phone size={12} /> {location.repPhone}
+                </span>
               ) : null}
               {location.repEmail ? (
-                <a href={`mailto:${location.repEmail}`} className="location-tile-contact-link">
-                  <Mail size={11} /> {location.repEmail}
-                </a>
+                <a href={`mailto:${location.repEmail}`}>{location.repEmail}</a>
               ) : null}
             </div>
           ) : null}
