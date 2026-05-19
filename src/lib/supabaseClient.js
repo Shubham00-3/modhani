@@ -10,6 +10,10 @@ export const supabase = isSupabaseConfigured
       auth: {
         persistSession: true,
         autoRefreshToken: true,
+        // Required so invite / recovery / magic-link tokens carried in the
+        // URL hash are picked up automatically on page load. Defaults to
+        // true in supabase-js v2 but we set it explicitly for clarity.
+        detectSessionInUrl: true,
       },
     })
   : null;

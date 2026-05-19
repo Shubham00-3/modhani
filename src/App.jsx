@@ -21,10 +21,35 @@ import CustomerPortalShell from './pages/CustomerPortalShell';
 import CartProvider from './context/CartProvider';
 import DriverPortal from './pages/DriverPortal';
 
+// Detect Supabase invite / recovery callbacks before rendering the login form,
+// so the JS client has time to turn the URL token or code into a session.
+function hasAuthHashInUrl() {
+  if (typeof window === 'undefined') return false;
+  const hash = window.location.hash || '';
+  const search = window.location.search || '';
+  const combined = `${hash}&${search}`;
+  if (
+    !combined.includes('access_token')
+    && !combined.includes('code=')
+    && !combined.includes('error')
+  ) {
+    return false;
+  }
+  return /type=(invite|recovery|signup|magiclink)/.test(combined)
+    || combined.includes('access_token')
+    || combined.includes('code=');
+}
+
 export default function App() {
   const { state, dispatch } = useApp();
+  const processingAuthHash = state.authConfigured
+    && !state.isAuthenticated
+    && hasAuthHashInUrl();
 
-  if (!state.initialized || state.authLoading) {
+  if (!state.initialized || state.authLoading || processingAuthHash) {
+    const message = processingAuthHash
+      ? 'Processing your invite link...'
+      : `Preparing ${state.authConfigured ? 'Supabase-backed workspace' : 'demo workspace'}...`;
     return (
       <div
         style={{
@@ -37,7 +62,7 @@ export default function App() {
         <div className="card" style={{ padding: '28px 32px', textAlign: 'center', minWidth: 320 }}>
           <div style={{ fontWeight: 700, fontSize: '20px' }}>Loading ModhaniOS</div>
           <div style={{ color: 'var(--color-text-secondary)', marginTop: '8px' }}>
-            Preparing {state.authConfigured ? 'Supabase-backed workspace' : 'demo workspace'}...
+            {message}
           </div>
         </div>
       </div>

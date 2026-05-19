@@ -23,6 +23,13 @@ function normalizePublicUrl(value) {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+function getRequestOrigin(req) {
+  const host = req.headers['x-forwarded-host'] || req.headers.host;
+  if (!host) return null;
+  const proto = req.headers['x-forwarded-proto'] || 'https';
+  return normalizePublicUrl(`${proto}://${host}`);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, error: 'Method not allowed.' });
@@ -83,13 +90,11 @@ export default async function handler(req, res) {
     return res.status(404).json({ ok: false, error: 'No user found with that email.' });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL
+  const appUrl = getRequestOrigin(req)
+    || process.env.NEXT_PUBLIC_APP_URL
     || process.env.VITE_APP_URL
     || normalizePublicUrl(process.env.VERCEL_PROJECT_PRODUCTION_URL)
     || normalizePublicUrl(process.env.VERCEL_URL)
-    || (req.headers['x-forwarded-host']
-      ? `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host']}`
-      : null)
     || 'http://localhost:5173';
 
   const redirectTo = normalizePublicUrl(appUrl);

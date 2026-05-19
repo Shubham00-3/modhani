@@ -856,7 +856,8 @@ export function AppProvider({ children }) {
 
       const identity = await fetchAuthIdentity(supabase, user.id);
       const hashParams = new URLSearchParams(window.location.hash.replace('#', ''));
-      const tokenType = hashParams.get('type');
+      const searchParams = new URLSearchParams(window.location.search);
+      const tokenType = hashParams.get('type') || searchParams.get('type');
       // Two signals point at "the user just clicked an invite or reset email
       // and still needs to choose a password":
       //   - URL hash carries `type=invite` (new invite) or `type=recovery` (reset)
