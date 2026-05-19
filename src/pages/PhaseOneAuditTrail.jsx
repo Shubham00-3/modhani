@@ -31,6 +31,8 @@ const ACTION_LABELS = {
   driver_removed: 'Driver Removed',
   customer_removed: 'Customer Removed',
   password_reset_sent: 'Password Reset Sent',
+  email_sent: 'Email Sent',
+  email_failed: 'Email Failed',
   quickbooks_settings_updated: 'QuickBooks Settings Updated',
   order_balance_declined: 'Remaining Balance Declined',
 };

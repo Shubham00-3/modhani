@@ -1243,8 +1243,8 @@ export async function persistAction(supabase, action, previousState, nextState) 
 }
 
 async function callRpc(supabase, fn, params) {
-  const { error } = await supabase.rpc(fn, params);
-  return { error };
+  const { data, error } = await supabase.rpc(fn, params);
+  return { data, error };
 }
 
 async function upsertRow(supabase, table, payload) {

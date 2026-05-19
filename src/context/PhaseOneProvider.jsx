@@ -741,6 +741,13 @@ const serverAdminActions = new Set([
   'ADD_BATCH',
   'UPDATE_BATCH',
 ]);
+const orderEmailEventsByAction = {
+  DECLINE_ORDER: 'order_updated',
+  APPLY_FULFILMENT_AND_DECLINE_REMAINING: 'order_updated',
+  CREATE_INVOICE: 'invoice_ready',
+  CONFIRM_SHIPMENT: 'order_shipped',
+  COMPLETE_DELIVERY_POD: 'order_delivered',
+};
 
 function buildLocalNotificationDismissals(userId, notificationKeys) {
   return notificationKeys.map((notificationKey) => ({
@@ -1123,6 +1130,37 @@ export function AppProvider({ children }) {
     return { ok: true };
   }, []);
 
+  const notifyOrderEvent = useCallback(async (orderId, eventType) => {
+    if (!supabase || !orderId || !eventType) return { ok: true };
+
+    const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError || !sessionResult.session) {
+      return { ok: false, error: sessionError?.message ?? 'No active session.' };
+    }
+
+    const response = await fetch('/api/notify-order-event', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionResult.session.access_token}`,
+      },
+      body: JSON.stringify({ orderId, eventType }),
+    });
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok || data.ok === false) {
+      const message = data.error || `Email notification failed (${response.status}).`;
+      addToast(message, 'warning');
+      return { ok: false, error: message };
+    }
+
+    if (!data.skipped) {
+      addToast('Customer email notification sent.');
+    }
+
+    return { ok: true };
+  }, [addToast]);
+
 
 
   const completeCustomerProfile = useCallback(async (fullName) => {
@@ -1150,12 +1188,15 @@ export function AppProvider({ children }) {
     if (sessionError) return { ok: false, error: sessionError.message };
     if (!sessionResult.session) return { ok: false, error: 'No customer session is active.' };
 
-    const { error } = await submitCustomerOrder(supabase, { clientId, locationId, items });
+    const { data: orderId, error } = await submitCustomerOrder(supabase, { clientId, locationId, items });
     if (error) return { ok: false, error: error.message };
 
     await loadCustomerPortalData(sessionResult.session.user);
-    return { ok: true };
-  }, [loadCustomerPortalData]);
+    if (orderId) {
+      notifyOrderEvent(orderId, 'order_received');
+    }
+    return { ok: true, orderId };
+  }, [loadCustomerPortalData, notifyOrderEvent]);
 
   const logout = useCallback(async () => {
     if (!supabase) return;
@@ -1307,6 +1348,11 @@ export function AppProvider({ children }) {
           }
         }
 
+        const emailEventType = orderEmailEventsByAction[action.type];
+        if (emailEventType && action.payload?.orderId) {
+          notifyOrderEvent(action.payload.orderId, emailEventType);
+        }
+
         return { ok: true };
       }
 
@@ -1329,7 +1375,7 @@ export function AppProvider({ children }) {
 
       return { ok: true };
     },
-    [addToast, loadDriverPortalData, loadRemoteData]
+    [addToast, loadDriverPortalData, loadRemoteData, notifyOrderEvent]
   );
 
   const value = useMemo(
@@ -1343,6 +1389,7 @@ export function AppProvider({ children }) {
       addToast,
       addAudit,
       login,
+      notifyOrderEvent,
       logout,
       dismissNotification,
       clearNotifications,
@@ -1358,6 +1405,7 @@ export function AppProvider({ children }) {
       addToast,
       addAudit,
       login,
+      notifyOrderEvent,
       logout,
       dismissNotification,
       clearNotifications,
