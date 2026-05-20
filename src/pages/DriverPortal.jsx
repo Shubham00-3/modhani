@@ -129,7 +129,6 @@ function buildPodTimestampSnapshot({ date = new Date(), timeZone } = {}) {
   });
   return {
     iso: date.toISOString(),
-    unixMs: date.getTime(),
     local: localFormatter.format(date),
     timeZone: resolvedTimeZone,
   };
@@ -303,7 +302,6 @@ export default function DriverPortal() {
           signatureDataUrl,
           notes: notes.trim(),
           timestamp: signedTimestamp.iso,
-          signedAtUnixMs: signedTimestamp.unixMs,
           signedAtLocal: signedTimestamp.local,
           signedTimezone: signedTimestamp.timeZone,
           userId: state.currentUserId,
@@ -431,7 +429,6 @@ export default function DriverPortal() {
                     </p>
                     <div style={{ display: 'grid', gap: 4, marginTop: 10, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
                       <span>Local timestamp: {selectedOrder.podSignedAtLocal ?? formatDateTime(selectedOrder.podSignedAt)}</span>
-                      <span>Unix timestamp: {selectedOrder.podSignedAtUnixMs ?? (selectedOrder.podSignedAt ? new Date(selectedOrder.podSignedAt).getTime() : '-')}</span>
                       <span>Timezone: {selectedOrder.podSignedTimezone ?? getDeliveryTimeZone(selectedLocation, shipTo)}</span>
                     </div>
                   </div>
