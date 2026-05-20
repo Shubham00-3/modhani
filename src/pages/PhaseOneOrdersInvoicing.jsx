@@ -525,9 +525,14 @@ function DriverAssignmentRow({ order }) {
   const canAssign =
     state.currentUser?.permissions?.fulfilOrders
     || state.currentUser?.permissions?.manageSettings;
+  const isDelivered = order.status === 'delivered';
   const [saving, setSaving] = useState(false);
 
   async function handleChange(event) {
+    if (isDelivered) {
+      addToast('Delivered orders cannot have their driver changed.', 'warning');
+      return;
+    }
     const next = event.target.value || null;
     setSaving(true);
     const result = await dispatch({
@@ -563,8 +568,14 @@ function DriverAssignmentRow({ order }) {
             className="form-select"
             value={order.driverUserId ?? ''}
             onChange={handleChange}
-            disabled={!canAssign || saving || drivers.length === 0}
-            title={!canAssign ? 'Requires fulfilment or settings permission' : undefined}
+            disabled={!canAssign || saving || drivers.length === 0 || isDelivered}
+            title={
+              isDelivered
+                ? 'Delivered orders cannot have their driver changed'
+                : !canAssign
+                  ? 'Requires fulfilment or settings permission'
+                  : undefined
+            }
           >
             <option value="">- Unassigned -</option>
             {drivers.map((d) => (
@@ -574,6 +585,11 @@ function DriverAssignmentRow({ order }) {
           {drivers.length === 0 ? (
             <div style={{ marginTop: 4, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
               No active drivers registered. Invite a driver from Settings → User Management.
+            </div>
+          ) : null}
+          {isDelivered ? (
+            <div style={{ marginTop: 4, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+              Driver is locked after delivery.
             </div>
           ) : null}
         </div>
