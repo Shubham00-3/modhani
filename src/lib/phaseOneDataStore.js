@@ -16,6 +16,8 @@ function profileToUi(profile) {
     role: profile.role,
     disabledAt: profile.disabled_at ?? null,
     disabledReason: profile.disabled_reason ?? null,
+    failedLoginAttempts: Number(profile.failed_login_attempts ?? 0),
+    failedLoginLastAt: profile.failed_login_last_at ?? null,
     permissions: {
       fulfilOrders: profile.fulfil_orders,
       overridePrices: profile.override_prices,
@@ -303,6 +305,8 @@ function customerContactToUi(contact) {
     fullName: contact.full_name,
     clientId: contact.client_id,
     status: contact.status,
+    failedLoginAttempts: Number(contact.failed_login_attempts ?? 0),
+    failedLoginLastAt: contact.failed_login_last_at ?? null,
     createdAt: contact.created_at,
     updatedAt: contact.updated_at,
   };

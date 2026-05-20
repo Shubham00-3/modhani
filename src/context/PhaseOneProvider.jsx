@@ -394,7 +394,16 @@ function reducer(state, action) {
           ...state,
           customerContacts: state.customerContacts.map((contact) =>
             contact.userId === action.payload.userId
-              ? { ...contact, status: action.payload.disabled ? 'disabled' : 'active' }
+              ? {
+                  ...contact,
+                  status: action.payload.disabled ? 'disabled' : 'active',
+                  failedLoginAttempts: action.payload.disabled
+                    ? (action.payload.failedLoginAttempts ?? contact.failedLoginAttempts ?? 0)
+                    : 0,
+                  failedLoginLastAt: action.payload.disabled
+                    ? (action.payload.failedLoginLastAt ?? contact.failedLoginLastAt ?? null)
+                    : null,
+                }
               : contact
           ),
         };
@@ -408,6 +417,12 @@ function reducer(state, action) {
                 ...user,
                 disabledAt,
                 disabledReason: action.payload.disabled ? (action.payload.reason ?? user.disabledReason ?? null) : null,
+                failedLoginAttempts: action.payload.disabled
+                  ? (action.payload.failedLoginAttempts ?? user.failedLoginAttempts ?? 0)
+                  : 0,
+                failedLoginLastAt: action.payload.disabled
+                  ? (action.payload.failedLoginLastAt ?? user.failedLoginLastAt ?? null)
+                  : null,
               }
             : user
         ),

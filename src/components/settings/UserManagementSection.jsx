@@ -30,10 +30,18 @@ const STAFF_PERM_FIELDS = [
 
 const TABS = [
   { value: 'all', label: 'All' },
+  { value: 'locked', label: 'Locked' },
   { value: 'staff', label: 'Staff' },
   { value: 'driver', label: 'Drivers' },
   { value: 'customer', label: 'Customers' },
 ];
+
+function isLoginLockout(row) {
+  return Boolean(row.disabled && (
+    Number(row.failedLoginAttempts ?? 0) >= 3
+    || /failed sign-in attempts/i.test(row.disabledReason ?? '')
+  ));
+}
 
 /**
  * Unified user-management table for the Settings page. Lists staff, drivers,
@@ -55,7 +63,7 @@ export default function UserManagementSection({ canManage }) {
   );
   const settingsAdminCount = settingsAdmins.length;
 
-  const rows = useMemo(() => {
+  const allRows = useMemo(() => {
     const staffRows = state.users.map((user) => ({
       id: user.id,
       userId: user.id,
@@ -64,6 +72,9 @@ export default function UserManagementSection({ canManage }) {
       email: user.email,
       status: user.disabledAt ? 'disabled' : 'active',
       disabled: Boolean(user.disabledAt),
+      disabledReason: user.disabledReason ?? null,
+      failedLoginAttempts: Number(user.failedLoginAttempts ?? 0),
+      failedLoginLastAt: user.failedLoginLastAt ?? null,
       permissions: user.permissions,
       isSelf: user.id === currentUserId,
       // Only enabled admins count toward the "must have one admin" rule.
@@ -80,14 +91,31 @@ export default function UserManagementSection({ canManage }) {
       email: c.email,
       status: c.status,
       disabled: c.status === 'disabled',
+      disabledReason: c.status === 'disabled' && Number(c.failedLoginAttempts ?? 0) >= 3
+        ? 'Auto-disabled after 3 failed sign-in attempts.'
+        : null,
+      failedLoginAttempts: Number(c.failedLoginAttempts ?? 0),
+      failedLoginLastAt: c.failedLoginLastAt ?? null,
       permissions: null,
       isSelf: false,
       isLastAdmin: false,
     }));
-    const combined = [...staffRows, ...customerRows];
-    if (tab === 'all') return combined;
-    return combined.filter((row) => row.role === tab);
-  }, [state.users, state.customerContacts, currentUserId, settingsAdminCount, tab]);
+    return [...staffRows, ...customerRows];
+  }, [state.users, state.customerContacts, currentUserId, settingsAdminCount]);
+
+  const rows = useMemo(() => {
+    if (tab === 'all') return allRows;
+    if (tab === 'locked') return allRows.filter(isLoginLockout);
+    return allRows.filter((row) => row.role === tab);
+  }, [allRows, tab]);
+
+  const tabCounts = useMemo(() => ({
+    all: allRows.length,
+    locked: allRows.filter(isLoginLockout).length,
+    staff: allRows.filter((row) => row.role === 'staff').length,
+    driver: allRows.filter((row) => row.role === 'driver').length,
+    customer: allRows.filter((row) => row.role === 'customer').length,
+  }), [allRows]);
 
   async function callAdminApi(path, body) {
     const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -113,7 +141,12 @@ export default function UserManagementSection({ canManage }) {
   }
 
   async function handleSendReset(row) {
-    const confirmed = window.confirm(`Send a password reset email to ${row.email}?`);
+    const loginLocked = isLoginLockout(row);
+    const confirmed = window.confirm(
+      loginLocked
+        ? `Unlock ${row.email} and send a password reset link so they can set a new password?`
+        : `Send a password reset email to ${row.email}?`
+    );
     if (!confirmed) return;
     setPendingActionUserId(row.userId);
     const { ok, data } = await callAdminApi('/api/reset-user-password', { email: row.email });
@@ -127,11 +160,14 @@ export default function UserManagementSection({ canManage }) {
             role: row.role,
             disabled: false,
             disabledAt: null,
+            disabledReason: null,
+            failedLoginAttempts: 0,
+            failedLoginLastAt: null,
           },
         });
       }
       addToast(data?.reenabled
-        ? `${ROLE_LABEL[row.role]} ${row.email} re-enabled and password reset email sent.`
+        ? `${ROLE_LABEL[row.role]} ${row.email} unlocked and password reset link sent.`
         : `Password reset email sent to ${row.email}.`);
     }
   }
@@ -211,13 +247,7 @@ export default function UserManagementSection({ canManage }) {
 
       <div className="user-mgmt-tabs">
         {TABS.map((t) => {
-          const count = t.value === 'all'
-            ? rows.length
-            : (
-                t.value === 'customer'
-                  ? (state.customerContacts ?? []).length
-                  : state.users.filter((u) => u.role === t.value).length
-              );
+          const count = tabCounts[t.value] ?? 0;
           return (
             <button
               key={t.value}
@@ -245,6 +275,7 @@ export default function UserManagementSection({ canManage }) {
             const isExpanded = expandedUserId === row.userId && row.role === 'staff';
             const isBusy = pendingActionUserId === row.userId;
             const canEditPerms = row.role === 'staff' && canManage;
+            const loginLocked = isLoginLockout(row);
 
             const RoleIcon = ROLE_ICON[row.role] ?? Briefcase;
 
@@ -260,7 +291,9 @@ export default function UserManagementSection({ canManage }) {
                     <div className="um-name-line">
                       <span className="um-name">{row.name}</span>
                       {row.isSelf ? <span className="um-self-chip">You</span> : null}
-                      {row.disabled ? (
+                      {loginLocked ? (
+                        <span className="um-status um-status-locked">Locked after 3 wrong passwords</span>
+                      ) : row.disabled ? (
                         <span className="um-status um-status-disabled">Disabled</span>
                       ) : row.role === 'customer' ? (
                         <span className={`um-status um-status-${row.status}`}>
@@ -269,6 +302,11 @@ export default function UserManagementSection({ canManage }) {
                       ) : null}
                     </div>
                     <div className="um-email">{row.email}</div>
+                    {loginLocked ? (
+                      <div className="um-lockout-note">
+                        Admin must send an unlock/reset link before this user can set a new password and log in.
+                      </div>
+                    ) : null}
                     {row.role === 'staff' && row.permissions ? (
                       <div className="um-perm-summary">
                         {STAFF_PERM_FIELDS.map((p) => (
@@ -310,8 +348,8 @@ export default function UserManagementSection({ canManage }) {
                       type="button"
                       disabled={!canManage || isBusy}
                       onClick={() => handleSendReset(row)}
-                      aria-label="Send password reset email"
-                      title="Send password reset email"
+                      aria-label={loginLocked ? 'Send unlock and password reset link' : 'Send password reset email'}
+                      title={loginLocked ? 'Send unlock and password reset link' : 'Send password reset email'}
                     >
                       <KeyRound size={15} />
                     </button>
