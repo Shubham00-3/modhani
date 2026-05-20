@@ -17,6 +17,7 @@ import {
   formatCurrency,
   formatDate,
   formatDateTime,
+  formatTorontoDateTime,
   getBatchLabel,
   getActiveCatalogProducts,
   getClientName,
@@ -800,8 +801,8 @@ function OrderDetailPanel({
                 {formatDateTime(order.podSignedAt)}
               </div>
               <div style={{ display: 'grid', gap: 3, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', marginTop: 8 }}>
-                <span>Local timestamp: {order.podSignedAtLocal ?? formatDateTime(order.podSignedAt)}</span>
-                <span>Timezone: {order.podSignedTimezone ?? 'Local'}</span>
+                <span>Local timestamp: {order.podSignedAtLocal ?? formatTorontoDateTime(order.podSignedAt)}</span>
+                <span>Timezone: {order.podSignedTimezone ?? 'America/Toronto'}</span>
               </div>
               {order.podNotes ? <p style={{ marginTop: 10 }}>{order.podNotes}</p> : null}
             </div>

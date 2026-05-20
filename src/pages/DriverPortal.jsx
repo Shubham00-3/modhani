@@ -3,6 +3,7 @@ import { ClipboardSignature, LogOut, MapPin, Printer, RotateCcw, Truck } from 'l
 import { useApp } from '../context/useApp';
 import {
   formatDateTime,
+  formatTorontoDateTime,
   getClientName,
   getLocationName,
   getOrderShipToSnapshot,
@@ -358,7 +359,7 @@ export default function DriverPortal() {
                       Signed by <strong>{selectedOrder.podSignedBy}</strong> on {formatDateTime(selectedOrder.podSignedAt)}
                     </p>
                     <div style={{ display: 'grid', gap: 4, marginTop: 10, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
-                      <span>Local timestamp: {selectedOrder.podSignedAtLocal ?? formatDateTime(selectedOrder.podSignedAt)}</span>
+                      <span>Local timestamp: {selectedOrder.podSignedAtLocal ?? formatTorontoDateTime(selectedOrder.podSignedAt)}</span>
                       <span>Timezone: {selectedOrder.podSignedTimezone ?? POD_TIME_ZONE}</span>
                     </div>
                   </div>

@@ -337,6 +337,21 @@ export function formatDateTime(dateString) {
   }).format(new Date(dateString));
 }
 
+export function formatTorontoDateTime(dateString) {
+  if (!dateString) return '-';
+  return new Intl.DateTimeFormat('en-CA', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true,
+    timeZoneName: 'short',
+    timeZone: 'America/Toronto',
+  }).format(new Date(dateString));
+}
+
 export function getEffectiveItemPrice(item) {
   return item.overridePrice ?? item.clientPrice ?? item.basePrice ?? 0;
 }

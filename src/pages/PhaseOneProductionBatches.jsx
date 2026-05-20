@@ -536,8 +536,8 @@ function LogProductionModal({ onClose, onSave }) {
         return haystack.includes(search);
       });
   }, [activeProducts, productSearch]);
-  const productSuggestions = productSearch.trim() ? filteredProducts.slice(0, 8) : [];
-  const showProductSuggestions = isProductSearchFocused && productSearch.trim() && !productId;
+  const productSuggestions = filteredProducts.slice(0, 50);
+  const showProductSuggestions = isProductSearchFocused && !productId;
 
   return (
     <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
@@ -575,7 +575,8 @@ function LogProductionModal({ onClose, onSave }) {
                   borderRadius: 'var(--radius-md)',
                   background: 'var(--color-surface)',
                   boxShadow: 'var(--shadow-sm)',
-                  overflow: 'hidden',
+                  overflow: 'auto',
+                  maxHeight: 240,
                 }}
               >
                 {productSuggestions.length ? (
@@ -611,27 +612,6 @@ function LogProductionModal({ onClose, onSave }) {
                     No products match this search.
                   </div>
                 )}
-              </div>
-            ) : null}
-            <select
-              className="form-select"
-              value={productId}
-              onChange={(event) => {
-                const nextProduct = getProduct(state.products, event.target.value);
-                setProductId(event.target.value);
-                setProductSearch(nextProduct ? getProductDisplayName(nextProduct) : productSearch);
-              }}
-            >
-              <option value="">Select product</option>
-              {filteredProducts.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {getProductDisplayName(product)}
-                </option>
-              ))}
-            </select>
-            {!filteredProducts.length ? (
-              <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                No products match this search.
               </div>
             ) : null}
             {selectedProduct ? (

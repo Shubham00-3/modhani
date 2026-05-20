@@ -1,6 +1,7 @@
 import {
   buildBatchSummary,
   formatDate,
+  formatTorontoDateTime,
   getClientName,
   getEffectiveItemPrice,
   getOrderShipToSnapshot,
@@ -379,8 +380,8 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
     ? `<img src="${order.podSignatureDataUrl}" alt="POD signature" style="max-width:320px;max-height:120px;object-fit:contain;" />`
     : '<div style="height:90px;border-bottom:1px solid #111827;"></div>';
   const signedAt = order.podSignedAt ?? new Date().toISOString();
-  const signedLocal = order.podSignedAtLocal ?? formatDate(signedAt);
-  const signedTimezone = order.podSignedTimezone ?? 'Local';
+  const signedLocal = order.podSignedAtLocal ?? formatTorontoDateTime(signedAt);
+  const signedTimezone = order.podSignedTimezone ?? 'America/Toronto';
 
   openPrintableWindow(
     `POD ${order.orderNumber}`,
