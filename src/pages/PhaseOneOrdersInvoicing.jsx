@@ -534,6 +534,16 @@ function DriverAssignmentRow({ order }) {
       return;
     }
     const next = event.target.value || null;
+    if ((order.driverUserId ?? null) === next) return;
+
+    const nextDriver = next ? drivers.find((driver) => driver.id === next) : null;
+    const confirmed = window.confirm(
+      next
+        ? `Assign ${nextDriver?.name ?? 'this driver'} to order #${order.orderNumber}?`
+        : `Remove the assigned driver from order #${order.orderNumber}?`
+    );
+    if (!confirmed) return;
+
     setSaving(true);
     const result = await dispatch({
       type: 'ASSIGN_DRIVER',
