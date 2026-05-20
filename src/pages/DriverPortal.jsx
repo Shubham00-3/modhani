@@ -47,15 +47,20 @@ function formatAddress(shipTo) {
 }
 
 function buildPodTimestampSnapshot(date = new Date()) {
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Local';
+  const localFormatter = new Intl.DateTimeFormat('en-CA', {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    timeZoneName: 'short',
+  });
   return {
     iso: date.toISOString(),
     unixMs: date.getTime(),
-    local: new Intl.DateTimeFormat('en-CA', {
-      dateStyle: 'medium',
-      timeStyle: 'medium',
-      timeZoneName: 'short',
-    }).format(date),
+    local: localFormatter.format(date),
     timeZone,
   };
 }
@@ -215,9 +220,9 @@ export default function DriverPortal() {
 
     setSaving(true);
     const justPoddedOrderId = selectedOrder.id;
-    const signedTimestamp = buildPodTimestampSnapshot();
     let result;
     try {
+      const signedTimestamp = buildPodTimestampSnapshot();
       result = await dispatch({
         type: 'COMPLETE_DELIVERY_POD',
         payload: {
