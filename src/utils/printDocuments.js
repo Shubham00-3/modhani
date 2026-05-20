@@ -386,12 +386,29 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
   openPrintableWindow(
     `POD ${order.orderNumber}`,
     `
-      <main style="font-family:Segoe UI,Arial,sans-serif;padding:32px;color:#111827;background:#fff;min-height:100vh;">
-        <header style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-bottom:28px;">
+      <style>
+        @page { size: letter; margin: 0.35in; }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #fff !important; }
+        .pod-sheet {
+          font-family: Segoe UI, Arial, sans-serif;
+          padding: 18px;
+          color: #111827;
+          background: #fff;
+          page-break-after: avoid;
+          break-after: avoid;
+        }
+        .pod-section { break-inside: avoid; page-break-inside: avoid; }
+        @media print {
+          .pod-sheet { padding: 0; }
+        }
+      </style>
+      <main class="pod-sheet">
+        <header class="pod-section" style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:18px;">
           <div style="display:flex;align-items:center;gap:18px;">
-            <img src="${logoSrc}" alt="Modhani" style="width:168px;height:auto;object-fit:contain;" />
+            <img src="${logoSrc}" alt="Modhani" style="width:148px;height:auto;object-fit:contain;" />
             <div>
-              <div style="font-size:28px;font-weight:700;">Proof of Delivery</div>
+              <div style="font-size:24px;font-weight:700;">Proof of Delivery</div>
               <div style="margin-top:6px;color:#6b7280;">Signed delivery record</div>
             </div>
           </div>
@@ -402,18 +419,18 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
           </div>
         </header>
 
-        <section style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:28px;">
-          <div style="padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
+        <section class="pod-section" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;">
+          <div style="padding:12px;border:1px solid #e5e7eb;border-radius:10px;">
             <div style="font-size:12px;text-transform:uppercase;color:#6b7280;">Client</div>
             <div style="font-size:18px;font-weight:600;margin-top:4px;">${escapeHtml(clientName)}</div>
           </div>
-          <div style="padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
+          <div style="padding:12px;border:1px solid #e5e7eb;border-radius:10px;">
             <div style="font-size:12px;text-transform:uppercase;color:#6b7280;">Ship To</div>
             <div style="font-size:16px;font-weight:600;margin-top:4px;">${formatAddressBlock(shipTo.name, shipTo)}</div>
           </div>
         </section>
 
-        <table style="width:100%;border-collapse:collapse;margin-bottom:32px;">
+        <table class="pod-section" style="width:100%;border-collapse:collapse;margin-bottom:18px;">
           <thead>
             <tr>
               <th style="text-align:left;border:1px solid #e5e7eb;padding:10px;background:#f9fafb;">Product</th>
@@ -424,12 +441,12 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
           <tbody>${rows}</tbody>
         </table>
 
-        <section style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:end;">
-          <div style="padding:18px;border:1px solid #e5e7eb;border-radius:10px;">
+        <section class="pod-section" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:end;">
+          <div style="padding:14px;border:1px solid #e5e7eb;border-radius:10px;">
             <div style="font-size:12px;text-transform:uppercase;color:#6b7280;margin-bottom:12px;">Receiver Signature</div>
             ${signatureImage}
           </div>
-          <div style="padding:18px;border:1px solid #e5e7eb;border-radius:10px;line-height:1.7;">
+          <div style="padding:14px;border:1px solid #e5e7eb;border-radius:10px;line-height:1.55;">
             <div><strong>Received By:</strong> ${escapeHtml(order.podSignedBy ?? '-')}</div>
             <div><strong>Local Timestamp:</strong> ${escapeHtml(signedLocal)}</div>
             <div><strong>Timezone:</strong> ${escapeHtml(signedTimezone)}</div>
