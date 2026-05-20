@@ -82,8 +82,16 @@ export default async function handler(req, res) {
   // or a customer contact. Otherwise refuse, so admins can't spray reset
   // emails at arbitrary external addresses.
   const [{ data: targetProfile }, { data: targetContact }] = await Promise.all([
-    supabase.from('profiles').select('user_id, role, full_name').eq('email', trimmedEmail).maybeSingle(),
-    supabase.from('customer_contacts').select('user_id, full_name').eq('email', trimmedEmail).maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('user_id, role, full_name, disabled_at')
+      .eq('email', trimmedEmail)
+      .maybeSingle(),
+    supabase
+      .from('customer_contacts')
+      .select('user_id, full_name, status')
+      .eq('email', trimmedEmail)
+      .maybeSingle(),
   ]);
 
   if (!targetProfile && !targetContact) {
@@ -98,6 +106,57 @@ export default async function handler(req, res) {
     || 'http://localhost:5173';
 
   const redirectTo = normalizePublicUrl(appUrl);
+  const targetUserId = targetProfile?.user_id ?? targetContact?.user_id;
+  let reenabled = false;
+
+  if (targetProfile?.disabled_at) {
+    const { error: enableError } = await supabase
+      .from('profiles')
+      .update({
+        disabled_at: null,
+        disabled_by: null,
+        disabled_reason: null,
+        failed_login_attempts: 0,
+        failed_login_last_at: null,
+      })
+      .eq('user_id', targetProfile.user_id);
+
+    if (enableError) {
+      return res.status(500).json({ ok: false, error: `Could not re-enable user before reset: ${enableError.message}` });
+    }
+    reenabled = true;
+  } else if (targetContact?.status === 'disabled') {
+    const { error: enableError } = await supabase
+      .from('customer_contacts')
+      .update({
+        status: 'active',
+        failed_login_attempts: 0,
+        failed_login_last_at: null,
+      })
+      .eq('user_id', targetContact.user_id);
+
+    if (enableError) {
+      return res.status(500).json({ ok: false, error: `Could not re-enable customer before reset: ${enableError.message}` });
+    }
+    reenabled = true;
+  } else if (targetUserId) {
+    await Promise.all([
+      supabase
+        .from('profiles')
+        .update({ failed_login_attempts: 0, failed_login_last_at: null })
+        .eq('user_id', targetUserId),
+      supabase
+        .from('customer_contacts')
+        .update({ failed_login_attempts: 0, failed_login_last_at: null })
+        .eq('user_id', targetUserId),
+    ]);
+  }
+
+  if (targetUserId) {
+    await supabase.auth.admin.updateUserById(targetUserId, {
+      ban_duration: 'none',
+    }).then(() => null, () => null);
+  }
 
   const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
     redirectTo,
@@ -114,10 +173,10 @@ export default async function handler(req, res) {
     p_client_id: null,
     p_user_id: caller.id,
     p_user_name: callerProfile.full_name,
-    p_details: `Sent password reset to ${trimmedEmail}`,
-    p_previous_value: null,
-    p_new_value: null,
+    p_details: `${reenabled ? 'Re-enabled account and sent' : 'Sent'} password reset to ${trimmedEmail}`,
+    p_previous_value: reenabled ? 'disabled' : null,
+    p_new_value: reenabled ? 'active' : null,
   }).then(() => null, () => null);
 
-  return res.status(200).json({ ok: true, email: trimmedEmail });
+  return res.status(200).json({ ok: true, email: trimmedEmail, reenabled, userId: targetUserId });
 }

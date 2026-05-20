@@ -116,9 +116,24 @@ export default function UserManagementSection({ canManage }) {
     const confirmed = window.confirm(`Send a password reset email to ${row.email}?`);
     if (!confirmed) return;
     setPendingActionUserId(row.userId);
-    const { ok } = await callAdminApi('/api/reset-user-password', { email: row.email });
+    const { ok, data } = await callAdminApi('/api/reset-user-password', { email: row.email });
     setPendingActionUserId(null);
-    if (ok) addToast(`Password reset email sent to ${row.email}.`);
+    if (ok) {
+      if (data?.reenabled) {
+        await dispatch({
+          type: 'SET_USER_DISABLED',
+          payload: {
+            userId: row.userId,
+            role: row.role,
+            disabled: false,
+            disabledAt: null,
+          },
+        });
+      }
+      addToast(data?.reenabled
+        ? `${ROLE_LABEL[row.role]} ${row.email} re-enabled and password reset email sent.`
+        : `Password reset email sent to ${row.email}.`);
+    }
   }
 
   async function handleToggleDisabled(row) {

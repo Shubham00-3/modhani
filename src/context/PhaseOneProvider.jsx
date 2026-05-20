@@ -1158,12 +1158,45 @@ export function AppProvider({ children }) {
       return { ok: false, error: getSupabaseConfigError() };
     }
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
+    const normalizedEmail = String(email ?? '').trim().toLowerCase();
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
       password,
     });
 
-    if (error) return { ok: false, error: error.message };
+    if (error) {
+      const response = await fetch('/api/record-login-failure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail }),
+      }).catch(() => null);
+      const failureData = await response?.json().catch(() => ({}));
+
+      if (failureData?.locked) {
+        return {
+          ok: false,
+          error: failureData.error ?? 'Too many failed sign-in attempts. Ask an admin to re-enable your account and send a password reset link.',
+        };
+      }
+      if (Number.isFinite(failureData?.attemptsRemaining)) {
+        return {
+          ok: false,
+          error: failureData.error ?? `${error.message} ${failureData.attemptsRemaining} attempt${failureData.attemptsRemaining === 1 ? '' : 's'} remaining before this account is disabled.`,
+        };
+      }
+      return { ok: false, error: error.message };
+    }
+
+    if (data.session?.access_token) {
+      fetch('/api/clear-login-failures', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${data.session.access_token}`,
+        },
+      }).catch(() => null);
+    }
+
     return { ok: true };
   }, []);
 

@@ -150,7 +150,18 @@ export function getActiveCatalogProducts(products) {
 
 export function getProductDisplayName(product) {
   if (!product) return 'Unknown product';
-  return `${product.name} ${product.unitSize}`;
+  const name = String(product.name ?? '').trim();
+  const unitSize = String(product.unitSize ?? '').trim();
+  if (!unitSize) return name || 'Unknown product';
+
+  const normalize = (value) =>
+    String(value ?? '')
+      .toLowerCase()
+      .replace(/\b(grams|gram|gms|gm)\b/g, 'g')
+      .replace(/\b(liters|litres|liter|litre|lit)\b/g, 'l')
+      .replace(/[^a-z0-9.%]+/g, '');
+
+  return normalize(name).includes(normalize(unitSize)) ? name : `${name} ${unitSize}`;
 }
 
 export function getProductOrderUnitLabel(product) {

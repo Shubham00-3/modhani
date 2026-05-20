@@ -79,7 +79,7 @@ export default async function handler(req, res) {
   const { data: targetContact } = !targetProfile
     ? await supabase
         .from('customer_contacts')
-        .select('user_id, email, full_name, status')
+        .select('user_id, email, full_name, status, failed_login_attempts, failed_login_last_at')
         .eq('user_id', userId)
         .maybeSingle()
     : { data: null };
@@ -118,7 +118,13 @@ export default async function handler(req, res) {
           disabled_by: caller.id,
           disabled_reason: reason?.trim() || null,
         }
-      : { disabled_at: null, disabled_by: null, disabled_reason: null };
+      : {
+          disabled_at: null,
+          disabled_by: null,
+          disabled_reason: null,
+          failed_login_attempts: 0,
+          failed_login_last_at: null,
+        };
     const { error: updateError } = await supabase
       .from('profiles')
       .update(update)
@@ -130,7 +136,11 @@ export default async function handler(req, res) {
     const nextStatus = disabled ? 'disabled' : 'active';
     const { error: updateError } = await supabase
       .from('customer_contacts')
-      .update({ status: nextStatus })
+      .update({
+        status: nextStatus,
+        failed_login_attempts: disabled ? targetContact.failed_login_attempts : 0,
+        failed_login_last_at: disabled ? targetContact.failed_login_last_at : null,
+      })
       .eq('user_id', userId);
     if (updateError) {
       return res.status(500).json({ ok: false, error: `Failed to update contact: ${updateError.message}` });
