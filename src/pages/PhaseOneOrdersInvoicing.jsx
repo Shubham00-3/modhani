@@ -1781,13 +1781,20 @@ function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) 
             emptyMessage="No products match this search."
             getOptionValue={(product) => product.id}
             getOptionLabel={getProductDisplayName}
-            getOptionMeta={(product) => product.qbItemName ?? ''}
+            getOptionMeta={(product) =>
+              [
+                product.itemNumber ? `Item #${product.itemNumber}` : '',
+                product.orderUnitLabel || product.packagingDetails || product.category || '',
+              ].filter(Boolean).join(' - ')
+            }
             getSearchText={(product) =>
               [
                 product.name,
                 product.unitSize,
                 product.category,
-                product.qbItemName,
+                product.itemNumber,
+                product.orderUnitLabel,
+                product.packagingDetails,
                 getProductDisplayName(product),
               ]
                 .filter(Boolean)

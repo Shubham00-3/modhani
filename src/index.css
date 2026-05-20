@@ -2395,7 +2395,8 @@ input[type='checkbox']:disabled {
 }
 
 .modal-order {
-  max-width: 760px;
+  max-width: 920px;
+  width: 92vw;
 }
 
 /* Order detail modal - wider than the form modals so the line table fits. */
@@ -2583,7 +2584,7 @@ input[type='checkbox']:disabled {
 
 .order-line-editor {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(140px, 160px) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 140px) auto;
   gap: var(--space-4);
   align-items: end;
 }
@@ -2682,11 +2683,11 @@ input[type='checkbox']:disabled {
 
 .searchable-select-option {
   width: 100%;
-  min-height: 42px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
+  min-height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
   padding: 9px 12px;
   border: 0;
   border-bottom: 1px solid var(--color-border-subtle);
@@ -2695,6 +2696,7 @@ input[type='checkbox']:disabled {
   font: inherit;
   text-align: left;
   cursor: pointer;
+  line-height: 1.25;
 }
 
 .searchable-select-option:last-child {
@@ -2708,15 +2710,16 @@ input[type='checkbox']:disabled {
 
 .searchable-select-option span:first-child {
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-weight: 600;
 }
 
 .searchable-select-option .cell-monospace {
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .searchable-select-empty {
