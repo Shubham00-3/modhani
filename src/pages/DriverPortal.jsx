@@ -46,77 +46,9 @@ function formatAddress(shipTo) {
   return deduped.join(', ');
 }
 
-const CANADA_TIME_ZONE_BY_PROVINCE = {
-  AB: 'America/Edmonton',
-  ALBERTA: 'America/Edmonton',
-  BC: 'America/Vancouver',
-  'BRITISH COLUMBIA': 'America/Vancouver',
-  MB: 'America/Winnipeg',
-  MANITOBA: 'America/Winnipeg',
-  NB: 'America/Moncton',
-  'NEW BRUNSWICK': 'America/Moncton',
-  NL: 'America/St_Johns',
-  NEWFOUNDLAND: 'America/St_Johns',
-  'NEWFOUNDLAND AND LABRADOR': 'America/St_Johns',
-  NS: 'America/Halifax',
-  'NOVA SCOTIA': 'America/Halifax',
-  NT: 'America/Yellowknife',
-  'NORTHWEST TERRITORIES': 'America/Yellowknife',
-  NU: 'America/Iqaluit',
-  NUNAVUT: 'America/Iqaluit',
-  ON: 'America/Toronto',
-  ONTARIO: 'America/Toronto',
-  PE: 'America/Halifax',
-  PEI: 'America/Halifax',
-  'PRINCE EDWARD ISLAND': 'America/Halifax',
-  QC: 'America/Toronto',
-  QUEBEC: 'America/Toronto',
-  SK: 'America/Regina',
-  SASKATCHEWAN: 'America/Regina',
-  YT: 'America/Whitehorse',
-  YUKON: 'America/Whitehorse',
-};
+const POD_TIME_ZONE = 'America/Toronto';
 
-const CANADA_TIME_ZONE_BY_POSTAL_PREFIX = {
-  A: 'America/St_Johns',
-  B: 'America/Halifax',
-  C: 'America/Halifax',
-  E: 'America/Moncton',
-  G: 'America/Toronto',
-  H: 'America/Toronto',
-  J: 'America/Toronto',
-  K: 'America/Toronto',
-  L: 'America/Toronto',
-  M: 'America/Toronto',
-  N: 'America/Toronto',
-  P: 'America/Toronto',
-  R: 'America/Winnipeg',
-  S: 'America/Regina',
-  T: 'America/Edmonton',
-  V: 'America/Vancouver',
-  X: 'America/Yellowknife',
-  Y: 'America/Whitehorse',
-};
-
-function getDeliveryTimeZone(location, shipTo) {
-  const postalPrefix = String(shipTo?.postalCode ?? location?.postalCode ?? '')
-    .trim()
-    .charAt(0)
-    .toUpperCase();
-  const provinceKey = String(shipTo?.province ?? location?.province ?? '')
-    .trim()
-    .toUpperCase();
-
-  return (
-    CANADA_TIME_ZONE_BY_POSTAL_PREFIX[postalPrefix]
-    ?? CANADA_TIME_ZONE_BY_PROVINCE[provinceKey]
-    ?? Intl.DateTimeFormat().resolvedOptions().timeZone
-    ?? 'America/Toronto'
-  );
-}
-
-function buildPodTimestampSnapshot({ date = new Date(), timeZone } = {}) {
-  const resolvedTimeZone = timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'America/Toronto';
+function buildPodTimestampSnapshot(date = new Date()) {
   const localFormatter = new Intl.DateTimeFormat('en-CA', {
     year: 'numeric',
     month: 'short',
@@ -125,12 +57,12 @@ function buildPodTimestampSnapshot({ date = new Date(), timeZone } = {}) {
     minute: '2-digit',
     second: '2-digit',
     timeZoneName: 'short',
-    timeZone: resolvedTimeZone,
+    timeZone: POD_TIME_ZONE,
   });
   return {
     iso: date.toISOString(),
     local: localFormatter.format(date),
-    timeZone: resolvedTimeZone,
+    timeZone: POD_TIME_ZONE,
   };
 }
 
@@ -291,9 +223,7 @@ export default function DriverPortal() {
     const justPoddedOrderId = selectedOrder.id;
     let result;
     try {
-      const signedTimestamp = buildPodTimestampSnapshot({
-        timeZone: getDeliveryTimeZone(selectedLocation, shipTo),
-      });
+      const signedTimestamp = buildPodTimestampSnapshot();
       result = await dispatch({
         type: 'COMPLETE_DELIVERY_POD',
         payload: {
@@ -429,7 +359,7 @@ export default function DriverPortal() {
                     </p>
                     <div style={{ display: 'grid', gap: 4, marginTop: 10, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
                       <span>Local timestamp: {selectedOrder.podSignedAtLocal ?? formatDateTime(selectedOrder.podSignedAt)}</span>
-                      <span>Timezone: {selectedOrder.podSignedTimezone ?? getDeliveryTimeZone(selectedLocation, shipTo)}</span>
+                      <span>Timezone: {selectedOrder.podSignedTimezone ?? POD_TIME_ZONE}</span>
                     </div>
                   </div>
                   {selectedOrder.podSignatureDataUrl ? (
