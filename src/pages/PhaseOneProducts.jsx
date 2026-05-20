@@ -37,13 +37,11 @@ export default function PhaseOneProducts() {
         product.unitSize,
         product.category,
         product.itemNumber,
-        product.upc,
         product.packagingDetails,
         product.unitsPerCase,
         product.shelfLifeDays,
         product.leadTimeDays,
         product.orderUnitLabel,
-        product.qbItemName,
         product.baseCataloguePrice,
         ...Object.values(product.tierPrices ?? {}),
       ]
@@ -125,9 +123,6 @@ export default function PhaseOneProducts() {
                     <td className="cell-monospace">{product.itemNumber || '-'}</td>
                     <td>
                       <div style={{ fontWeight: 600 }}>{getProductDisplayName(product)}</div>
-                      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>
-                        {[product.upc ? `UPC ${product.upc}` : '', product.qbItemName ? `QB ${product.qbItemName}` : ''].filter(Boolean).join(' | ')}
-                      </div>
                     </td>
                     <td>{product.category || '-'}</td>
                     <td>
