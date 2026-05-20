@@ -14,6 +14,8 @@ function profileToUi(profile) {
     name: profile.full_name,
     initials: profile.initials,
     role: profile.role,
+    disabledAt: profile.disabled_at ?? null,
+    disabledReason: profile.disabled_reason ?? null,
     permissions: {
       fulfilOrders: profile.fulfil_orders,
       overridePrices: profile.override_prices,
@@ -120,6 +122,9 @@ function batchToUi(batch) {
     qtyRemaining: Number(batch.qty_remaining),
     status: batch.status,
     updatedAt: batch.updated_at,
+    deletedAt: batch.deleted_at ?? null,
+    deletedBy: batch.deleted_by ?? null,
+    deletedReason: batch.deleted_reason ?? null,
   };
 }
 
@@ -601,16 +606,41 @@ export async function fetchRemoteState(supabase, userId) {
   };
 }
 
+/**
+ * Custom error thrown when a recognized user is in the disabled state.
+ * The AuthScreen / provider catches this to sign them out and surface a
+ * clear message instead of letting them into the app.
+ */
+export class AccountDisabledError extends Error {
+  constructor() {
+    super('Your account has been disabled. Contact a settings admin to re-enable it.');
+    this.name = 'AccountDisabledError';
+    this.code = 'ACCOUNT_DISABLED';
+  }
+}
+
 export async function fetchAuthIdentity(supabase, userId) {
   const { data: staffProfile, error: staffError } = await supabase
     .from('profiles')
-    .select('user_id, role')
+    .select('user_id, role, disabled_at')
     .eq('user_id', userId)
     .maybeSingle();
 
   if (staffError) throw staffError;
-  if (staffProfile?.role === 'driver') return 'driver';
-  if (staffProfile) return 'staff';
+  if (staffProfile) {
+    if (staffProfile.disabled_at) throw new AccountDisabledError();
+    if (staffProfile.role === 'driver') return 'driver';
+    return 'staff';
+  }
+
+  // Customer side — block disabled status too.
+  const { data: contact } = await supabase
+    .from('customer_contacts')
+    .select('user_id, status')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (contact?.status === 'disabled') throw new AccountDisabledError();
+
   return 'customer';
 }
 
@@ -903,6 +933,24 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_product_id: action.payload.productId,
         p_production_date: action.payload.productionDate,
         p_qty_produced: action.payload.qtyProduced,
+        p_user_id: currentUser.id,
+      });
+    case 'EDIT_PRODUCTION_BATCH':
+      return callRpc(supabase, 'modhanios_edit_production_batch', {
+        p_batch_id: action.payload.id,
+        p_user_id: currentUser.id,
+        p_new_qty: action.payload.qtyProduced,
+        p_reason: action.payload.reason ?? null,
+      });
+    case 'SOFT_DELETE_BATCH':
+      return callRpc(supabase, 'modhanios_soft_delete_batch', {
+        p_batch_id: action.payload.id,
+        p_user_id: currentUser.id,
+        p_reason: action.payload.reason ?? null,
+      });
+    case 'RESTORE_BATCH':
+      return callRpc(supabase, 'modhanios_restore_batch', {
+        p_batch_id: action.payload.id,
         p_user_id: currentUser.id,
       });
     default:

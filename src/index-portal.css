@@ -27,6 +27,33 @@
   align-items: center;
   gap: 16px;
 }
+
+/* Persistent context strip below the main nav showing first name + company + location */
+.cp-nav-context {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(255, 255, 255, 0.55);
+}
+.cp-nav-context-inner {
+  padding: 8px clamp(16px, 3vw, 32px);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cp-nav-context-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 12.5px;
+  color: var(--color-text-secondary, #4b5563);
+  white-space: nowrap;
+}
+.cp-nav-context-chip strong {
+  color: var(--color-text, #111827);
+  font-weight: 700;
+}
+.cp-nav-context-chip svg { color: var(--color-text-muted, #9ca3af); }
 .cp-nav-brand {
   display: flex;
   align-items: center;

@@ -2091,12 +2091,12 @@ img {
   min-width: 680px;
 }
 
-/* Compact variant: no min-width — fits into a half-width card without scrolling. */
+/* Compact variant: no min-width - fits into a half-width card without scrolling. */
 .data-table-compact {
   min-width: 0;
 }
 
-/* User Roles permissions table — name on left, checkbox columns evenly centered. */
+/* User Roles permissions table - name on left, checkbox columns evenly centered. */
 .data-table-permissions th:not(:first-child),
 .data-table-permissions td:not(:first-child) {
   text-align: center;
@@ -2116,7 +2116,7 @@ img {
   opacity: 0.5;
 }
 
-/* QuickBooks Connection — flat stat grid (no nested cards). */
+/* QuickBooks Connection - flat stat grid (no nested cards). */
 .qb-stat-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2398,7 +2398,7 @@ input[type='checkbox']:disabled {
   max-width: 760px;
 }
 
-/* Order detail modal — wider than the form modals so the line table fits. */
+/* Order detail modal - wider than the form modals so the line table fits. */
 .modal-order-detail {
   max-width: 880px;
   width: 92vw;
@@ -3632,6 +3632,22 @@ input[type='checkbox']:disabled {
   background: #fef2f2;
   color: #b91c1c;
 }
+
+/* Re-enable icon - softer brand-green hover */
+.um-icon-btn-restore {
+  color: var(--color-success, #16a34a);
+}
+.um-icon-btn-restore:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.10);
+  color: #15803d;
+}
+
+/* Visually dim disabled rows */
+.um-row.is-disabled {
+  opacity: 0.62;
+}
+.um-row.is-disabled .um-name { color: var(--color-text-secondary); }
+.um-row.is-disabled:hover { opacity: 0.85; }
 
 .um-link-btn {
   display: inline-flex;

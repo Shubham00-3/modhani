@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
-  formatCurrency,
   formatDateTime,
   getProductDisplayName,
   getProductOrderUnitLabel,
@@ -46,14 +45,12 @@ export default function CustomerRecentOrders() {
                 <div className="cp-recent-detail-lines">
                   {order.items.map((item) => {
                     const product = productsById.get(item.productId);
-                    const unitPrice = item.clientPrice ?? product?.clientPrice ?? 0;
                     return (
                       <div className="cp-recent-detail-line" key={item.id}>
                         <span>{product ? getProductDisplayName(product) : item.productId}</span>
                         <span className="cp-detail-qty">
                           {Number(item.quantity).toLocaleString()} x {product ? getProductOrderUnitLabel(product) : 'Order unit'}
                         </span>
-                        <span className="cp-detail-price">{formatCurrency(Number(item.quantity) * unitPrice)}</span>
                       </div>
                     );
                   })}

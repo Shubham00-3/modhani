@@ -1,11 +1,38 @@
 import { Link } from 'react-router-dom';
-import { ShoppingCart } from 'lucide-react';
+import { Building2, MapPin, ShoppingCart, User } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { useCart } from '../hooks/useCart';
 
+function firstNameOf(fullName, fallbackEmail) {
+  if (fullName && fullName.trim()) {
+    return fullName.trim().split(/\s+/)[0];
+  }
+  if (fallbackEmail && fallbackEmail.includes('@')) {
+    return fallbackEmail.split('@')[0];
+  }
+  return 'Welcome';
+}
+
 export default function CustomerPortalShell({ children }) {
-  const { logout } = useApp();
-  const { cartItemCount } = useCart();
+  const { state, logout } = useApp();
+  const {
+    cartItemCount,
+    activeClientId,
+    activeLocationId,
+    portalClients,
+    activeLocations,
+  } = useCart();
+
+  const contact = state.customerPortal?.contact ?? null;
+  const firstName = firstNameOf(contact?.fullName, contact?.email);
+
+  const activeCompany = portalClients.find((c) => c.id === activeClientId);
+  const companyLabel = activeCompany
+    ? (activeCompany.operatingAs?.trim() || activeCompany.name)
+    : null;
+
+  const activeLocation = activeLocations.find((l) => l.id === activeLocationId);
+  const locationLabel = activeLocation?.name ?? null;
 
   return (
     <main className="customer-portal-page">
@@ -32,6 +59,30 @@ export default function CustomerPortalShell({ children }) {
             </button>
           </div>
         </div>
+
+        {/* Persistent user / company / location strip */}
+        {(contact || companyLabel || locationLabel) ? (
+          <div className="cp-nav-context">
+            <div className="cp-nav-inner cp-nav-context-inner">
+              <span className="cp-nav-context-chip">
+                <User size={13} />
+                <span>Signed in as <strong>{firstName}</strong></span>
+              </span>
+              {companyLabel ? (
+                <span className="cp-nav-context-chip">
+                  <Building2 size={13} />
+                  <span>{companyLabel}</span>
+                </span>
+              ) : null}
+              {locationLabel ? (
+                <span className="cp-nav-context-chip">
+                  <MapPin size={13} />
+                  <span>{locationLabel}</span>
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
       </header>
       <div className="customer-portal-content">{children}</div>
     </main>

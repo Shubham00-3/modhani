@@ -4,7 +4,6 @@ import { Building2, CheckCircle2, Droplets, Milk, Minus, Package, Plus, Search, 
 import { useApp } from '../context/useApp';
 import { useCart } from '../hooks/useCart';
 import {
-  formatCurrency,
   getProductDisplayName,
   getProductImageUrl,
   getProductOrderUnitLabel,
@@ -19,7 +18,6 @@ export default function CustomerPortal() {
     quantities,
     activeProducts,
     cartItemCount,
-    orderTotal,
     updateProductQuantity,
     hasMultipleClients,
     portalClients,
@@ -248,7 +246,6 @@ export default function CustomerPortal() {
                   <span className="cp-product-unit">
                     {[product.packagingDetails || product.unitSize, orderUnit].filter(Boolean).join(' - ')}
                   </span>
-                  <strong>{formatCurrency(product.clientPrice)}</strong>
                 </div>
                 <div className="customer-product-actions">
                   <button
@@ -294,8 +291,7 @@ export default function CustomerPortal() {
         <div className="cp-floating-cart">
           <div className="cp-floating-cart-info">
             <ShoppingCart size={20} />
-            <span>{cartItemCount} item{cartItemCount !== 1 ? 's' : ''}</span>
-            <strong>{formatCurrency(orderTotal)}</strong>
+            <span>{cartItemCount} item{cartItemCount !== 1 ? 's' : ''} in cart</span>
           </div>
           <div className="cp-floating-cart-actions">
             <Link to="/cart" className="btn btn-primary cp-floating-cart-btn">
@@ -390,8 +386,6 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
             ) : null}
           </div>
 
-          <div className="cp-detail-price">{formatCurrency(product.clientPrice)}</div>
-
           <div className="cp-detail-actions">
             <div className="cp-detail-qty">
               <button
@@ -422,7 +416,7 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
             </div>
             {numericQuantity > 0 && (
               <div className="cp-detail-line-total">
-                Subtotal: <strong>{formatCurrency(numericQuantity * product.clientPrice)}</strong>
+                <strong>{numericQuantity} unit{numericQuantity !== 1 ? 's' : ''}</strong> in cart
               </div>
             )}
           </div>

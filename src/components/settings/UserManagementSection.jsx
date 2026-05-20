@@ -5,8 +5,9 @@ import {
   ChevronDown,
   ChevronUp,
   KeyRound,
+  Power,
+  PowerOff,
   ShoppingBag,
-  Trash2,
   Truck,
   UserPlus,
   Users,
@@ -48,8 +49,9 @@ export default function UserManagementSection({ canManage }) {
   const [pendingActionUserId, setPendingActionUserId] = useState(null);
 
   const currentUserId = state.currentUser?.id;
+  // Only enabled admins count toward the "at least one admin must remain" rule.
   const settingsAdmins = useMemo(
-    () => state.users.filter((u) => u.permissions?.manageSettings),
+    () => state.users.filter((u) => u.permissions?.manageSettings && !u.disabledAt),
     [state.users]
   );
   const settingsAdminCount = settingsAdmins.length;
@@ -61,10 +63,15 @@ export default function UserManagementSection({ canManage }) {
       role: user.role,
       name: user.name,
       email: user.email,
-      status: 'active',
+      status: user.disabledAt ? 'disabled' : 'active',
+      disabled: Boolean(user.disabledAt),
       permissions: user.permissions,
       isSelf: user.id === currentUserId,
-      isLastAdmin: Boolean(user.permissions?.manageSettings) && settingsAdminCount === 1,
+      // Only enabled admins count toward the "must have one admin" rule.
+      isLastAdmin:
+        Boolean(user.permissions?.manageSettings)
+        && !user.disabledAt
+        && settingsAdminCount === 1,
     }));
     const customerRows = (state.customerContacts ?? []).map((c) => ({
       id: c.userId,
@@ -73,6 +80,7 @@ export default function UserManagementSection({ canManage }) {
       name: c.fullName || c.email,
       email: c.email,
       status: c.status,
+      disabled: c.status === 'disabled',
       permissions: null,
       isSelf: false,
       isLastAdmin: false,
@@ -114,29 +122,33 @@ export default function UserManagementSection({ canManage }) {
     if (ok) addToast(`Password reset email sent to ${row.email}.`);
   }
 
-  async function handleRemove(row) {
-    if (row.isSelf) {
-      addToast("You can't remove your own account.", 'warning');
+  async function handleToggleDisabled(row) {
+    const turningOff = !row.disabled;
+    if (turningOff && row.isSelf) {
+      addToast("You can't disable your own account.", 'warning');
       return;
     }
-    if (row.isLastAdmin) {
-      addToast('Grant another user settings access before removing the last admin.', 'warning');
+    if (turningOff && row.isLastAdmin) {
+      addToast('Grant another user settings access before disabling the last admin.', 'warning');
       return;
     }
-    const confirmed = window.confirm(
-      `Permanently remove ${row.name} (${row.email})? This deletes their account and cannot be undone.`
-    );
+    const verb = turningOff ? 'Disable' : 'Re-enable';
+    const sessionNote = turningOff
+      ? '\n\nThey will be immediately signed out and unable to log in until re-enabled. Their profile and history are kept on record.'
+      : '\n\nThey will be able to sign in again with their existing password.';
+    const confirmed = window.confirm(`${verb} ${row.name} (${row.email})?${sessionNote}`);
     if (!confirmed) return;
 
     setPendingActionUserId(row.userId);
-    if (row.role === 'customer') {
-      const { ok } = await callAdminApi('/api/delete-customer', { customerUserId: row.userId });
-      setPendingActionUserId(null);
-      if (ok) addToast(`Customer ${row.email} removed.`);
-    } else {
-      const { ok } = await callAdminApi('/api/delete-staff-user', { userId: row.userId });
-      setPendingActionUserId(null);
-      if (ok) addToast(`${ROLE_LABEL[row.role]} ${row.email} removed.`);
+    const { ok } = await callAdminApi('/api/set-user-disabled', {
+      userId: row.userId,
+      disabled: turningOff,
+    });
+    setPendingActionUserId(null);
+    if (ok) {
+      addToast(turningOff
+        ? `${ROLE_LABEL[row.role]} ${row.email} disabled.`
+        : `${ROLE_LABEL[row.role]} ${row.email} re-enabled.`);
     }
   }
 
@@ -215,7 +227,7 @@ export default function UserManagementSection({ canManage }) {
 
             return (
               <div key={`${row.role}:${row.id}`} className="um-row-wrap">
-                <div className={`um-row um-row-${row.role} ${isExpanded ? 'is-expanded' : ''}`}>
+                <div className={`um-row um-row-${row.role} ${isExpanded ? 'is-expanded' : ''} ${row.disabled ? 'is-disabled' : ''}`}>
                   <div className={`um-role-pill um-role-${row.role}`} aria-hidden="true">
                     <RoleIcon size={13} />
                     <span>{ROLE_LABEL[row.role]}</span>
@@ -225,7 +237,9 @@ export default function UserManagementSection({ canManage }) {
                     <div className="um-name-line">
                       <span className="um-name">{row.name}</span>
                       {row.isSelf ? <span className="um-self-chip">You</span> : null}
-                      {row.role === 'customer' ? (
+                      {row.disabled ? (
+                        <span className="um-status um-status-disabled">Disabled</span>
+                      ) : row.role === 'customer' ? (
                         <span className={`um-status um-status-${row.status}`}>
                           {row.status}
                         </span>
@@ -279,20 +293,22 @@ export default function UserManagementSection({ canManage }) {
                       <KeyRound size={15} />
                     </button>
                     <button
-                      className="um-icon-btn um-icon-btn-danger"
+                      className={`um-icon-btn ${row.disabled ? 'um-icon-btn-restore' : 'um-icon-btn-danger'}`}
                       type="button"
-                      disabled={!canManage || isBusy || row.isSelf || row.isLastAdmin}
-                      onClick={() => handleRemove(row)}
-                      aria-label="Remove user"
+                      disabled={!canManage || isBusy || (row.isSelf && !row.disabled) || (row.isLastAdmin && !row.disabled)}
+                      onClick={() => handleToggleDisabled(row)}
+                      aria-label={row.disabled ? 'Re-enable user' : 'Disable user'}
                       title={
-                        row.isSelf
-                          ? "You can't remove your own account"
-                          : row.isLastAdmin
+                        row.isSelf && !row.disabled
+                          ? "You can't disable your own account"
+                          : row.isLastAdmin && !row.disabled
                             ? 'At least one settings admin must remain'
-                            : 'Remove user'
+                            : row.disabled
+                              ? 'Re-enable this user'
+                              : 'Disable login (keeps history)'
                       }
                     >
-                      <Trash2 size={15} />
+                      {row.disabled ? <Power size={15} /> : <PowerOff size={15} />}
                     </button>
                   </div>
                 </div>

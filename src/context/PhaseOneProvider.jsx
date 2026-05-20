@@ -721,6 +721,9 @@ const serverWorkflowActions = new Set([
   'CONFIRM_SHIPMENT',
   'COMPLETE_DELIVERY_POD',
   'LOG_PRODUCTION_BATCH',
+  'EDIT_PRODUCTION_BATCH',
+  'SOFT_DELETE_BATCH',
+  'RESTORE_BATCH',
 ]);
 const serverAdminActions = new Set([
   'ADD_PRODUCT',
