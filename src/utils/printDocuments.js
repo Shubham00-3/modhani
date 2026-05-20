@@ -15,6 +15,13 @@ function openPrintableWindow(title, markup) {
 
   if (!printWindow) return false;
 
+  const slug = String(title || 'document')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'document';
+  const printUrl = `${window.location.origin}/print/${slug}`;
+
   const printableMarkup = `
     <!doctype html>
     <html lang="en">
@@ -33,6 +40,12 @@ function openPrintableWindow(title, markup) {
     printWindow.focus();
     printWindow.print();
   };
+
+  try {
+    printWindow.history.replaceState(null, title, printUrl);
+  } catch {
+    // If the browser refuses history changes for the print popup, printing still works.
+  }
 
   printWindow.document.open();
   printWindow.document.write(printableMarkup);
