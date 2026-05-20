@@ -216,21 +216,28 @@ export default function DriverPortal() {
     setSaving(true);
     const justPoddedOrderId = selectedOrder.id;
     const signedTimestamp = buildPodTimestampSnapshot();
-    const result = await dispatch({
-      type: 'COMPLETE_DELIVERY_POD',
-      payload: {
-        orderId: justPoddedOrderId,
-        signedBy: signedBy.trim(),
-        signatureDataUrl,
-        notes: notes.trim(),
-        timestamp: signedTimestamp.iso,
-        signedAtUnixMs: signedTimestamp.unixMs,
-        signedAtLocal: signedTimestamp.local,
-        signedTimezone: signedTimestamp.timeZone,
-        userId: state.currentUserId,
-      },
-    });
-    setSaving(false);
+    let result;
+    try {
+      result = await dispatch({
+        type: 'COMPLETE_DELIVERY_POD',
+        payload: {
+          orderId: justPoddedOrderId,
+          signedBy: signedBy.trim(),
+          signatureDataUrl,
+          notes: notes.trim(),
+          timestamp: signedTimestamp.iso,
+          signedAtUnixMs: signedTimestamp.unixMs,
+          signedAtLocal: signedTimestamp.local,
+          signedTimezone: signedTimestamp.timeZone,
+          userId: state.currentUserId,
+        },
+      });
+    } catch (error) {
+      addToast(`Save failed: ${error.message}`, 'warning');
+      result = { ok: false, error };
+    } finally {
+      setSaving(false);
+    }
 
     if (result?.ok) {
       addToast(`POD saved for order #${selectedOrder.orderNumber}.`);

@@ -1371,6 +1371,17 @@ export function AppProvider({ children }) {
           return { ok: false, error };
         }
 
+        if (previousState.authRole === 'driver' && action.type === 'COMPLETE_DELIVERY_POD') {
+          baseDispatch(action);
+          lastManualReloadAtRef.current = Date.now();
+          if (previousState.currentUserId) {
+            loadDriverPortalData(previousState.currentUserId).catch((reloadError) => {
+              addToast(`Reload failed: ${reloadError.message}`, 'warning');
+            });
+          }
+          return { ok: true };
+        }
+
         if (previousState.currentUserId) {
           try {
             if (previousState.authRole === 'driver') {

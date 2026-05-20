@@ -923,8 +923,8 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_packing_slip_number: action.payload.packingSlipNumber,
         p_packing_slip_sent_at: action.payload.packingSlipSentAt,
       });
-    case 'COMPLETE_DELIVERY_POD':
-      return callRpc(supabase, 'modhanios_complete_delivery_pod', {
+    case 'COMPLETE_DELIVERY_POD': {
+      const podResult = await callRpc(supabase, 'modhanios_complete_delivery_pod', {
         p_order_id: action.payload.orderId,
         p_user_id: currentUser.id,
         p_signed_by: action.payload.signedBy,
@@ -935,6 +935,24 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_signed_at_local: action.payload.signedAtLocal ?? null,
         p_signed_timezone: action.payload.signedTimezone ?? null,
       });
+      if (!podResult.error) return podResult;
+
+      const message = podResult.error.message ?? '';
+      const shouldFallbackToLegacyPod =
+        podResult.error.code === 'PGRST202'
+        || message.includes('modhanios_complete_delivery_pod')
+        || message.includes('Could not find the function');
+
+      if (!shouldFallbackToLegacyPod) return podResult;
+
+      return callRpc(supabase, 'modhanios_complete_delivery_pod', {
+        p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+        p_signed_by: action.payload.signedBy,
+        p_signature_data_url: action.payload.signatureDataUrl,
+        p_notes: action.payload.notes ?? null,
+      });
+    }
     case 'LOG_PRODUCTION_BATCH':
       return callRpc(supabase, 'modhanios_log_production_batch', {
         p_batch_id: action.payload.id,
