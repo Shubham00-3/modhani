@@ -18,6 +18,7 @@ import {
   formatDate,
   formatDateTime,
   getBatchLabel,
+  getActiveCatalogProducts,
   getClientName,
   getClientPricingForProduct,
   getInvoiceableTotal,
@@ -41,7 +42,8 @@ export default function PhaseOneOrdersInvoicing() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dashboardView = searchParams.get('view') ?? '';
   const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
-  const canCreateOrders = state.clients.length > 0 && state.locations.length > 0 && state.products.length > 0;
+  const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
+  const canCreateOrders = state.clients.length > 0 && state.locations.length > 0 && activeProducts.length > 0;
   const [filters, setFilters] = useState({
     clientId: '',
     locationId: '',
@@ -1509,6 +1511,7 @@ function EditInvoiceModal({ order, onClose }) {
 
 function AddOrderModal({ onClose }) {
   const { state, dispatch, addToast, addAudit } = useApp();
+  const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
   const [clientId, setClientId] = useState(state.clients[0]?.id ?? '');
   const [locationId, setLocationId] = useState(
     () => state.locations.find((location) => location.clientId === (state.clients[0]?.id ?? ''))?.id ?? ''
@@ -1711,7 +1714,7 @@ function AddOrderModal({ onClose }) {
                 key={line.id}
                 line={line}
                 lines={lines}
-                products={state.products}
+                products={activeProducts}
                 onUpdateLine={(nextLine) =>
                   setLines((current) => current.map((entry) => (entry.id === line.id ? { ...entry, ...nextLine } : entry)))
                 }

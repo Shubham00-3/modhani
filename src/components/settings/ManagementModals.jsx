@@ -5,6 +5,7 @@ import { useModalBehavior, handleOverlayClick } from '../../hooks/useModalBehavi
 import {
   PRICE_TIERS,
   formatCurrency,
+  getActiveCatalogProducts,
   getProductDisplayName,
   getProductImageUrl,
   getProductTierPrice,
@@ -473,7 +474,8 @@ export function PricingModal({ clientId, onClose }) {
           .map((pricing) => pricing.productId)
       )
   );
-  const filteredProducts = state.products.filter((product) =>
+  const activeProducts = getActiveCatalogProducts(state.products);
+  const filteredProducts = activeProducts.filter((product) =>
     [
       getProductDisplayName(product),
       product.category,

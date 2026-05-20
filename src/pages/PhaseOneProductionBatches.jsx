@@ -5,6 +5,7 @@ import { useApp } from '../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
 import {
   formatDate,
+  getActiveCatalogProducts,
   getItemOutstandingQty,
   getNextLotCode,
   getProduct,
@@ -15,7 +16,8 @@ import {
 export default function PhaseOneProductionBatches() {
   const { state, dispatch, addToast } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
-  const canLogProduction = state.products.length > 0;
+  const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
+  const canLogProduction = activeProducts.length > 0;
   const [showModal, setShowModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState(null);
   const [trashingBatch, setTrashingBatch] = useState(null);
@@ -134,7 +136,7 @@ export default function PhaseOneProductionBatches() {
         <div className="filter-bar">
           <select className="form-select" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
             <option value="">All Products</option>
-            {state.products.map((product) => (
+            {activeProducts.map((product) => (
               <option key={product.id} value={product.id}>
                 {getProductDisplayName(product)}
               </option>
@@ -500,6 +502,7 @@ function TrashBatchModal({ batch, onClose, onConfirm }) {
 function LogProductionModal({ onClose, onSave }) {
   useModalBehavior(onClose);
   const { state, addToast } = useApp();
+  const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
   const [productId, setProductId] = useState('');
   const [productSearch, setProductSearch] = useState('');
   const [isProductSearchFocused, setIsProductSearchFocused] = useState(false);
@@ -515,9 +518,9 @@ function LogProductionModal({ onClose, onSave }) {
 
   const filteredProducts = useMemo(() => {
     const search = productSearch.trim().toLowerCase();
-    if (!search) return state.products;
+    if (!search) return activeProducts;
 
-    return state.products
+    return activeProducts
       .filter((product) => {
         const haystack = [
           product.name,
@@ -532,7 +535,7 @@ function LogProductionModal({ onClose, onSave }) {
 
         return haystack.includes(search);
       });
-  }, [productSearch, state.products]);
+  }, [activeProducts, productSearch]);
   const productSuggestions = productSearch.trim() ? filteredProducts.slice(0, 8) : [];
   const showProductSuggestions = isProductSearchFocused && productSearch.trim() && !productId;
 

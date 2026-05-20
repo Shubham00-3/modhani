@@ -13,6 +13,7 @@ import {
   USERS,
   buildReportRowsFromOrders,
   getEffectiveItemPrice,
+  getActiveCatalogProducts,
   getProductTierPrice,
   normalizePriceTier,
 } from '../data/phaseOneData';
@@ -223,10 +224,11 @@ function refreshClientPricingForProducts(clientPricing, clients, products, produ
 
 function buildClientCataloguePricing({ clientPricing, products, clientId, priceTier, enabledProductIds }) {
   const enabledIds = new Set(enabledProductIds);
+  const activeProducts = getActiveCatalogProducts(products);
   const existingByProductId = new Map(
     clientPricing.filter((pricing) => pricing.clientId === clientId).map((pricing) => [pricing.productId, pricing])
   );
-  const clientRows = products.map((product) => {
+  const clientRows = activeProducts.map((product) => {
     const existing = existingByProductId.get(product.id);
 
     return {
@@ -237,7 +239,7 @@ function buildClientCataloguePricing({ clientPricing, products, clientId, priceT
       isActive: enabledIds.has(product.id),
     };
   });
-  const clientProductIds = new Set(products.map((product) => product.id));
+  const clientProductIds = new Set(activeProducts.map((product) => product.id));
 
   return [
     ...clientPricing.filter((pricing) => pricing.clientId !== clientId || !clientProductIds.has(pricing.productId)),

@@ -140,6 +140,14 @@ export function getProduct(products, productId) {
   return products.find((product) => product.id === productId);
 }
 
+export function isProductCatalogActive(product) {
+  return product?.isCatalogActive !== false;
+}
+
+export function getActiveCatalogProducts(products) {
+  return products.filter(isProductCatalogActive);
+}
+
 export function getProductDisplayName(product) {
   if (!product) return 'Unknown product';
   return `${product.name} ${product.unitSize}`;

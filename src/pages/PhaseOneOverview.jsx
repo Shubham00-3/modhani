@@ -7,6 +7,7 @@ import {
   formatDate,
   formatTime,
   getClientName,
+  getActiveCatalogProducts,
   getLocationName,
   getOrderOutstandingQty,
   getOrderValue,
@@ -29,6 +30,7 @@ export default function PhaseOneOverview() {
   const dashboardSearchRaw = (searchParams.get('q') ?? '').trim();
   const dashboardSearch = dashboardSearchRaw.toLowerCase();
   const todayKey = new Date().toISOString().slice(0, 10);
+  const activeProducts = getActiveCatalogProducts(state.products);
   const orderMatchesDashboardSearch = (order) => {
     if (!dashboardSearch) return true;
 
@@ -111,7 +113,7 @@ export default function PhaseOneOverview() {
       : null;
   const recentOrdersSource = dashboardSearchRaw ? dashboardSearchOrders : state.orders;
   const recentOrders = [...recentOrdersSource].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
-  const inventoryPreviewRows = state.products
+  const inventoryPreviewRows = activeProducts
     .map((product) => {
       const productBatches = state.batches.filter((batch) => batch.productId === product.id);
       const activeBatches = productBatches

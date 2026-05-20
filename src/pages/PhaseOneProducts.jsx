@@ -8,6 +8,7 @@ import {
   getProductImageUrl,
   getProductOrderUnitLabel,
   getProductTierPrice,
+  getActiveCatalogProducts,
   hasProductImage,
 } from '../data/phaseOneData';
 import { ProductModal } from '../components/settings/ManagementModals';
@@ -22,13 +23,14 @@ export default function PhaseOneProducts() {
   const [previewProduct, setPreviewProduct] = useState(null);
   const [productSearch, setProductSearch] = useState('');
   const dashboardSearch = searchParams.get('q') ?? '';
+  const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
 
   const filteredProducts = useMemo(() => {
     const query = (productSearch || dashboardSearch).trim().toLowerCase();
 
-    if (!query) return state.products;
+    if (!query) return activeProducts;
 
-    return state.products.filter((product) =>
+    return activeProducts.filter((product) =>
       [
         getProductDisplayName(product),
         product.name,
@@ -50,7 +52,7 @@ export default function PhaseOneProducts() {
         .toLowerCase()
         .includes(query)
     );
-  }, [dashboardSearch, productSearch, state.products]);
+  }, [activeProducts, dashboardSearch, productSearch]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -85,7 +87,7 @@ export default function PhaseOneProducts() {
               <Package size={18} /> Product Catalogue
             </div>
             <div className="catalogue-count">
-              Showing {filteredProducts.length.toLocaleString()} of {state.products.length.toLocaleString()} products
+              Showing {filteredProducts.length.toLocaleString()} of {activeProducts.length.toLocaleString()} products
             </div>
           </div>
           <label className="catalogue-search">
@@ -98,7 +100,7 @@ export default function PhaseOneProducts() {
             />
           </label>
         </div>
-        {state.products.length ? (
+        {activeProducts.length ? (
           <div className="table-scroll-wrapper">
           <table className="data-table">
             <thead>

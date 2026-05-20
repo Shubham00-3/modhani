@@ -5,6 +5,7 @@ import {
   formatDate,
   formatDateTime,
   getBatchLabel,
+  getActiveCatalogProducts,
   getProduct,
   getProductDisplayName,
   getProductImageUrl,
@@ -28,15 +29,16 @@ export default function PhaseOneInventory() {
   const [lotStatusFilter, setLotStatusFilter] = useState('');
   const [sortBy, setSortBy] = useState('product');
   const [previewProduct, setPreviewProduct] = useState(null);
+  const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
   const categories = useMemo(
-    () => [...new Set(state.products.map((product) => product.category).filter(Boolean))].sort(),
-    [state.products]
+    () => [...new Set(activeProducts.map((product) => product.category).filter(Boolean))].sort(),
+    [activeProducts]
   );
 
   const inventoryRows = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
 
-    return state.products
+    return activeProducts
       .map((product) => {
         const productBatches = state.batches.filter((batch) => batch.productId === product.id);
         const visibleBatches = lotStatusFilter
@@ -99,7 +101,7 @@ export default function PhaseOneInventory() {
 
         return getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
       });
-  }, [categoryFilter, lotStatusFilter, search, sortBy, state.batches, state.products, stockFilter]);
+  }, [activeProducts, categoryFilter, lotStatusFilter, search, sortBy, state.batches, stockFilter]);
 
   const historyRows = useMemo(() => buildInventoryHistory(state), [state]);
   const hasActiveFilters = Boolean(search || categoryFilter || stockFilter || lotStatusFilter);

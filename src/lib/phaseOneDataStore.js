@@ -81,6 +81,7 @@ function productToUi(product) {
     orderUnitLabel: product.order_unit_label ?? '',
     qbItemName: product.qb_item_name ?? `${product.name} ${product.unit_size}`.trim(),
     qbMappingStatus: product.qb_mapping_status ?? 'ready',
+    isCatalogActive: product.is_catalog_active !== false,
     imageUrl: product.image_url ?? '',
     imagePath: product.image_path ?? '',
   };
@@ -279,6 +280,7 @@ function productToDb(product) {
     order_unit_label: product.orderUnitLabel ?? null,
     qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
     qb_mapping_status: product.qbMappingStatus ?? 'ready',
+    is_catalog_active: product.isCatalogActive !== false,
     image_url: product.imageUrl ?? null,
     image_path: product.imagePath ?? null,
   };
@@ -758,7 +760,7 @@ export async function fetchCustomerPortalState(supabase, user) {
     .filter((pricing) => pricing.is_active && Number(pricing.price) > 0)
     .map((pricing) => {
       const productUi = productsById.get(pricing.product_id);
-      if (!productUi) return null;
+      if (!productUi || productUi.isCatalogActive === false) return null;
 
       return {
         ...productUi,
