@@ -724,6 +724,7 @@ const serverWorkflowActions = new Set([
   'EDIT_PRODUCTION_BATCH',
   'SOFT_DELETE_BATCH',
   'RESTORE_BATCH',
+  'ASSIGN_DRIVER',
 ]);
 const serverAdminActions = new Set([
   'ADD_PRODUCT',

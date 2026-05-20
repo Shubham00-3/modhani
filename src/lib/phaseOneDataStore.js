@@ -563,6 +563,9 @@ export async function fetchRemoteState(supabase, userId) {
     podSignedAt: order.pod_signed_at ?? null,
     podNotes: order.pod_notes ?? null,
     podCapturedBy: order.pod_captured_by ?? null,
+    driverUserId: order.driver_user_id ?? null,
+    driverAssignedAt: order.driver_assigned_at ?? null,
+    driverAssignedBy: order.driver_assigned_by ?? null,
     createdAt: order.created_at,
     fulfilledAt: order.fulfilled_at,
     invoicedAt: order.invoiced_at,
@@ -646,18 +649,12 @@ export async function fetchAuthIdentity(supabase, userId) {
 
 export async function fetchDriverPortalState(supabase, userId) {
   const data = await fetchRemoteState(supabase, userId);
-  // Include shipped (still need POD) and recently delivered (POD captured) orders
-  // so the driver can still see their completed deliveries for the day.
-  const RECENT_DELIVERED_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours
-  const now = Date.now();
-  const isDriverVisible = (order) => {
-    if (order.status === 'shipped') return true;
-    if (order.status === 'delivered' && order.podSignedAt) {
-      const signedAt = new Date(order.podSignedAt).getTime();
-      if (!Number.isNaN(signedAt) && now - signedAt <= RECENT_DELIVERED_WINDOW_MS) return true;
-    }
-    return false;
-  };
+  // Drivers only see orders that are (a) still in shipped status — meaning
+  // POD hasn't been captured yet — AND (b) explicitly assigned to them.
+  // Once POD is captured the order flips to "delivered" and disappears from
+  // the queue immediately.
+  const isDriverVisible = (order) =>
+    order.status === 'shipped' && order.driverUserId === userId;
 
   const driverOrders = data.orders.filter(isDriverVisible);
   const visibleOrderIds = new Set(driverOrders.map((order) => order.id));
@@ -952,6 +949,12 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
       return callRpc(supabase, 'modhanios_restore_batch', {
         p_batch_id: action.payload.id,
         p_user_id: currentUser.id,
+      });
+    case 'ASSIGN_DRIVER':
+      return callRpc(supabase, 'modhanios_assign_driver', {
+        p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+        p_driver_user_id: action.payload.driverUserId ?? null,
       });
     default:
       return { error: null };

@@ -509,6 +509,76 @@ function InfoCard({ label, value }) {
   );
 }
 
+/**
+ * Driver assignment row for the order detail panel. Lets admin pick which
+ * registered driver should deliver this order. Only after a driver is assigned
+ * AND the order is in "shipped" status will the order show up in that driver's
+ * queue.
+ */
+function DriverAssignmentRow({ order }) {
+  const { state, dispatch, addToast } = useApp();
+  const drivers = state.users.filter((u) => u.role === 'driver' && !u.disabledAt);
+  const currentDriver = drivers.find((d) => d.id === order.driverUserId);
+  const canAssign =
+    state.currentUser?.permissions?.fulfilOrders
+    || state.currentUser?.permissions?.manageSettings;
+  const [saving, setSaving] = useState(false);
+
+  async function handleChange(event) {
+    const next = event.target.value || null;
+    setSaving(true);
+    const result = await dispatch({
+      type: 'ASSIGN_DRIVER',
+      payload: { orderId: order.id, driverUserId: next },
+    });
+    setSaving(false);
+    if (result?.ok) {
+      addToast(next
+        ? `Driver assigned to order #${order.orderNumber}.`
+        : `Driver removed from order #${order.orderNumber}.`);
+    }
+  }
+
+  return (
+    <div className="card" style={{ padding: 'var(--space-4)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
+            Assigned driver
+          </div>
+          <div style={{ marginTop: 4, fontWeight: 600 }}>
+            {currentDriver ? currentDriver.name : <span style={{ color: 'var(--color-text-muted)' }}>Unassigned</span>}
+          </div>
+          {currentDriver && order.driverAssignedAt ? (
+            <div style={{ marginTop: 2, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+              Assigned {formatDateTime(order.driverAssignedAt)}
+            </div>
+          ) : null}
+        </div>
+        <div style={{ minWidth: 220 }}>
+          <select
+            className="form-select"
+            value={order.driverUserId ?? ''}
+            onChange={handleChange}
+            disabled={!canAssign || saving || drivers.length === 0}
+            title={!canAssign ? 'Requires fulfilment or settings permission' : undefined}
+          >
+            <option value="">- Unassigned -</option>
+            {drivers.map((d) => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+          {drivers.length === 0 ? (
+            <div style={{ marginTop: 4, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+              No active drivers registered. Invite a driver from Settings → User Management.
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FormTextInput({ label, value, onChange }) {
   return (
     <div className="form-group">
@@ -584,6 +654,9 @@ function OrderDetailPanel({
           }
         />
       </div>
+
+      <DriverAssignmentRow order={order} />
+
 
       {quickBooksJob ? (
         <div className={`alert ${quickBooksJob.status === 'failed' ? 'alert-warning' : 'alert-info'}`}>

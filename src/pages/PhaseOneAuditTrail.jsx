@@ -17,6 +17,8 @@ const ACTION_LABELS = {
   production_restored: 'Production Restored',
   user_disabled: 'User Disabled',
   user_enabled: 'User Re-enabled',
+  driver_assigned: 'Driver Assigned',
+  driver_unassigned: 'Driver Unassigned',
   price_override: 'Price Override',
   invoice_created: 'Invoice Created',
   invoice_updated: 'Invoice Updated',

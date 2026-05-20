@@ -1,18 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CheckCircle2, ClipboardSignature, LogOut, MapPin, Printer, RotateCcw, Truck } from 'lucide-react';
+import { ClipboardSignature, LogOut, MapPin, Printer, RotateCcw, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatDateTime,
   getClientName,
-  getEffectiveItemPrice,
   getLocationName,
   getOrderShipToSnapshot,
-  getOrderValue,
   getProduct,
   getProductDisplayName,
   normalizeLotCode,
 } from '../data/phaseOneData';
-import { printInvoice, printProofOfDelivery } from '../utils/printDocuments';
+import { printProofOfDelivery } from '../utils/printDocuments';
 
 function formatAddress(shipTo) {
   // Clean each part: trim, strip trailing commas/whitespace.
@@ -166,15 +164,10 @@ export default function DriverPortal() {
     ? selectedOrderId
     : fallbackSelectedOrderId;
 
-  // Split orders into pending (still need POD) and completed (POD captured)
-  const pendingOrders = useMemo(
-    () => state.orders.filter((order) => !order.podSignedAt),
-    [state.orders]
-  );
-  const completedOrders = useMemo(
-    () => state.orders.filter((order) => order.podSignedAt),
-    [state.orders]
-  );
+  // Driver portal only ever holds orders in "shipped" status assigned to
+  // this driver. Once POD is captured the order disappears on the next
+  // refresh, so there's no separate completed list to render.
+  const pendingOrders = state.orders;
 
   const selectedOrder = useMemo(
     () => state.orders.find((order) => order.id === effectiveSelectedOrderId) ?? null,
@@ -271,36 +264,9 @@ export default function DriverPortal() {
               );
             })
           ) : (
-            <div className="driver-empty-state">No shipped orders are ready for driver POD.</div>
-          )}
-
-          {completedOrders.length > 0 && (
-            <>
-              <div className="driver-list-heading" style={{ marginTop: 16 }}>
-                <CheckCircle2 size={18} />
-                <span>Delivered (24h)</span>
-                <strong>{completedOrders.length}</strong>
-              </div>
-              {completedOrders.map((order) => {
-                const locationName = getLocationName(state.locations, order.locationId);
-                const clientName = getClientName(state.clients, order.clientId);
-                return (
-                  <button
-                    className={`driver-order-card driver-order-completed ${order.id === selectedOrder?.id ? 'active' : ''}`}
-                    key={order.id}
-                    type="button"
-                    onClick={() => handleSelectOrder(order.id)}
-                  >
-                    <span className="driver-order-number">Order #{order.orderNumber}</span>
-                    <span>{clientName}</span>
-                    <small>{locationName}</small>
-                    <span className="driver-pod-complete">
-                      <CheckCircle2 size={14} /> POD saved
-                    </span>
-                  </button>
-                );
-              })}
-            </>
+            <div className="driver-empty-state">
+              No deliveries assigned to you right now.
+            </div>
           )}
         </aside>
 
@@ -316,14 +282,14 @@ export default function DriverPortal() {
                   </p>
                 </div>
                 <div className="driver-status-card">
-                  <span>Invoice</span>
-                  <strong>{selectedOrder.invoiceNumber ?? '-'}</strong>
+                  <span>Shipped</span>
+                  <strong>Order #{selectedOrder.orderNumber}</strong>
                   <small>{formatDateTime(selectedOrder.shippedAt)}</small>
                 </div>
               </div>
 
               <div className="driver-invoice-preview">
-                <div className="driver-section-title">Invoice Lines</div>
+                <div className="driver-section-title">Items to deliver</div>
                 {selectedOrder.items
                   .filter((item) => (item.invoiceQty ?? item.fulfilledQty) > 0)
                   .map((item) => {
@@ -348,15 +314,10 @@ export default function DriverPortal() {
                         </div>
                         <div>
                           <strong>{qty.toLocaleString()} {qty === 1 ? 'unit' : 'units'}</strong>
-                          <span>${(qty * getEffectiveItemPrice(item)).toFixed(2)}</span>
                         </div>
                       </div>
                     );
                   })}
-                <div className="driver-total-row">
-                  <span>Total</span>
-                  <strong>${getOrderValue(selectedOrder).toFixed(2)}</strong>
-                </div>
               </div>
 
               {selectedOrder.podSignedAt ? (
@@ -404,21 +365,6 @@ export default function DriverPortal() {
               )}
 
               <div className="driver-print-actions">
-                <button
-                  className="btn btn-secondary"
-                  type="button"
-                  onClick={() =>
-                    printInvoice({
-                      order: selectedOrder,
-                      clients: state.clients,
-                      locations: state.locations,
-                      products: state.products,
-                      batches: state.batches,
-                    })
-                  }
-                >
-                  <Printer size={16} /> Print Invoice
-                </button>
                 {selectedOrder.podSignedAt ? (
                   <button
                     className="btn btn-secondary"
