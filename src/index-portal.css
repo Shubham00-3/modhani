@@ -1410,6 +1410,14 @@
 /* ---------- Driver Portal ---------- */
 .driver-portal-page {
   min-height: 100vh;
+  /* Explicitly opt into vertical scrolling so the page always scrolls past
+     the signature canvas. Some browsers compute `touch-action: auto` on a
+     child (the canvas has `touch-action: none`) in a way that blocks the
+     parent from scrolling when the user starts the gesture on the canvas.
+     Forcing pan-y here lets the user swipe vertically anywhere on the page
+     and reach the Save POD button below the signature pad. */
+  touch-action: pan-y;
+  overflow-y: auto;
   padding: clamp(18px, 3vw, 34px);
   background: linear-gradient(180deg, #f7faf7 0%, #edf3ee 100%);
   color: var(--color-text);
@@ -1646,6 +1654,10 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background: #fff;
+  /* Block all gestures on the canvas itself so finger-drawing produces a
+     clean signature (no scroll interference). The user can still scroll the
+     page by swiping in the area above/below the canvas - see
+     `.driver-portal-page { touch-action: pan-y; }`. */
   touch-action: none;
 }
 

@@ -4074,3 +4074,278 @@ input[type='checkbox']:disabled {
   font-size: var(--font-size-xs);
   line-height: 1.4;
 }
+
+/* ============================================================
+   RESPONSIVE LAYER
+   Single coherent block for all staff-dashboard breakpoints.
+   Below 900px the sidebar becomes a slide-out drawer. Below
+   640px we tighten paddings, stack grids, and make modals
+   full-screen for a tablet/phone-friendly experience.
+   ============================================================ */
+
+/* Backdrop element - hidden on desktop, shown on mobile when drawer is open. */
+.app-sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 95;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* ---------- Tablet & narrower: drawer-style sidebar ---------- */
+@media (max-width: 900px) {
+  .sidebar {
+    /* Force full sidebar width even when "collapsed" - collapsed on mobile
+       means slid off-canvas, not narrow. */
+    width: var(--sidebar-width) !important;
+    transform: translateX(-100%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    transition: transform 0.25s ease;
+  }
+  /* When not-collapsed (drawer open) slide it in. */
+  .app-layout.sidebar-open .sidebar {
+    transform: translateX(0);
+  }
+  .sidebar.collapsed {
+    transform: translateX(-100%);
+  }
+
+  /* Drawer-mode sidebar always shows the full link labels (no icon-only). */
+  .sidebar .sidebar-brand-text,
+  .sidebar .sidebar-link span,
+  .sidebar .sidebar-user-info {
+    display: initial;
+  }
+
+  /* Backdrop becomes visible while the drawer is open. */
+  .app-layout.sidebar-open .app-sidebar-backdrop {
+    display: block;
+    opacity: 1;
+  }
+
+  /* Main column always fills the viewport - no fixed margin-left on mobile. */
+  .app-main,
+  .app-main.sidebar-collapsed {
+    margin-left: 0;
+  }
+
+  /* Padding tightens on tablets so content uses the available width. */
+  .app-content {
+    padding: var(--space-5);
+  }
+
+  /* Topbar - hide the central QB status pill on narrow screens; keep search
+     compact. */
+  .topbar-center,
+  .topbar-qb-status,
+  .topbar-qb-status-btn {
+    display: none !important;
+  }
+  .topbar-search {
+    min-width: 0;
+    max-width: 220px;
+  }
+
+  /* The hamburger menu button must be visible on mobile - it was hidden at
+     <=640px in an earlier rule, override that here. */
+  .topbar-menu-btn {
+    display: inline-flex !important;
+  }
+
+  /* Multi-column grids collapse */
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Stat cards row reflows to 2 cols on tablet */
+  .stat-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* Page header - title + buttons stack vertically with a sensible gap */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .page-header > div:last-child {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  /* Modals - leave a small margin on tablet but allow full width */
+  .modal {
+    width: calc(100% - 32px) !important;
+    max-width: 100% !important;
+    max-height: calc(100vh - 32px);
+  }
+  .modal-overlay {
+    padding: 16px !important;
+  }
+
+  /* Filter bars wrap nicely */
+  .filter-bar {
+    flex-wrap: wrap;
+  }
+  .filter-bar > * {
+    flex: 1 1 160px;
+    min-width: 0;
+  }
+
+  /* Clients/Locations detail panel uses single column on tablet */
+  .client-row-detail {
+    padding: 8px 16px 22px 16px;
+  }
+
+  /* User management rows stack */
+  .um-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .um-actions {
+    justify-content: flex-start;
+  }
+}
+
+/* ---------- Phone-sized: single column everything, full-bleed modals ---------- */
+@media (max-width: 640px) {
+  .app-content {
+    padding: var(--space-3);
+  }
+
+  /* Stat cards stack on phone */
+  .stat-cards-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Topbar shrinks further; search is gone, leaving hamburger + bell + avatar */
+  .topbar {
+    padding: 0 var(--space-3) !important;
+  }
+  .topbar-breadcrumb {
+    font-size: var(--font-size-sm) !important;
+  }
+  .topbar-search {
+    display: none !important;
+  }
+
+  /* Page header title scales down a touch */
+  .page-title {
+    font-size: 1.25rem !important;
+  }
+  .page-subtitle {
+    font-size: var(--font-size-xs) !important;
+  }
+
+  /* Full-bleed modals on phone */
+  .modal-overlay {
+    padding: 0 !important;
+  }
+  .modal {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 100vh !important;
+    height: 100vh;
+    border-radius: 0 !important;
+  }
+  .modal-body {
+    padding: var(--space-4) !important;
+  }
+  .modal-header,
+  .modal-footer {
+    padding: var(--space-3) var(--space-4) !important;
+  }
+
+  /* Cards take full width with minimal padding */
+  .card {
+    padding: var(--space-4) !important;
+    border-radius: 10px !important;
+  }
+
+  /* Inventory grid collapses to single column on phone */
+  .inventory-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Form rows stack their labels above inputs (already mostly do, just make
+     sure side-by-side flex groups wrap) */
+  .form-group {
+    width: 100%;
+  }
+  .grid-2 .form-group,
+  .grid-3 .form-group {
+    width: auto;
+  }
+
+  /* Filter bar one-per-row on phone */
+  .filter-bar > * {
+    flex: 1 1 100%;
+  }
+
+  /* Tabs in user management / customers wrap cleanly */
+  .user-mgmt-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .user-mgmt-tabs::-webkit-scrollbar { display: none; }
+  .user-mgmt-tab {
+    flex-shrink: 0;
+  }
+
+  /* Order detail modal goes full-bleed too */
+  .modal-order-detail {
+    border-radius: 0 !important;
+    height: 100vh;
+    max-height: 100vh !important;
+  }
+
+  /* Toast container above the topbar but not overlapping it */
+  .toast-container {
+    bottom: 12px !important;
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+  }
+}
+
+/* ---------- Touch-pointer optimization (phones/tablets) ---------- */
+@media (pointer: coarse) {
+  /* Slightly larger tap targets for icon-only buttons app-wide. */
+  .btn.btn-icon,
+  .um-icon-btn,
+  .location-tile-edit,
+  .topbar-menu-btn,
+  .topbar-icon-btn {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  /* 16px input font-size keeps iOS Safari from zooming on focus. */
+  .form-input,
+  .form-select,
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="password"],
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* ---------- Landscape phone: dial the topbar height back ---------- */
+@media (orientation: landscape) and (max-height: 500px) {
+  .topbar {
+    height: 56px !important;
+  }
+  .app-content {
+    padding: var(--space-3);
+  }
+}
