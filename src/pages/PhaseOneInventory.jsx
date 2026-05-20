@@ -221,19 +221,23 @@ export default function PhaseOneInventory() {
                 <div className="inventory-card-lots">
                   <div className="inventory-lots-header">
                     <span>Active lots: {activeBatches.length || 0}</span>
-                    {oldestLot ? <span className="inventory-oldest">FIFO: {oldestLot.batchNumber} ({formatDate(oldestLot.productionDate)})</span> : null}
+                    <span className="inventory-oldest">
+                      {oldestLot ? `FIFO: ${oldestLot.batchNumber} (${formatDate(oldestLot.productionDate)})` : ''}
+                    </span>
                   </div>
-                  {batches.length ? (
-                    <div className="inventory-lot-badges">
-                      {batches.map((batch) => (
-                        <span key={batch.id} className={`badge badge-${batch.status}`}>
-                          {batch.batchNumber}: {batch.qtyRemaining.toLocaleString()}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="inventory-no-lots">No lots logged</div>
-                  )}
+                  <div className="inventory-lots-body">
+                    {batches.length ? (
+                      <div className="inventory-lot-badges">
+                        {batches.map((batch) => (
+                          <span key={batch.id} className={`badge badge-${batch.status}`}>
+                            {batch.batchNumber}: {batch.qtyRemaining.toLocaleString()}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="inventory-no-lots">No lots logged</div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

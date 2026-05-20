@@ -1984,6 +1984,13 @@
   font-weight: 500;
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
+  min-height: 1.2em;
+}
+
+.inventory-lots-body {
+  min-height: 28px;
+  display: flex;
+  align-items: flex-start;
 }
 
 .inventory-lot-badges {
