@@ -657,6 +657,9 @@ function reducer(state, action) {
                 podSignatureDataUrl: action.payload.signatureDataUrl,
                 podSignedBy: action.payload.signedBy,
                 podSignedAt: action.payload.timestamp,
+                podSignedAtUnixMs: action.payload.signedAtUnixMs ?? null,
+                podSignedAtLocal: action.payload.signedAtLocal ?? null,
+                podSignedTimezone: action.payload.signedTimezone ?? null,
                 podNotes: action.payload.notes ?? null,
                 podCapturedBy: action.payload.userId ?? state.currentUserId,
               }

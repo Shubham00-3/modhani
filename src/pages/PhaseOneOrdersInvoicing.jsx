@@ -797,6 +797,11 @@ function OrderDetailPanel({
               <div style={{ color: 'var(--color-text-muted)', marginTop: 4 }}>
                 {formatDateTime(order.podSignedAt)}
               </div>
+              <div style={{ display: 'grid', gap: 3, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', marginTop: 8 }}>
+                <span>Local timestamp: {order.podSignedAtLocal ?? formatDateTime(order.podSignedAt)}</span>
+                <span>Unix timestamp: {order.podSignedAtUnixMs ?? new Date(order.podSignedAt).getTime()}</span>
+                <span>Timezone: {order.podSignedTimezone ?? 'Local'}</span>
+              </div>
               {order.podNotes ? <p style={{ marginTop: 10 }}>{order.podNotes}</p> : null}
             </div>
             {order.podSignatureDataUrl ? (

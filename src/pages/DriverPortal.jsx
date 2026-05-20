@@ -46,6 +46,20 @@ function formatAddress(shipTo) {
   return deduped.join(', ');
 }
 
+function buildPodTimestampSnapshot(date = new Date()) {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+  return {
+    iso: date.toISOString(),
+    unixMs: date.getTime(),
+    local: new Intl.DateTimeFormat('en-CA', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZoneName: 'short',
+    }).format(date),
+    timeZone,
+  };
+}
+
 function SignaturePad({ onChange }) {
   const canvasRef = useRef(null);
   const drawingRef = useRef(false);
@@ -201,6 +215,7 @@ export default function DriverPortal() {
 
     setSaving(true);
     const justPoddedOrderId = selectedOrder.id;
+    const signedTimestamp = buildPodTimestampSnapshot();
     const result = await dispatch({
       type: 'COMPLETE_DELIVERY_POD',
       payload: {
@@ -208,7 +223,10 @@ export default function DriverPortal() {
         signedBy: signedBy.trim(),
         signatureDataUrl,
         notes: notes.trim(),
-        timestamp: new Date().toISOString(),
+        timestamp: signedTimestamp.iso,
+        signedAtUnixMs: signedTimestamp.unixMs,
+        signedAtLocal: signedTimestamp.local,
+        signedTimezone: signedTimestamp.timeZone,
         userId: state.currentUserId,
       },
     });
@@ -327,6 +345,11 @@ export default function DriverPortal() {
                     <p>
                       Signed by <strong>{selectedOrder.podSignedBy}</strong> on {formatDateTime(selectedOrder.podSignedAt)}
                     </p>
+                    <div style={{ display: 'grid', gap: 4, marginTop: 10, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
+                      <span>Local timestamp: {selectedOrder.podSignedAtLocal ?? formatDateTime(selectedOrder.podSignedAt)}</span>
+                      <span>Unix timestamp: {selectedOrder.podSignedAtUnixMs ?? (selectedOrder.podSignedAt ? new Date(selectedOrder.podSignedAt).getTime() : '-')}</span>
+                      <span>Timezone: {selectedOrder.podSignedTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'Local'}</span>
+                    </div>
                   </div>
                   {selectedOrder.podSignatureDataUrl ? (
                     <img src={selectedOrder.podSignatureDataUrl} alt="Saved proof of delivery signature" />

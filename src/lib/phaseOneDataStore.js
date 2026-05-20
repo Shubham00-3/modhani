@@ -359,6 +359,9 @@ function orderToDb(order) {
     pod_signature_data_url: order.podSignatureDataUrl ?? null,
     pod_signed_by: order.podSignedBy ?? null,
     pod_signed_at: order.podSignedAt ?? null,
+    pod_signed_at_unix_ms: order.podSignedAtUnixMs ?? null,
+    pod_signed_at_local: order.podSignedAtLocal ?? null,
+    pod_signed_timezone: order.podSignedTimezone ?? null,
     pod_notes: order.podNotes ?? null,
     pod_captured_by: order.podCapturedBy ?? null,
     created_at: order.createdAt,
@@ -561,6 +564,9 @@ export async function fetchRemoteState(supabase, userId) {
     podSignatureDataUrl: order.pod_signature_data_url ?? null,
     podSignedBy: order.pod_signed_by ?? null,
     podSignedAt: order.pod_signed_at ?? null,
+    podSignedAtUnixMs: order.pod_signed_at_unix_ms == null ? null : Number(order.pod_signed_at_unix_ms),
+    podSignedAtLocal: order.pod_signed_at_local ?? null,
+    podSignedTimezone: order.pod_signed_timezone ?? null,
     podNotes: order.pod_notes ?? null,
     podCapturedBy: order.pod_captured_by ?? null,
     driverUserId: order.driver_user_id ?? null,
@@ -922,6 +928,10 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_signed_by: action.payload.signedBy,
         p_signature_data_url: action.payload.signatureDataUrl,
         p_notes: action.payload.notes ?? null,
+        p_signed_at: action.payload.timestamp,
+        p_signed_at_unix_ms: action.payload.signedAtUnixMs ?? null,
+        p_signed_at_local: action.payload.signedAtLocal ?? null,
+        p_signed_timezone: action.payload.signedTimezone ?? null,
       });
     case 'LOG_PRODUCTION_BATCH':
       return callRpc(supabase, 'modhanios_log_production_batch', {

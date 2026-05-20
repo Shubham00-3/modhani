@@ -378,6 +378,10 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
   const signatureImage = order.podSignatureDataUrl
     ? `<img src="${order.podSignatureDataUrl}" alt="POD signature" style="max-width:320px;max-height:120px;object-fit:contain;" />`
     : '<div style="height:90px;border-bottom:1px solid #111827;"></div>';
+  const signedAt = order.podSignedAt ?? new Date().toISOString();
+  const signedUnixMs = order.podSignedAtUnixMs ?? new Date(signedAt).getTime();
+  const signedLocal = order.podSignedAtLocal ?? formatDate(signedAt);
+  const signedTimezone = order.podSignedTimezone ?? 'Local';
 
   openPrintableWindow(
     `POD ${order.orderNumber}`,
@@ -394,7 +398,7 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
           <div style="text-align:right;line-height:1.6;">
             <div><strong>Order #:</strong> ${escapeHtml(order.orderNumber)}</div>
             <div><strong>Invoice #:</strong> ${escapeHtml(order.invoiceNumber ?? '-')}</div>
-            <div><strong>Signed:</strong> ${escapeHtml(formatDate(order.podSignedAt ?? new Date().toISOString()))}</div>
+            <div><strong>Signed:</strong> ${escapeHtml(formatDate(signedAt))}</div>
           </div>
         </header>
 
@@ -427,6 +431,9 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
           </div>
           <div style="padding:18px;border:1px solid #e5e7eb;border-radius:10px;line-height:1.7;">
             <div><strong>Received By:</strong> ${escapeHtml(order.podSignedBy ?? '-')}</div>
+            <div><strong>Local Timestamp:</strong> ${escapeHtml(signedLocal)}</div>
+            <div><strong>Unix Timestamp:</strong> ${escapeHtml(signedUnixMs)}</div>
+            <div><strong>Timezone:</strong> ${escapeHtml(signedTimezone)}</div>
             <div><strong>Delivery Notes:</strong> ${escapeHtml(order.podNotes ?? '-')}</div>
           </div>
         </section>
