@@ -11,16 +11,15 @@ import {
 } from '../data/phaseOneData';
 
 function openPrintableWindow(title, markup) {
-  const printWindow = window.open('', '_blank', 'width=900,height=700');
-
-  if (!printWindow) return false;
-
   const slug = String(title || 'document')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     || 'document';
   const printUrl = `${window.location.origin}/print/${slug}`;
+  const printWindow = window.open(printUrl, '_blank', 'width=900,height=700');
+
+  if (!printWindow) return false;
 
   const printableMarkup = `
     <!doctype html>
@@ -40,12 +39,6 @@ function openPrintableWindow(title, markup) {
     printWindow.focus();
     printWindow.print();
   };
-
-  try {
-    printWindow.history.replaceState(null, title, printUrl);
-  } catch {
-    // If the browser refuses history changes for the print popup, printing still works.
-  }
 
   printWindow.document.open();
   printWindow.document.write(printableMarkup);
