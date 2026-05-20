@@ -386,6 +386,33 @@ function reducer(state, action) {
           contact.userId === action.payload.userId ? { ...contact, ...action.payload } : contact
         ),
       };
+    case 'SET_USER_DISABLED': {
+      const disabledAt = action.payload.disabled ? (action.payload.disabledAt ?? new Date().toISOString()) : null;
+
+      if (action.payload.role === 'customer') {
+        return {
+          ...state,
+          customerContacts: state.customerContacts.map((contact) =>
+            contact.userId === action.payload.userId
+              ? { ...contact, status: action.payload.disabled ? 'disabled' : 'active' }
+              : contact
+          ),
+        };
+      }
+
+      return {
+        ...state,
+        users: state.users.map((user) =>
+          user.id === action.payload.userId
+            ? {
+                ...user,
+                disabledAt,
+                disabledReason: action.payload.disabled ? (action.payload.reason ?? user.disabledReason ?? null) : null,
+              }
+            : user
+        ),
+      };
+    }
     case 'UPDATE_CUSTOMER_ASSIGNMENTS': {
       const { customerUserId, clientIds, locationIds } = action.payload;
       return {
@@ -712,7 +739,7 @@ function reducer(state, action) {
   }
 }
 
-const localOnlyActions = new Set(['TOGGLE_SIDEBAR', 'ADD_TOAST', 'REMOVE_TOAST']);
+const localOnlyActions = new Set(['TOGGLE_SIDEBAR', 'ADD_TOAST', 'REMOVE_TOAST', 'SET_USER_DISABLED']);
 const serverWorkflowActions = new Set([
   'LOCK_ORDER',
   'UNLOCK_ORDER',

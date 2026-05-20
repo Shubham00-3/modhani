@@ -109,10 +109,12 @@ export default async function handler(req, res) {
   }
 
   // Update the right table.
+  const disabledAt = disabled ? new Date().toISOString() : null;
+
   if (targetProfile) {
     const update = disabled
       ? {
-          disabled_at: new Date().toISOString(),
+          disabled_at: disabledAt,
           disabled_by: caller.id,
           disabled_reason: reason?.trim() || null,
         }
@@ -138,12 +140,6 @@ export default async function handler(req, res) {
   const { error: authUpdateError } = await supabase.auth.admin.updateUserById(userId, {
     ban_duration: disabled ? '876000h' : 'none',
   });
-  if (authUpdateError) {
-    return res.status(500).json({
-      ok: false,
-      error: `User status was updated, but Supabase Auth could not ${disabled ? 'ban' : 'unban'} the account: ${authUpdateError.message}`,
-    });
-  }
 
   const targetEmail = targetProfile?.email ?? targetContact?.email ?? '';
   const targetName = targetProfile?.full_name ?? targetContact?.full_name ?? targetEmail;
@@ -165,5 +161,9 @@ export default async function handler(req, res) {
     ok: true,
     userId,
     disabled,
+    disabledAt,
+    warning: authUpdateError
+      ? `User ${disabled ? 'disabled' : 're-enabled'}, but Supabase Auth ${disabled ? 'ban' : 'unban'} sync failed: ${authUpdateError.message}`
+      : null,
   });
 }

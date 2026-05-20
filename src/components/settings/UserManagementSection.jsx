@@ -38,8 +38,7 @@ const TABS = [
 /**
  * Unified user-management table for the Settings page. Lists staff, drivers,
  * and customers; lets settings admins invite new users, send password resets,
- * remove users (with last-admin / self-delete guards), and edit staff
- * permissions inline.
+ * disable or re-enable users, and edit staff permissions inline.
  */
 export default function UserManagementSection({ canManage }) {
   const { state, dispatch, addToast } = useApp();
@@ -140,12 +139,21 @@ export default function UserManagementSection({ canManage }) {
     if (!confirmed) return;
 
     setPendingActionUserId(row.userId);
-    const { ok } = await callAdminApi('/api/set-user-disabled', {
+    const { ok, data } = await callAdminApi('/api/set-user-disabled', {
       userId: row.userId,
       disabled: turningOff,
     });
     setPendingActionUserId(null);
     if (ok) {
+      await dispatch({
+        type: 'SET_USER_DISABLED',
+        payload: {
+          userId: row.userId,
+          role: row.role,
+          disabled: turningOff,
+          disabledAt: data?.disabledAt,
+        },
+      });
       addToast(turningOff
         ? `${ROLE_LABEL[row.role]} ${row.email} disabled.`
         : `${ROLE_LABEL[row.role]} ${row.email} re-enabled.`);
