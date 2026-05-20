@@ -258,7 +258,7 @@ export default function DriverPortal() {
     <div className="driver-portal-page">
       <header className="driver-portal-header">
         <div className="driver-brand">
-          <img src="/modhani-logo.svg" alt="Modhani" />
+          <img src="/modhani-logo.png" alt="Modhani" />
           <div>
             <div className="driver-kicker">Driver Portal</div>
             <h1>Delivery Proof</h1>

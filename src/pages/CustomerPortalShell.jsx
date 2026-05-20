@@ -50,7 +50,7 @@ export default function CustomerPortalShell({ children }) {
       <header className="cp-nav">
         <div className="cp-nav-inner">
           <div className="cp-nav-brand">
-            <img className="cp-brand-logo" src="/modhani-logo.svg" alt="Modhani" />
+            <img className="cp-brand-logo" src="/modhani-logo.png" alt="Modhani" />
             <div>
               <strong className="cp-brand-name">Modhani</strong>
               <span className="cp-brand-sub">Customer ordering portal</span>

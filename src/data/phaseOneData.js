@@ -205,7 +205,7 @@ export function getProductTierPrice(product, tier = 1) {
   return Number(product.baseCataloguePrice ?? 0);
 }
 
-export const PRODUCT_IMAGE_FALLBACK_URL = '/modhani-logo.svg';
+export const PRODUCT_IMAGE_FALLBACK_URL = '/modhani-logo.png';
 
 export function hasProductImage(product) {
   return Boolean((product?.imageUrl || product?.imagePath || '').trim());

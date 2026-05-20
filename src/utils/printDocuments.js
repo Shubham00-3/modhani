@@ -53,7 +53,7 @@ function openPrintableWindow(title, markup) {
 }
 
 function getLogoSrc() {
-  return `${window.location.origin}/modhani-logo.svg`;
+  return `${window.location.origin}/modhani-logo.png`;
 }
 
 function escapeHtml(value) {

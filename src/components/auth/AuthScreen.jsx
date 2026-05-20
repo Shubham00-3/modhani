@@ -107,7 +107,7 @@ export default function AuthScreen() {
         </section>
 
         <section className="auth-form-card auth-portal-card">
-          <img className="auth-card-logo" src="/modhani-logo.svg" alt="Modhani" />
+          <img className="auth-card-logo" src="/modhani-logo.png" alt="Modhani" />
           <div className="auth-card-title">{mode === 'login' ? 'LOGIN' : 'RESET PASSWORD'}</div>
 
           {mode === 'login' ? (

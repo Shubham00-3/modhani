@@ -105,7 +105,7 @@ export default function SetPasswordScreen({ authRole, onComplete }) {
         </section>
 
         <section className="auth-form-card auth-portal-card">
-          <img className="auth-card-logo" src="/modhani-logo.svg" alt="Modhani" />
+          <img className="auth-card-logo" src="/modhani-logo.png" alt="Modhani" />
           <div className="auth-card-title">SET PASSWORD</div>
 
           <div className="auth-form-heading">
