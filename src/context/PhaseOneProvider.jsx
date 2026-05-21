@@ -96,6 +96,17 @@ const remoteBootState = {
 
 const initialState = isSupabaseConfigured ? remoteBootState : demoState;
 
+const SIDEBAR_MOBILE_BREAKPOINT = 900;
+
+function getInitialSidebarCollapsed() {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia(`(max-width: ${SIDEBAR_MOBILE_BREAKPOINT}px)`).matches;
+}
+
+function withViewportDefaults(state) {
+  return { ...state, sidebarCollapsed: getInitialSidebarCollapsed() };
+}
+
 function applyAssignments(order, batches, assignments, timestamp) {
   const nextBatchesById = new Map(batches.map((batch) => [batch.id, { ...batch }]));
   let acceptedQty = 0;
@@ -817,7 +828,7 @@ function isMissingNotificationDismissalsTable(error) {
 }
 
 export function AppProvider({ children }) {
-  const [state, baseDispatch] = useReducer(reducer, initialState);
+  const [state, baseDispatch] = useReducer(reducer, initialState, withViewportDefaults);
   const stateRef = useRef(state);
   // Timestamp of the last manual full-state reload (after a dispatch). The
   // realtime subscription consults this and skips its own debounced refresh

@@ -2211,6 +2211,95 @@ img {
   font-size: var(--font-size-sm);
 }
 
+.data-table .cell-monospace-th {
+  font-family: 'SF Mono', 'Cascadia Code', monospace;
+  font-size: var(--font-size-xs);
+  text-align: right;
+}
+
+.data-table .cell-monospace-th + .cell-monospace,
+.data-table td.cell-monospace {
+  text-align: right;
+}
+
+.text-truncate {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.data-table td.cell-truncate {
+  max-width: 220px;
+}
+
+.data-table td.cell-truncate > .text-truncate {
+  max-width: 100%;
+}
+
+.inventory-preview-table {
+  table-layout: auto;
+}
+
+.inventory-preview-table thead th {
+  font-size: var(--font-size-xs);
+}
+
+.inventory-preview-table .inventory-preview-thumb {
+  width: 56px;
+  padding-right: 0;
+}
+
+.inventory-preview-table .inventory-preview-name {
+  min-width: 0;
+  max-width: 0;
+  width: 100%;
+}
+
+/* ---------- Reports KPI cards ---------- */
+.report-info-card {
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.report-info-card-label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.report-info-card-value {
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  color: var(--color-text);
+  line-height: 1.1;
+  word-break: break-word;
+}
+
+/* ---------- Chart empty state ---------- */
+.chart-empty-state {
+  height: 260px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: var(--font-size-sm);
+  padding: var(--space-4);
+}
+
+.chart-empty-state svg {
+  opacity: 0.4;
+}
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-flex;

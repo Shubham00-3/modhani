@@ -356,7 +356,9 @@ export default function PhaseOneInventory() {
                       <tr key={row.id}>
                         <td>{formatDateTime(row.date)}</td>
                         <td><span className="badge badge-portal">{row.type}</span></td>
-                        <td>{row.productName}</td>
+                        <td className="cell-truncate">
+                          <span className="text-truncate" title={row.productName}>{row.productName}</span>
+                        </td>
                         <td className="cell-monospace">{row.lotCode}</td>
                         <td className="cell-monospace">{row.quantity}</td>
                         <td>{row.details}</td>

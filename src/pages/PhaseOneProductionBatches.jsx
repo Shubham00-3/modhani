@@ -179,10 +179,14 @@ export default function PhaseOneProductionBatches() {
                 </tr>
               </thead>
               <tbody>
-                {filteredBatches.map((batch) => (
+                {filteredBatches.map((batch) => {
+                  const batchProductName = getProductDisplayName(getProduct(state.products, batch.productId));
+                  return (
                   <tr key={batch.id}>
                     <td className="cell-monospace">{batch.batchNumber}</td>
-                    <td>{getProductDisplayName(getProduct(state.products, batch.productId))}</td>
+                    <td className="cell-truncate">
+                      <span className="text-truncate" title={batchProductName}>{batchProductName}</span>
+                    </td>
                     <td>{formatDate(batch.productionDate)}</td>
                     <td className="cell-monospace">{batch.qtyProduced.toLocaleString()}</td>
                     <td className="cell-monospace">{batch.qtyRemaining.toLocaleString()}</td>
@@ -210,7 +214,8 @@ export default function PhaseOneProductionBatches() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -280,10 +285,14 @@ export default function PhaseOneProductionBatches() {
                   </tr>
                 </thead>
                 <tbody>
-                  {trashedBatches.map((batch) => (
+                  {trashedBatches.map((batch) => {
+                    const trashedProductName = getProductDisplayName(getProduct(state.products, batch.productId));
+                    return (
                     <tr key={batch.id} style={{ opacity: 0.78 }}>
                       <td className="cell-monospace">{batch.batchNumber}</td>
-                      <td>{getProductDisplayName(getProduct(state.products, batch.productId))}</td>
+                      <td className="cell-truncate">
+                        <span className="text-truncate" title={trashedProductName}>{trashedProductName}</span>
+                      </td>
                       <td>{formatDate(batch.productionDate)}</td>
                       <td>{batch.deletedAt ? formatDate(batch.deletedAt) : '-'}</td>
                       <td style={{ color: 'var(--color-text-muted)' }}>{batch.deletedReason || '-'}</td>
@@ -307,7 +316,8 @@ export default function PhaseOneProductionBatches() {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

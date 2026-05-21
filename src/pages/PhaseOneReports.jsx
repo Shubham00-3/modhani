@@ -300,66 +300,86 @@ export default function PhaseOneReports() {
         <>
       <div className="grid-2 section">
         <ChartCard title={`Sales Volume (${filters.period})`}>
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={salesVolume}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="units" fill="#1A3021" name="Units" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {salesVolume.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={salesVolume} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} tickMargin={6} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} width={40} allowDecimals={false} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(26, 48, 33, 0.04)' }} />
+                <Bar dataKey="units" fill="#1A3021" name="Units" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ChartEmptyState message="No shipments in the selected range." />
+          )}
         </ChartCard>
 
         <ChartCard title="Revenue by Client">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={revenueByClient}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="revenue" fill="#587B66" name="Revenue" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {revenueByClient.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={revenueByClient} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} tickMargin={6} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} width={56} tickFormatter={currencyTickFormatter} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(88, 123, 102, 0.06)' }} />
+                <Bar dataKey="revenue" fill="#587B66" name="Revenue" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ChartEmptyState message="No client revenue to summarise." />
+          )}
         </ChartCard>
       </div>
 
       <div className="grid-3 section">
         <ChartCard title="Top Products by Units Shipped">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={topProducts}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="units" fill="#D1A14E" name="Units" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {topProducts.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={topProducts} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }} tickMargin={6} interval={0} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} width={40} allowDecimals={false} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(209, 161, 78, 0.08)' }} />
+                <Bar dataKey="units" fill="#D1A14E" name="Units" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ChartEmptyState message="No shipped product data yet." />
+          )}
         </ChartCard>
 
         <ChartCard title="Orders by Location">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={ordersByLocation}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-              <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip content={<ChartTooltip />} />
-              <Bar dataKey="orders" fill="#8FA899" name="Orders" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          {ordersByLocation.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={ordersByLocation} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }} tickMargin={6} interval={0} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} width={40} allowDecimals={false} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(143, 168, 153, 0.08)' }} />
+                <Bar dataKey="orders" fill="#8FA899" name="Orders" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ChartEmptyState message="No orders to break down by location." />
+          )}
         </ChartCard>
 
         <ChartCard title="Fulfilment Rate">
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie data={fulfilmentRate} dataKey="value" nameKey="name" innerRadius={50} outerRadius={86}>
-                {fulfilmentRate.map((entry, index) => (
-                  <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip content={<ChartTooltip />} />
-            </PieChart>
-          </ResponsiveContainer>
+          {fulfilmentRate.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <PieChart>
+                <Pie data={fulfilmentRate} dataKey="value" nameKey="name" innerRadius={50} outerRadius={86}>
+                  {fulfilmentRate.map((entry, index) => (
+                    <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<ChartTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <ChartEmptyState message="No fulfilment data yet." />
+          )}
         </ChartCard>
       </div>
 
@@ -447,13 +467,25 @@ function ChartCard({ title, children }) {
 
 function ReportInfoCard({ label, value }) {
   return (
-    <div className="card" style={{ padding: 'var(--space-4)' }}>
-      <div style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
-        {label}
-      </div>
-      <div style={{ marginTop: 6, fontWeight: 700 }}>{value}</div>
+    <div className="report-info-card card">
+      <div className="report-info-card-label">{label}</div>
+      <div className="report-info-card-value">{value}</div>
     </div>
   );
+}
+
+function ChartEmptyState({ message }) {
+  return (
+    <div className="chart-empty-state">
+      <BarChart3 size={28} />
+      <div>{message}</div>
+    </div>
+  );
+}
+
+function currencyTickFormatter(value) {
+  if (value >= 1000) return `$${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}k`;
+  return `$${value}`;
 }
 
 function ReportOrderDrillDown({ order }) {

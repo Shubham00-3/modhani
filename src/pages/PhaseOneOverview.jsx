@@ -147,11 +147,10 @@ export default function PhaseOneOverview() {
     .slice(0, 4);
   return (
     <div>
-      <div className="dashboard-brand section">
-        <img src="/modhani-logo.png" alt="Modhani" />
+      <div className="page-header">
         <div>
-          <div className="dashboard-brand-title">Operations Dashboard</div>
-          <div className="dashboard-brand-subtitle">Orders, fulfilment, invoicing, and QuickBooks sync.</div>
+          <h1 className="page-title">Operations Dashboard</h1>
+          <p className="page-subtitle">Orders, fulfilment, invoicing, and QuickBooks sync.</p>
         </div>
       </div>
 
@@ -213,39 +212,46 @@ export default function PhaseOneOverview() {
             </div>
             <Link className="btn btn-secondary" to="/inventory">View full inventory</Link>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
+          <div className="inventory-preview" style={{ marginTop: 'var(--space-4)' }}>
             {inventoryPreviewRows.length ? (
-              inventoryPreviewRows.map((row) => (
-                <div
-                  key={row.product.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '52px minmax(0, 1fr) auto',
-                    gap: 'var(--space-3)',
-                    alignItems: 'center',
-                  }}
-                >
-                  <DashboardProductImage product={row.product} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 700 }}>{getProductDisplayName(row.product)}</div>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      {row.product.category || 'Uncategorized'} | {row.product.unitSize || 'Unit not set'}
-                    </div>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      Oldest: {row.oldestLot ? `${row.oldestLot.batchNumber} (${formatDate(row.oldestLot.productionDate)})` : '-'}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <span className={`badge badge-${row.stockStatus === 'low' ? 'partial' : row.stockStatus === 'out' ? 'declined' : 'fulfilled'}`}>
-                      {getStockStatusLabel(row.stockStatus)}
-                    </span>
-                    <div className="cell-monospace" style={{ marginTop: 6 }}>{row.totalRemaining.toLocaleString()} left</div>
-                    <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      {row.activeBatches.length.toLocaleString()} active lots
-                    </div>
-                  </div>
-                </div>
-              ))
+              <table className="data-table inventory-preview-table">
+                <thead>
+                  <tr>
+                    <th colSpan={2}>Product</th>
+                    <th>Status</th>
+                    <th className="cell-monospace-th">Remaining</th>
+                    <th className="cell-monospace-th">Active lots</th>
+                    <th>Oldest lot</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventoryPreviewRows.map((row) => (
+                    <tr key={row.product.id}>
+                      <td className="inventory-preview-thumb">
+                        <DashboardProductImage product={row.product} />
+                      </td>
+                      <td className="inventory-preview-name">
+                        <div className="text-truncate" title={getProductDisplayName(row.product)} style={{ fontWeight: 600 }}>
+                          {getProductDisplayName(row.product)}
+                        </div>
+                        <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-xs)' }}>
+                          {row.product.category || 'Uncategorized'} · {row.product.unitSize || 'Unit not set'}
+                        </div>
+                      </td>
+                      <td>
+                        <span className={`badge badge-${row.stockStatus === 'low' ? 'partial' : row.stockStatus === 'out' ? 'declined' : 'fulfilled'}`}>
+                          {getStockStatusLabel(row.stockStatus)}
+                        </span>
+                      </td>
+                      <td className="cell-monospace">{row.totalRemaining.toLocaleString()}</td>
+                      <td className="cell-monospace">{row.activeBatches.length.toLocaleString()}</td>
+                      <td style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                        {row.oldestLot ? `${row.oldestLot.batchNumber} (${formatDate(row.oldestLot.productionDate)})` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : (
               <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
                 <div className="empty-state-title">No urgent stock alerts</div>

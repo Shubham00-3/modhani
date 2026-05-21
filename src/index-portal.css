@@ -1805,6 +1805,8 @@
   display: grid;
   gap: var(--space-4);
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: 1fr;
+  align-items: stretch;
 }
 
 @media (max-width: 1200px) {
@@ -1988,9 +1990,10 @@
 }
 
 .inventory-lots-body {
-  min-height: 28px;
+  min-height: 32px;
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
 }
 
 .inventory-lot-badges {

@@ -12,6 +12,7 @@ const pageTitles = {
   '/inventory': 'Inventory',
   '/reports': 'Reports',
   '/clients-locations': 'Clients & Locations',
+  '/customers': 'Customers',
   '/products': 'Products',
   '/settings': 'Settings',
   '/audit': 'Audit Trail',
