@@ -1059,7 +1059,7 @@ function FulfilmentPanel({ order, onBack }) {
                 <tbody>
                   {availableBatches.map((batch) => (
                     <tr key={batch.id}>
-                      <td className="cell-monospace">{batch.batchNumber}</td>
+                      <td className="cell-monospace" style={{ textAlign: 'left' }}>{batch.batchNumber}</td>
                       <td>{formatDate(batch.productionDate)}</td>
                       <td className="cell-monospace">{batch.qtyRemaining.toLocaleString()}</td>
                       <td>
