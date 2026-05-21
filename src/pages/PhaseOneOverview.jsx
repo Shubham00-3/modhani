@@ -214,6 +214,7 @@ export default function PhaseOneOverview() {
           </div>
           <div className="inventory-preview" style={{ marginTop: 'var(--space-4)' }}>
             {inventoryPreviewRows.length ? (
+              <div className="table-scroll-wrapper">
               <table className="data-table inventory-preview-table">
                 <thead>
                   <tr>
@@ -252,6 +253,7 @@ export default function PhaseOneOverview() {
                   ))}
                 </tbody>
               </table>
+              </div>
             ) : (
               <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
                 <div className="empty-state-title">No urgent stock alerts</div>

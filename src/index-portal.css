@@ -2955,13 +2955,11 @@
     justify-content: space-between;
   }
 
-  .topbar-avatar {
-    display: none;
-  }
-
-  .topbar-menu-btn {
-    display: none;
-  }
+  /* Legacy rules removed:
+       .topbar-avatar  was display:none — left the user-menu button as a
+                       3×3px empty target on phones.
+       .topbar-menu-btn was display:none — overridden by index.css drawer
+                       rule, so removing it here too. */
 
   .page-header {
     align-items: stretch;

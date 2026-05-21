@@ -4347,11 +4347,12 @@ input[type='checkbox']:disabled {
     display: inline-flex !important;
   }
 
-  /* Multi-column grids collapse */
-  .grid-2,
+  /* Tablet (600–900px): drop 4-col grids to 2 cols so KPI cards stay
+     scannable side-by-side; .grid-2 stays 2 cols, .grid-3 collapses to 2
+     so chart cards don't get squeezed. */
   .grid-3,
   .grid-4 {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
   }
 
   /* Stat cards row reflows to 2 cols on tablet */
@@ -4414,6 +4415,13 @@ input[type='checkbox']:disabled {
     grid-template-columns: 1fr !important;
   }
 
+  /* All multi-column grids collapse to a single column on phones. */
+  .grid-2,
+  .grid-3,
+  .grid-4 {
+    grid-template-columns: 1fr !important;
+  }
+
   /* Topbar shrinks further; search is gone, leaving hamburger + bell + avatar */
   .topbar {
     padding: 0 var(--space-3) !important;
@@ -4421,8 +4429,12 @@ input[type='checkbox']:disabled {
   .topbar-breadcrumb {
     font-size: var(--font-size-sm) !important;
   }
+  /* Search stays available on phones — it's the only way to filter
+     dashboard data once the QB status pill and Last sync are hidden. */
   .topbar-search {
-    display: none !important;
+    flex: 1 1 100%;
+    max-width: 100%;
+    width: 100%;
   }
 
   /* Page header title scales down a touch */
