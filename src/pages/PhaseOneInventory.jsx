@@ -162,9 +162,6 @@ export default function PhaseOneInventory() {
           title={historyRows.length ? 'Jump to Inventory History' : 'No inventory history yet'}
         >
           <History size={16} /> View Inventory History
-          {historyRows.length ? (
-            <span className="inventory-history-count">{historyRows.length}</span>
-          ) : null}
         </button>
       </div>
 
