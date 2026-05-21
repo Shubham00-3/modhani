@@ -106,6 +106,42 @@ export default function PhaseOneInventory() {
   const historyRows = useMemo(() => buildInventoryHistory(state), [state]);
   const hasActiveFilters = Boolean(search || categoryFilter || stockFilter || lotStatusFilter);
 
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyTypeFilter, setHistoryTypeFilter] = useState('');
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+
+  const historyTypes = useMemo(
+    () => [...new Set(historyRows.map((row) => row.type).filter(Boolean))].sort(),
+    [historyRows]
+  );
+
+  const filteredHistoryRows = useMemo(() => {
+    const normalizedSearch = historySearch.trim().toLowerCase();
+    const fromTime = historyDateFrom ? new Date(historyDateFrom).getTime() : null;
+    const toTime = historyDateTo ? new Date(historyDateTo).getTime() + 24 * 60 * 60 * 1000 - 1 : null;
+
+    return historyRows.filter((row) => {
+      if (historyTypeFilter && row.type !== historyTypeFilter) return false;
+      if (fromTime !== null || toTime !== null) {
+        const rowTime = row.date ? new Date(row.date).getTime() : null;
+        if (rowTime === null || Number.isNaN(rowTime)) return false;
+        if (fromTime !== null && rowTime < fromTime) return false;
+        if (toTime !== null && rowTime > toTime) return false;
+      }
+      if (normalizedSearch) {
+        const text = [row.productName, row.lotCode, row.quantity, row.details, row.type]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!text.includes(normalizedSearch)) return false;
+      }
+      return true;
+    });
+  }, [historyRows, historySearch, historyTypeFilter, historyDateFrom, historyDateTo]);
+
+  const hasHistoryFilters = Boolean(historySearch || historyTypeFilter || historyDateFrom || historyDateTo);
+
   function scrollToHistory() {
     const el = document.getElementById('inventory-history');
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -254,32 +290,88 @@ export default function PhaseOneInventory() {
       <div className="card" id="inventory-history" style={{ scrollMarginTop: 'var(--space-6)' }}>
         <div className="card-title">Inventory History</div>
         {historyRows.length ? (
-          <div className="table-scroll-wrapper">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Type</th>
-                  <th>Product</th>
-                  <th>Lot Code</th>
-                  <th>Quantity</th>
-                  <th>Details</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historyRows.map((row) => (
-                  <tr key={row.id}>
-                    <td>{formatDateTime(row.date)}</td>
-                    <td><span className="badge badge-portal">{row.type}</span></td>
-                    <td>{row.productName}</td>
-                    <td className="cell-monospace">{row.lotCode}</td>
-                    <td className="cell-monospace">{row.quantity}</td>
-                    <td>{row.details}</td>
-                  </tr>
+          <>
+            <div className="filter-bar">
+              <input
+                className="form-input"
+                value={historySearch}
+                onChange={(event) => setHistorySearch(event.target.value)}
+                placeholder="Search product, lot code, or details..."
+              />
+              <select
+                className="form-select"
+                value={historyTypeFilter}
+                onChange={(event) => setHistoryTypeFilter(event.target.value)}
+              >
+                <option value="">All Types</option>
+                {historyTypes.map((type) => (
+                  <option key={type} value={type}>{type}</option>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </select>
+              <input
+                className="form-input"
+                type="date"
+                value={historyDateFrom}
+                onChange={(event) => setHistoryDateFrom(event.target.value)}
+                aria-label="From date"
+                title="From date"
+              />
+              <input
+                className="form-input"
+                type="date"
+                value={historyDateTo}
+                onChange={(event) => setHistoryDateTo(event.target.value)}
+                aria-label="To date"
+                title="To date"
+              />
+              <button
+                className="btn btn-secondary"
+                type="button"
+                disabled={!hasHistoryFilters}
+                onClick={() => {
+                  setHistorySearch('');
+                  setHistoryTypeFilter('');
+                  setHistoryDateFrom('');
+                  setHistoryDateTo('');
+                }}
+              >
+                <RotateCcw size={14} /> Reset
+              </button>
+            </div>
+            {filteredHistoryRows.length ? (
+              <div className="table-scroll-wrapper">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Product</th>
+                      <th>Lot Code</th>
+                      <th>Quantity</th>
+                      <th>Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredHistoryRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>{formatDateTime(row.date)}</td>
+                        <td><span className="badge badge-portal">{row.type}</span></td>
+                        <td>{row.productName}</td>
+                        <td className="cell-monospace">{row.lotCode}</td>
+                        <td className="cell-monospace">{row.quantity}</td>
+                        <td>{row.details}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+                <div className="empty-state-title">No inventory history matches these filters</div>
+                <div className="empty-state-description">Reset filters to see all activity.</div>
+              </div>
+            )}
+          </>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
             <div className="empty-state-title">No inventory history yet</div>
