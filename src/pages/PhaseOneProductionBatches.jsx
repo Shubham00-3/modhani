@@ -526,7 +526,9 @@ function LogProductionModal({ onClose, onSave }) {
           product.name,
           product.unitSize,
           product.category,
-          product.qbItemName,
+          product.itemNumber,
+          product.orderUnitLabel,
+          product.packagingDetails,
           getProductDisplayName(product),
         ]
           .filter(Boolean)
@@ -538,6 +540,11 @@ function LogProductionModal({ onClose, onSave }) {
   }, [activeProducts, productSearch]);
   const productSuggestions = filteredProducts.slice(0, 50);
   const showProductSuggestions = isProductSearchFocused && !productId;
+  const getProductMeta = (product) =>
+    [
+      product.itemNumber ? `Item #${product.itemNumber}` : '',
+      product.orderUnitLabel || product.packagingDetails || product.category || '',
+    ].filter(Boolean).join(' - ');
 
   return (
     <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
@@ -568,30 +575,14 @@ function LogProductionModal({ onClose, onSave }) {
             />
             {showProductSuggestions ? (
               <div
-                style={{
-                  marginTop: 'calc(var(--space-2) * -1)',
-                  marginBottom: 'var(--space-2)',
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 'var(--radius-md)',
-                  background: 'var(--color-surface)',
-                  boxShadow: 'var(--shadow-sm)',
-                  overflow: 'auto',
-                  maxHeight: 240,
-                }}
+                className="production-product-menu"
               >
                 {productSuggestions.length ? (
                   productSuggestions.map((product) => (
                     <button
                       key={product.id}
-                      className="btn btn-ghost"
+                      className="production-product-option"
                       type="button"
-                      style={{
-                        width: '100%',
-                        justifyContent: 'space-between',
-                        borderRadius: 0,
-                        padding: '8px 12px',
-                        minHeight: 36,
-                      }}
                       onMouseDown={(event) => {
                         event.preventDefault();
                         setProductId(product.id);
@@ -599,12 +590,14 @@ function LogProductionModal({ onClose, onSave }) {
                         setIsProductSearchFocused(false);
                       }}
                     >
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span className="production-product-option-name">
                         {getProductDisplayName(product)}
                       </span>
-                      <span className="cell-monospace" style={{ color: 'var(--color-text-muted)', marginLeft: 'var(--space-3)' }}>
-                        {product.qbItemName ?? ''}
-                      </span>
+                      {getProductMeta(product) ? (
+                        <span className="production-product-option-meta">
+                          {getProductMeta(product)}
+                        </span>
+                      ) : null}
                     </button>
                   ))
                 ) : (
