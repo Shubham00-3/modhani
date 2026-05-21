@@ -2327,6 +2327,18 @@ img {
   opacity: 0.4;
 }
 
+/* On phones the chart container is ~280–320px wide, which makes X-axis
+   tick labels overlap to the point of illegibility. Hide them — the
+   tooltip still surfaces the label when a user taps a bar. */
+@media (max-width: 640px) {
+  .recharts-xAxis .recharts-cartesian-axis-tick-value {
+    display: none;
+  }
+  .recharts-xAxis .recharts-cartesian-axis-line {
+    display: none;
+  }
+}
+
 /* ---------- Audit trail cells ---------- */
 .data-table .audit-user-cell {
   font-weight: 600;
@@ -2629,6 +2641,13 @@ input[type='checkbox']:disabled {
 
 .filter-bar .btn {
   flex: 0 0 auto;
+}
+
+.filter-bar-secondary {
+  padding-top: 0;
+  margin-top: calc(-1 * var(--space-2));
+  border-top: 1px dashed var(--color-border-light);
+  padding-bottom: 0;
 }
 
 /* ---------- Alerts ---------- */
@@ -4519,13 +4538,25 @@ input[type='checkbox']:disabled {
 
 /* ---------- Touch-pointer optimization (phones/tablets) ---------- */
 @media (pointer: coarse) {
-  /* Slightly larger tap targets for icon-only buttons app-wide. */
+  /* iOS HIG / Material recommend 44px minimum touch targets. */
   .btn.btn-icon,
   .um-icon-btn,
   .location-tile-edit,
   .topbar-menu-btn,
-  .topbar-icon-btn {
-    min-width: 40px;
+  .topbar-icon-btn,
+  .topbar-avatar-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Regular buttons get a comfortable minimum tap height too. */
+  .btn {
+    min-height: 40px;
+  }
+
+  /* Filter-bar inputs and selects taller for thumb. */
+  .filter-bar .form-input,
+  .filter-bar .form-select {
     min-height: 40px;
   }
   /* 16px input font-size keeps iOS Safari from zooming on focus. */

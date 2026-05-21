@@ -2740,15 +2740,35 @@
      (max-width: 900px). Don't shrink to icon-only here — that conflicts with
      the slide-out drawer treatment. */
   .topbar {
-    padding: var(--space-4) var(--space-4) 0;
+    padding: var(--space-3) var(--space-4);
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    align-items: center;
   }
-  .topbar-left,
-  .topbar-center,
+  /* Hoist topbar-right's children up to be direct children of topbar
+     (using display: contents) so the search input can wrap to its own
+     row while bell + avatar stay inline with the title. */
   .topbar-right {
+    display: contents;
+  }
+  .topbar-left {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .topbar-center {
     flex: 1 1 100%;
   }
-  .topbar-right {
-    justify-content: flex-start;
+  /* Bell + user-menu sit on the same row as the title at natural width. */
+  .topbar-notifications,
+  .topbar-user-menu {
+    flex: 0 0 auto;
+  }
+  /* Search drops to a second row, full-width. */
+  .topbar-search {
+    flex: 1 1 100%;
+    order: 99;
+    min-width: 0;
+    max-width: 100%;
     width: 100%;
   }
   .topbar-breadcrumb {

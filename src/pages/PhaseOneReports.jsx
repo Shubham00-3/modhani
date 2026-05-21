@@ -86,6 +86,8 @@ export default function PhaseOneReports() {
     period: 'daily',
   });
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const hasSecondaryFilters = Boolean(filters.from || filters.to || filters.batchNumber || filters.period !== 'daily');
+  const [showSecondary, setShowSecondary] = useState(hasSecondaryFilters);
   const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
   const hasActiveFilters = Boolean(
     filters.clientId || filters.locationId || filters.productId || filters.status || filters.batchNumber || filters.from || filters.to || filters.period !== 'daily' || dashboardSearch
@@ -236,14 +238,14 @@ export default function PhaseOneReports() {
           <option value="delivered">Delivered</option>
           <option value="declined">Declined</option>
         </select>
-        <input aria-label="From date" title="From date" className="form-input" type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
-        <input aria-label="To date" title="To date" className="form-input" type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
-        <input aria-label="Filter by lot code" className="form-input" placeholder="Lot code" value={filters.batchNumber} onChange={(event) => setFilters((current) => ({ ...current, batchNumber: event.target.value }))} />
-        <select aria-label="Reporting period" title="Reporting period" className="form-select" value={filters.period} onChange={(event) => setFilters((current) => ({ ...current, period: event.target.value }))}>
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-        </select>
+        <button
+          className="btn btn-ghost"
+          type="button"
+          onClick={() => setShowSecondary((v) => !v)}
+          aria-expanded={showSecondary}
+        >
+          {showSecondary ? 'Hide' : 'More'} filters
+        </button>
         <button
           className="btn btn-secondary"
           type="button"
@@ -269,6 +271,18 @@ export default function PhaseOneReports() {
           <RotateCcw size={14} /> Reset Filters
         </button>
       </div>
+      {showSecondary ? (
+        <div className="filter-bar filter-bar-secondary">
+          <input aria-label="From date" title="From date" className="form-input" type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
+          <input aria-label="To date" title="To date" className="form-input" type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
+          <input aria-label="Filter by lot code" className="form-input" placeholder="Lot code" value={filters.batchNumber} onChange={(event) => setFilters((current) => ({ ...current, batchNumber: event.target.value }))} />
+          <select aria-label="Reporting period" title="Reporting period" className="form-select" value={filters.period} onChange={(event) => setFilters((current) => ({ ...current, period: event.target.value }))}>
+            <option value="daily">Daily</option>
+            <option value="weekly">Weekly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+        </div>
+      ) : null}
 
       <div className="grid-4 section">
         <ReportInfoCard label="Matching Orders" value={reportingSummary.orders.toLocaleString()} />
