@@ -487,6 +487,33 @@ img {
   background: var(--color-success);
 }
 
+.topbar-qb-label {
+  color: var(--color-text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.topbar-qb-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--color-border);
+  display: inline-block;
+}
+
+.topbar-qb-sync {
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .topbar-qb-sync {
+    display: none;
+  }
+  .topbar-qb-divider {
+    display: none;
+  }
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
@@ -2300,6 +2327,58 @@ img {
   opacity: 0.4;
 }
 
+/* ---------- Audit trail cells ---------- */
+.data-table .audit-user-cell {
+  font-weight: 600;
+  white-space: nowrap;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.audit-value-empty {
+  color: var(--color-text-muted);
+  opacity: 0.45;
+}
+
+/* ---------- Customer page tips card ---------- */
+.customer-tips-card {
+  display: flex;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.customer-tips-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-secondary);
+}
+
+.customer-tips-title {
+  font-weight: 600;
+  margin-bottom: var(--space-2);
+}
+
+.customer-tips-list {
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 /* ---------- Buttons ---------- */
 .btn {
   display: inline-flex;
@@ -2544,6 +2623,12 @@ input[type='checkbox']:disabled {
 .filter-bar .form-select,
 .filter-bar .form-input {
   min-width: 140px;
+  flex: 1 1 160px;
+  max-width: 240px;
+}
+
+.filter-bar .btn {
+  flex: 0 0 auto;
 }
 
 /* ---------- Alerts ---------- */

@@ -212,21 +212,21 @@ export default function PhaseOneReports() {
       </div>
 
       <div className="filter-bar">
-        <select className="form-select" value={filters.clientId} onChange={(event) => setFilters((current) => ({ ...current, clientId: event.target.value, locationId: '' }))}>
+        <select aria-label="Filter by client" title="Filter by client" className="form-select" value={filters.clientId} onChange={(event) => setFilters((current) => ({ ...current, clientId: event.target.value, locationId: '' }))}>
           <option value="">All Clients</option>
           {state.clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
         </select>
-        <select className="form-select" value={filters.locationId} onChange={(event) => setFilters((current) => ({ ...current, locationId: event.target.value }))}>
+        <select aria-label="Filter by location" title="Filter by location" className="form-select" value={filters.locationId} onChange={(event) => setFilters((current) => ({ ...current, locationId: event.target.value }))}>
           <option value="">All Locations</option>
           {state.locations.filter((location) => (filters.clientId ? location.clientId === filters.clientId : true)).map((location) => (
             <option key={location.id} value={location.id}>{location.name}</option>
           ))}
         </select>
-        <select className="form-select" value={filters.productId} onChange={(event) => setFilters((current) => ({ ...current, productId: event.target.value }))}>
+        <select aria-label="Filter by product" title="Filter by product" className="form-select" value={filters.productId} onChange={(event) => setFilters((current) => ({ ...current, productId: event.target.value }))}>
           <option value="">All Products</option>
           {state.products.map((product) => <option key={product.id} value={product.id}>{getProductDisplayName(product)}</option>)}
         </select>
-        <select className="form-select" value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+        <select aria-label="Filter by order status" title="Filter by order status" className="form-select" value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
           <option value="">All Statuses</option>
           <option value="pending">Pending</option>
           <option value="partial">Partial</option>
@@ -236,10 +236,10 @@ export default function PhaseOneReports() {
           <option value="delivered">Delivered</option>
           <option value="declined">Declined</option>
         </select>
-        <input className="form-input" type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
-        <input className="form-input" type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
-        <input className="form-input" placeholder="Lot code" value={filters.batchNumber} onChange={(event) => setFilters((current) => ({ ...current, batchNumber: event.target.value }))} />
-        <select className="form-select" value={filters.period} onChange={(event) => setFilters((current) => ({ ...current, period: event.target.value }))}>
+        <input aria-label="From date" title="From date" className="form-input" type="date" value={filters.from} onChange={(event) => setFilters((current) => ({ ...current, from: event.target.value }))} />
+        <input aria-label="To date" title="To date" className="form-input" type="date" value={filters.to} onChange={(event) => setFilters((current) => ({ ...current, to: event.target.value }))} />
+        <input aria-label="Filter by lot code" className="form-input" placeholder="Lot code" value={filters.batchNumber} onChange={(event) => setFilters((current) => ({ ...current, batchNumber: event.target.value }))} />
+        <select aria-label="Reporting period" title="Reporting period" className="form-select" value={filters.period} onChange={(event) => setFilters((current) => ({ ...current, period: event.target.value }))}>
           <option value="daily">Daily</option>
           <option value="weekly">Weekly</option>
           <option value="monthly">Monthly</option>

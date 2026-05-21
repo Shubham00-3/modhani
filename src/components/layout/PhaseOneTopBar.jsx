@@ -148,10 +148,10 @@ export default function PhaseOneTopBar() {
             className="topbar-qb-dot"
             style={{ background: qbHealthy ? 'var(--color-success)' : 'var(--color-warning)' }}
           />
-          <span>QuickBooks Desktop - {qbStatusLabel}</span>
-          <span style={{ color: 'var(--color-text-muted)', marginLeft: '4px' }}>|</span>
-          <span style={{ color: 'var(--color-text-muted)' }}>
-            Last sync: {qbSyncLabel}
+          <span className="topbar-qb-label">QuickBooks Desktop · {qbStatusLabel}</span>
+          <span className="topbar-qb-divider" aria-hidden="true" />
+          <span className="topbar-qb-sync">
+            Last sync {qbSyncLabel}
           </span>
         </button>
       </div>

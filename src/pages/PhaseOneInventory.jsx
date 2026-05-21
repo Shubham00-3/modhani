@@ -180,29 +180,30 @@ export default function PhaseOneInventory() {
 
         <div className="filter-bar">
           <input
+            aria-label="Search products or lot codes"
             className="form-input"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search products or lot codes..."
           />
-          <select className="form-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
+          <select aria-label="Filter by category" title="Filter by category" className="form-select" value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
             <option value="">All Categories</option>
             {categories.map((category) => (
               <option key={category} value={category}>{category}</option>
             ))}
           </select>
-          <select className="form-select" value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
+          <select aria-label="Filter by stock status" title="Filter by stock status" className="form-select" value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
             <option value="">All Stock Statuses</option>
             <option value="in">In stock</option>
             <option value="low">Running low</option>
             <option value="out">Out of stock</option>
           </select>
-          <select className="form-select" value={lotStatusFilter} onChange={(event) => setLotStatusFilter(event.target.value)}>
+          <select aria-label="Filter by lot status" title="Filter by lot status" className="form-select" value={lotStatusFilter} onChange={(event) => setLotStatusFilter(event.target.value)}>
             <option value="">All Lot Statuses</option>
             <option value="active">Active Lots</option>
             <option value="cleared">Cleared Lots</option>
           </select>
-          <select className="form-select" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+          <select aria-label="Sort by" title="Sort by" className="form-select" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
             <option value="product">Sort by Product</option>
             <option value="category">Sort by Category</option>
             <option value="status">Sort by Stock Status</option>
@@ -293,12 +294,15 @@ export default function PhaseOneInventory() {
           <>
             <div className="filter-bar">
               <input
+                aria-label="Search history"
                 className="form-input"
                 value={historySearch}
                 onChange={(event) => setHistorySearch(event.target.value)}
                 placeholder="Search product, lot code, or details..."
               />
               <select
+                aria-label="Filter by movement type"
+                title="Filter by movement type"
                 className="form-select"
                 value={historyTypeFilter}
                 onChange={(event) => setHistoryTypeFilter(event.target.value)}

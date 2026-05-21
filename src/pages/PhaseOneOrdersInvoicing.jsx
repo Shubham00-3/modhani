@@ -298,6 +298,8 @@ export default function PhaseOneOrdersInvoicing() {
         ) : null}
 
         <select
+          aria-label="Filter by client"
+          title="Filter by client"
           className="form-select"
           value={filters.clientId}
           onChange={(event) => updateFilters((current) => ({ ...current, clientId: event.target.value, locationId: '' }))}
@@ -311,6 +313,8 @@ export default function PhaseOneOrdersInvoicing() {
         </select>
 
         <select
+          aria-label="Filter by location"
+          title="Filter by location"
           className="form-select"
           value={filters.locationId}
           onChange={(event) => updateFilters((current) => ({ ...current, locationId: event.target.value }))}
@@ -324,6 +328,8 @@ export default function PhaseOneOrdersInvoicing() {
         </select>
 
         <select
+          aria-label="Filter by status"
+          title="Filter by status"
           className="form-select"
           value={filters.status}
           onChange={(event) => updateFilters((current) => ({ ...current, status: event.target.value }))}
@@ -339,6 +345,8 @@ export default function PhaseOneOrdersInvoicing() {
         </select>
 
         <select
+          aria-label="Filter by source"
+          title="Filter by source"
           className="form-select"
           value={filters.source}
           onChange={(event) => updateFilters((current) => ({ ...current, source: event.target.value }))}

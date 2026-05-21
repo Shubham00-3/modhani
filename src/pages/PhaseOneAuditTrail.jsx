@@ -56,7 +56,7 @@ const PERMISSION_LABELS = Object.fromEntries(PERMISSIONS);
 const PERMISSION_AUDIT_RE = /^\s*(?:[FOEM]:[tf]\s*)+$/;
 
 function renderAuditValue(value) {
-  if (value == null || value === '') return '-';
+  if (value == null || value === '') return <span className="audit-value-empty" aria-hidden="true">—</span>;
   if (typeof value !== 'string' || !PERMISSION_AUDIT_RE.test(value)) return value;
 
   const permissionState = Object.fromEntries(
@@ -179,7 +179,7 @@ export default function PhaseOneAuditTrail() {
       </div>
 
       <div className="filter-bar">
-        <select className="form-select" value={filters.action} onChange={(event) => setFilters((current) => ({ ...current, action: event.target.value }))}>
+        <select aria-label="Filter by action" title="Filter by action" className="form-select" value={filters.action} onChange={(event) => setFilters((current) => ({ ...current, action: event.target.value }))}>
           <option value="">All Actions</option>
           {actions.map((action) => (
             <option key={action} value={action}>
@@ -187,14 +187,14 @@ export default function PhaseOneAuditTrail() {
             </option>
           ))}
         </select>
-        <select className="form-select" value={filters.clientId} onChange={(event) => setFilters((current) => ({ ...current, clientId: event.target.value }))}>
+        <select aria-label="Filter by client" title="Filter by client" className="form-select" value={filters.clientId} onChange={(event) => setFilters((current) => ({ ...current, clientId: event.target.value }))}>
           <option value="">All Clients</option>
           {state.clients.map((client) => (
             <option key={client.id} value={client.id}>{client.name}</option>
           ))}
         </select>
-        <input className="form-input" placeholder="Order #" value={filters.order} onChange={(event) => setFilters((current) => ({ ...current, order: event.target.value }))} />
-        <input className="form-input" placeholder="Staff member" value={filters.user} onChange={(event) => setFilters((current) => ({ ...current, user: event.target.value }))} />
+        <input aria-label="Filter by order number" className="form-input" placeholder="Order #" value={filters.order} onChange={(event) => setFilters((current) => ({ ...current, order: event.target.value }))} />
+        <input aria-label="Filter by staff member" className="form-input" placeholder="Staff member" value={filters.user} onChange={(event) => setFilters((current) => ({ ...current, user: event.target.value }))} />
         <button
           className="btn btn-secondary"
           type="button"
@@ -236,7 +236,7 @@ export default function PhaseOneAuditTrail() {
                       <td><span className="badge badge-pending">{ACTION_LABELS[entry.action] ?? entry.action}</span></td>
                       <td>{entry.clientId ? getClientName(state.clients, entry.clientId) : '-'}</td>
                       <td className="cell-monospace">{order ? `#${order.orderNumber}` : '-'}</td>
-                      <td style={{ fontWeight: 600 }}>{entry.userName}</td>
+                      <td className="audit-user-cell" title={entry.userName}>{entry.userName}</td>
                       <td>{entry.details}</td>
                       <td>{renderAuditValue(entry.previousValue)}</td>
                       <td>{renderAuditValue(entry.newValue)}</td>
@@ -261,11 +261,9 @@ export default function PhaseOneAuditTrail() {
 
 function AuditSummaryCard({ label, value }) {
   return (
-    <div className="card" style={{ padding: 'var(--space-4)' }}>
-      <div style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
-        {label}
-      </div>
-      <div style={{ marginTop: 6, fontWeight: 700, fontSize: 'var(--font-size-lg)' }}>{value}</div>
+    <div className="report-info-card card">
+      <div className="report-info-card-label">{label}</div>
+      <div className="report-info-card-value">{value}</div>
     </div>
   );
 }

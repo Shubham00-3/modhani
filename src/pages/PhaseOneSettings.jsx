@@ -143,11 +143,9 @@ export default function PhaseOneSettings() {
 
 function SummaryCard({ label, value }) {
   return (
-    <div className="card" style={{ padding: 'var(--space-4)' }}>
-      <div style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)' }}>
-        {label}
-      </div>
-      <div style={{ marginTop: 6, fontWeight: 700, fontSize: 'var(--font-size-lg)' }}>{value}</div>
+    <div className="report-info-card card">
+      <div className="report-info-card-label">{label}</div>
+      <div className="report-info-card-value">{value}</div>
     </div>
   );
 }

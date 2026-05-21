@@ -181,6 +181,20 @@ export default function PhaseOneCustomers() {
         )}
       </div>
 
+      <div className="customer-tips-card">
+        <div className="customer-tips-icon">
+          <UserPlus size={18} />
+        </div>
+        <div className="customer-tips-body">
+          <div className="customer-tips-title">How customer accounts work</div>
+          <ul className="customer-tips-list">
+            <li>Invited customers receive a password setup link by email.</li>
+            <li>They can sign in to the customer portal to place orders and view recent invoices.</li>
+            <li>Assign a customer to one or more companies/locations to control what they can order.</li>
+          </ul>
+        </div>
+      </div>
+
       {showAddModal ? (
         <AddCustomerModal
           clients={state.clients}
