@@ -2272,9 +2272,22 @@
 .cp-cart-summary-row {
   display: flex;
   justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
   padding: var(--space-2) 0;
   font-size: var(--font-size-sm);
   color: var(--color-text-secondary);
+}
+
+.cp-cart-summary-row > span:first-child {
+  flex: 1 1 auto;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.cp-cart-summary-row > span:last-child {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .cp-cart-summary-total {

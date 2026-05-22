@@ -73,6 +73,13 @@ export default function PhaseOneProductionBatches() {
 
   return (
     <div>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Production &amp; Lots</h1>
+          <p className="page-subtitle">Log production runs, manage lot codes, and monitor FIFO consumption.</p>
+        </div>
+      </div>
+
       {oldestActive ? (
         <div className="alert alert-warning section">
           <AlertTriangle size={18} />

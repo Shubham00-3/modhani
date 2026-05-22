@@ -44,6 +44,8 @@ export default function PhaseOneSidebar() {
             to={to}
             className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
             end={to === '/'}
+            aria-label={label}
+            title={collapsed ? label : undefined}
           >
             {createElement(icon, { size: 20 })}
             {!collapsed && <span>{label}</span>}

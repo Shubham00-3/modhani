@@ -432,10 +432,16 @@ export default function PhaseOneOrdersInvoicing() {
 
       {selectedOrder ? (
         <div className="modal-overlay" onClick={handleOverlayClick(closePanel)}>
-          <div className="modal modal-order-detail" onClick={(event) => event.stopPropagation()}>
+          <div
+            className="modal modal-order-detail"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="order-detail-title"
+            onClick={(event) => event.stopPropagation()}
+          >
             <div className="modal-header">
               <div>
-                <h2 className="modal-title">Order #{selectedOrder.orderNumber}</h2>
+                <h2 id="order-detail-title" className="modal-title">Order #{selectedOrder.orderNumber}</h2>
                 <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)', marginTop: 2 }}>
                   {getClientName(state.clients, selectedOrder.clientId)} - {getLocationName(state.locations, selectedOrder.locationId)}
                 </div>
@@ -1216,10 +1222,16 @@ function InvoiceModal({ order, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-invoice-title"
+        onClick={(event) => event.stopPropagation()}
+      >
         <div className="modal-header">
-          <h3 className="modal-title">Create Invoice</h3>
-          <button className="btn btn-ghost" type="button" onClick={onClose}>
+          <h3 id="create-invoice-title" className="modal-title">Create Invoice</h3>
+          <button className="btn btn-ghost" type="button" onClick={onClose} aria-label="Close create invoice">
             <X size={18} />
           </button>
         </div>

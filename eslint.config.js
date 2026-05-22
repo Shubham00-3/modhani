@@ -6,7 +6,10 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
   globalIgnores([
-    'dist',
+    '**/dist/**',
+    '**/.tmp-*/**',
+    '**/.claude/**',
+    '**/node_modules/**',
     'src/context/AppContext.jsx',
     'src/components/layout/Sidebar.jsx',
     'src/components/layout/TopBar.jsx',

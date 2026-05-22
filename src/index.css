@@ -951,6 +951,23 @@ img {
   align-items: center;
 }
 
+/* Below 960px the floating product-stage cards (absolutely positioned)
+   collide with the welcome copy. Stack the panels and hide the stage. */
+@media (max-width: 960px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .auth-market-panel {
+    min-height: 0;
+  }
+
+  .auth-product-stage {
+    display: none;
+  }
+}
+
 .auth-brand-panel,
 .auth-form-card {
   border: 1px solid rgba(229, 231, 235, 0.9);
