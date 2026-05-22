@@ -1067,7 +1067,7 @@ function FulfilmentPanel({ order, onBack }) {
                     <tr key={batch.id}>
                       <td className="cell-monospace" style={{ textAlign: 'left' }}>{batch.batchNumber}</td>
                       <td>{formatDate(batch.productionDate)}</td>
-                      <td className="cell-monospace">{batch.qtyRemaining.toLocaleString()}</td>
+                      <td className="cell-monospace" style={{ textAlign: 'left' }}>{batch.qtyRemaining.toLocaleString()}</td>
                       <td>
                         <input
                           className="form-input"
