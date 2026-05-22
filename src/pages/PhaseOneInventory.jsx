@@ -360,8 +360,8 @@ export default function PhaseOneInventory() {
                         <td className="cell-truncate">
                           <span className="text-truncate" title={row.productName}>{row.productName}</span>
                         </td>
-                        <td className="cell-monospace">{row.lotCode}</td>
-                        <td className="cell-monospace">{row.quantity}</td>
+                        <td className="cell-monospace cell-align-left">{row.lotCode}</td>
+                        <td className="cell-monospace cell-align-left">{row.quantity}</td>
                         <td>{row.details}</td>
                       </tr>
                     ))}

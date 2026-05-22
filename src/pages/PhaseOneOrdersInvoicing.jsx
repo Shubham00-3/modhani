@@ -397,7 +397,7 @@ export default function PhaseOneOrdersInvoicing() {
                     tabIndex={0}
                     style={{ cursor: 'pointer' }}
                   >
-                    <td className="cell-monospace">#{order.orderNumber}</td>
+                    <td className="cell-monospace cell-align-left">#{order.orderNumber}</td>
                     <td>
                       <span className={`badge badge-${order.status}`}>{order.status}</span>
                       {order.lockedBy && order.lockedBy !== state.currentUser.id ? (
@@ -412,8 +412,8 @@ export default function PhaseOneOrdersInvoicing() {
                       <span className={`badge badge-${order.source}`}>{order.source.toUpperCase()}</span>
                     </td>
                     <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
-                    <td className="cell-monospace">{getQuickBooksSyncLabel(order)}</td>
-                    <td className="cell-monospace">{order.packingSlipNumber ?? '-'}</td>
+                    <td className="cell-monospace cell-align-left">{getQuickBooksSyncLabel(order)}</td>
+                    <td className="cell-monospace cell-align-left">{order.packingSlipNumber ?? '-'}</td>
                     <td>{formatDate(order.createdAt)}</td>
                   </tr>
                 ))}
@@ -1065,9 +1065,9 @@ function FulfilmentPanel({ order, onBack }) {
                 <tbody>
                   {availableBatches.map((batch) => (
                     <tr key={batch.id}>
-                      <td className="cell-monospace" style={{ textAlign: 'left' }}>{batch.batchNumber}</td>
+                      <td className="cell-monospace cell-align-left">{batch.batchNumber}</td>
                       <td>{formatDate(batch.productionDate)}</td>
-                      <td className="cell-monospace" style={{ textAlign: 'left' }}>{batch.qtyRemaining.toLocaleString()}</td>
+                      <td className="cell-monospace cell-align-left">{batch.qtyRemaining.toLocaleString()}</td>
                       <td>
                         <input
                           className="form-input"

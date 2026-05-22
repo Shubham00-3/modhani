@@ -235,7 +235,7 @@ export default function PhaseOneAuditTrail() {
                       <td>{formatDateTime(entry.timestamp)}</td>
                       <td><span className="badge badge-pending">{ACTION_LABELS[entry.action] ?? entry.action}</span></td>
                       <td>{entry.clientId ? getClientName(state.clients, entry.clientId) : '-'}</td>
-                      <td className="cell-monospace">{order ? `#${order.orderNumber}` : '-'}</td>
+                      <td className="cell-monospace cell-align-left">{order ? `#${order.orderNumber}` : '-'}</td>
                       <td className="audit-user-cell" title={entry.userName}>{entry.userName}</td>
                       <td>{entry.details}</td>
                       <td>{renderAuditValue(entry.previousValue)}</td>

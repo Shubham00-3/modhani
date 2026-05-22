@@ -2266,6 +2266,11 @@ img {
   text-align: right;
 }
 
+.data-table td.cell-align-left,
+.data-table .cell-align-left {
+  text-align: left;
+}
+
 .text-truncate {
   display: block;
   max-width: 100%;

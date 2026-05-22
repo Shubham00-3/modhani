@@ -288,12 +288,12 @@ export default function PhaseOneOverview() {
             {recentOrders.length ? (
               recentOrders.map((order) => (
                 <tr key={order.id}>
-                  <td className="cell-monospace">#{order.orderNumber}</td>
+                  <td className="cell-monospace cell-align-left">#{order.orderNumber}</td>
                   <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
                   <td>{getLocationName(state.locations, order.locationId)}</td>
                   <td><span className={`badge badge-${order.status}`}>{order.status}</span></td>
                   <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
-                  <td className="cell-monospace">{order.qbInvoiceNumber ?? '-'}</td>
+                  <td className="cell-monospace cell-align-left">{order.qbInvoiceNumber ?? '-'}</td>
                   <td>{formatDate(order.createdAt)}</td>
                 </tr>
               ))
@@ -384,13 +384,13 @@ function DashboardOrderPanel({ title, description, orders, clients, locations })
               .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
               .map((order) => (
                 <tr key={order.id}>
-                  <td className="cell-monospace">#{order.orderNumber}</td>
+                  <td className="cell-monospace cell-align-left">#{order.orderNumber}</td>
                   <td style={{ fontWeight: 600 }}>{getClientName(clients, order.clientId)}</td>
                   <td>{getLocationName(locations, order.locationId)}</td>
                   <td><span className={`badge badge-${order.status}`}>{order.status}</span></td>
                   <td className="cell-monospace">{getOrderOutstandingQty(order).toLocaleString()}</td>
                   <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
-                  <td className="cell-monospace">{order.qbInvoiceNumber ?? order.invoiceNumber ?? '-'}</td>
+                  <td className="cell-monospace cell-align-left">{order.qbInvoiceNumber ?? order.invoiceNumber ?? '-'}</td>
                   <td>{formatDate(order.createdAt)}</td>
                 </tr>
               ))}

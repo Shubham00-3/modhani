@@ -120,7 +120,7 @@ export default function PhaseOneProducts() {
                     <td>
                       <ProductThumbnail product={product} onPreview={setPreviewProduct} />
                     </td>
-                    <td className="cell-monospace">{product.itemNumber || '-'}</td>
+                    <td className="cell-monospace cell-align-left">{product.itemNumber || '-'}</td>
                     <td className="cell-truncate">
                       <span className="text-truncate" style={{ fontWeight: 600 }} title={getProductDisplayName(product)}>
                         {getProductDisplayName(product)}

@@ -431,8 +431,8 @@ export default function PhaseOneReports() {
                 <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
                 <td>{getLocationName(state.locations, order.locationId)}</td>
                 <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
-                <td className="cell-monospace">{order.qbInvoiceNumber ?? '-'}</td>
-                <td className="cell-monospace">{order.packingSlipNumber ?? '-'}</td>
+                <td className="cell-monospace cell-align-left">{order.qbInvoiceNumber ?? '-'}</td>
+                <td className="cell-monospace cell-align-left">{order.packingSlipNumber ?? '-'}</td>
               </tr>
             ))}
           </tbody>
@@ -576,7 +576,7 @@ function ReportOrderDrillDown({ order }) {
                             borderRadius: 'var(--radius-sm)',
                           }}
                         >
-                          <span className="cell-monospace">{getBatchLabel(state.batches, assigned.batchId)}</span>
+                          <span className="cell-monospace cell-align-left">{getBatchLabel(state.batches, assigned.batchId)}</span>
                           <span className="cell-monospace">{assigned.qty.toLocaleString()} units</span>
                         </div>
                       ))}
