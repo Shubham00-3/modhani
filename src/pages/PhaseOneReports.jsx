@@ -406,7 +406,7 @@ export default function PhaseOneReports() {
               <th>Status</th>
               <th>Client</th>
               <th>Location</th>
-              <th>Total Value</th>
+              <th className="cell-align-right">Total Value</th>
               <th>QB Invoice</th>
               <th>Packing Slip</th>
             </tr>

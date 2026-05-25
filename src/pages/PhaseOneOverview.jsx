@@ -279,7 +279,7 @@ export default function PhaseOneOverview() {
               <th>Client</th>
               <th>Location</th>
               <th>Status</th>
-              <th>Total Value</th>
+              <th className="cell-align-right">Total Value</th>
               <th>QB Invoice</th>
               <th>Created</th>
             </tr>
@@ -373,8 +373,8 @@ function DashboardOrderPanel({ title, description, orders, clients, locations })
               <th>Client</th>
               <th>Location</th>
               <th>Status</th>
-              <th>Outstanding</th>
-              <th>Total Value</th>
+              <th className="cell-align-right">Outstanding</th>
+              <th className="cell-align-right">Total Value</th>
               <th>QB Invoice</th>
               <th>Created</th>
             </tr>

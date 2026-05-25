@@ -108,7 +108,7 @@ export default function PhaseOneProducts() {
                 <th>Product</th>
                 <th>Category</th>
                 <th>Packaging</th>
-                <th>Tier 1 Price</th>
+                <th className="cell-align-right">Tier 1 Price</th>
                 <th>Shelf Life</th>
                 <th />
               </tr>
