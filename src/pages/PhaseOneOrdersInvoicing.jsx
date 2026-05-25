@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -9,6 +9,7 @@ import {
   Printer,
   Trash2,
   Truck,
+  Users,
   X,
 } from 'lucide-react';
 import { useApp } from '../context/useApp';
@@ -56,6 +57,8 @@ export default function PhaseOneOrdersInvoicing() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
+  const [bulkSelectedIds, setBulkSelectedIds] = useState(() => new Set());
+  const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
   const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || dashboardView || dashboardSearch);
 
   const selectedOrder = state.orders.find((order) => order.id === selectedOrderId) ?? null;
@@ -365,12 +368,38 @@ export default function PhaseOneOrdersInvoicing() {
         </button>
       </div>
 
+      {bulkSelectedIds.size > 0 ? (
+        <div className="card section" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', padding: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+            <Users size={18} />
+            <strong>{bulkSelectedIds.size} shipped order{bulkSelectedIds.size === 1 ? '' : 's'} selected</strong>
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <button className="btn btn-ghost" type="button" onClick={() => setBulkSelectedIds(new Set())}>
+              Clear selection
+            </button>
+            <button className="btn btn-primary" type="button" onClick={() => setShowBulkAssignModal(true)}>
+              <Users size={16} /> Assign Driver to Selected
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="card">
         {filteredOrders.length ? (
           <div className="table-scroll-wrapper">
             <table className="data-table">
               <thead>
                 <tr>
+                  <th style={{ width: 36, textAlign: 'center' }}>
+                    <BulkSelectAllCheckbox
+                      eligibleIds={filteredOrders
+                        .filter((order) => order.status === 'shipped' && !order.podSignedAt)
+                        .map((order) => order.id)}
+                      selectedIds={bulkSelectedIds}
+                      onChange={setBulkSelectedIds}
+                    />
+                  </th>
                   <th>Order</th>
                   <th>Status</th>
                   <th>Client</th>
@@ -383,7 +412,10 @@ export default function PhaseOneOrdersInvoicing() {
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order) => (
+                {filteredOrders.map((order) => {
+                  const canBulkSelect = order.status === 'shipped' && !order.podSignedAt;
+                  const isSelected = bulkSelectedIds.has(order.id);
+                  return (
                   <tr
                     key={order.id}
                     onClick={() => openOrder(order.id)}
@@ -397,6 +429,23 @@ export default function PhaseOneOrdersInvoicing() {
                     tabIndex={0}
                     style={{ cursor: 'pointer' }}
                   >
+                    <td onClick={(event) => event.stopPropagation()} style={{ textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select order ${order.orderNumber} for bulk driver assignment`}
+                        disabled={!canBulkSelect}
+                        title={canBulkSelect ? undefined : 'Bulk assignment is only available for shipped orders that have not been delivered yet.'}
+                        checked={isSelected}
+                        onChange={(event) => {
+                          setBulkSelectedIds((current) => {
+                            const next = new Set(current);
+                            if (event.target.checked) next.add(order.id);
+                            else next.delete(order.id);
+                            return next;
+                          });
+                        }}
+                      />
+                    </td>
                     <td className="cell-monospace cell-align-left">#{order.orderNumber}</td>
                     <td>
                       <span className={`badge badge-${order.status}`}>{order.status}</span>
@@ -416,7 +465,8 @@ export default function PhaseOneOrdersInvoicing() {
                     <td className="cell-monospace cell-align-left">{order.packingSlipNumber ?? '-'}</td>
                     <td>{formatDate(order.createdAt)}</td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -429,6 +479,17 @@ export default function PhaseOneOrdersInvoicing() {
           </div>
         )}
       </div>
+
+      {showBulkAssignModal ? (
+        <BulkAssignDriverModal
+          orderIds={[...bulkSelectedIds]}
+          onClose={() => setShowBulkAssignModal(false)}
+          onAssigned={() => {
+            setShowBulkAssignModal(false);
+            setBulkSelectedIds(new Set());
+          }}
+        />
+      ) : null}
 
       {selectedOrder ? (
         <div className="modal-overlay" onClick={handleOverlayClick(closePanel)}>
@@ -850,6 +911,20 @@ function OrderDetailPanel({
               <img src={order.podSignatureDataUrl} alt="Proof of delivery signature" />
             ) : null}
           </div>
+          {Array.isArray(order.podPhotoUrls) && order.podPhotoUrls.length > 0 ? (
+            <div style={{ marginTop: 'var(--space-4)' }}>
+              <div style={{ fontSize: 'var(--font-size-xs)', textTransform: 'uppercase', color: 'var(--color-text-muted)', marginBottom: 'var(--space-2)' }}>
+                Delivery Photos
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                {order.podPhotoUrls.map((url, index) => (
+                  <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: 96, height: 96, borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                    <img src={url} alt={`Delivery photo ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -1074,6 +1149,7 @@ function FulfilmentPanel({ order, onBack }) {
                           style={{ width: 96 }}
                           type="number"
                           min="0"
+                          step="0.01"
                           value={itemAssignments[batch.id] ?? ''}
                           onChange={(event) => updateAssignment(item.id, batch.id, event.target.value, outstanding)}
                         />
@@ -1166,6 +1242,7 @@ function InvoiceModal({ order, onClose }) {
         {
           price: String(item.overridePrice ?? item.clientPrice ?? item.basePrice),
           reason: item.overrideReason ?? '',
+          discount: String(item.discountAmount ?? 0),
         },
       ])
     )
@@ -1178,6 +1255,9 @@ function InvoiceModal({ order, onClose }) {
         const nextPrice = Number(nextLine.price);
         const defaultPrice = item.clientPrice ?? item.basePrice;
         const hasOverride = Number(nextPrice.toFixed(2)) !== Number(defaultPrice.toFixed(2));
+        const discountValue = Number(nextLine.discount);
+        const nextDiscount = Number.isFinite(discountValue) && discountValue > 0 ? discountValue : 0;
+        const lineSubtotal = item.fulfilledQty * nextPrice;
 
         if (hasOverride && !state.currentUser.permissions.overridePrices) {
           throw new Error('This user cannot override prices.');
@@ -1187,10 +1267,15 @@ function InvoiceModal({ order, onClose }) {
           throw new Error(`Provide an override reason for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
         }
 
+        if (nextDiscount > lineSubtotal) {
+          throw new Error(`Discount cannot exceed the line subtotal for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
+        }
+
         return {
           orderItemId: item.id,
           overridePrice: hasOverride ? nextPrice : null,
           overrideReason: hasOverride ? nextLine.reason.trim() : null,
+          discount: nextDiscount,
         };
       });
 
@@ -1241,6 +1326,10 @@ function InvoiceModal({ order, onClose }) {
             const defaultPrice = item.clientPrice ?? item.basePrice;
             const lineValue = lineOverrides[item.id];
             const effectivePrice = Number(lineValue.price) || defaultPrice;
+            const discountValue = Number(lineValue.discount);
+            const lineDiscount = Number.isFinite(discountValue) && discountValue > 0 ? discountValue : 0;
+            const lineSubtotal = item.fulfilledQty * effectivePrice;
+            const lineTotal = Math.max(lineSubtotal - lineDiscount, 0);
 
             return (
               <div key={item.id} className="card" style={{ padding: 'var(--space-4)' }}>
@@ -1254,8 +1343,13 @@ function InvoiceModal({ order, onClose }) {
                     </div>
                     </div>
                   </div>
-                  <div className="cell-monospace">
-                    {formatCurrency(item.fulfilledQty * effectivePrice)}
+                  <div className="cell-monospace" style={{ textAlign: 'right' }}>
+                    <div>{formatCurrency(lineTotal)}</div>
+                    {lineDiscount > 0 ? (
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                        Subtotal {formatCurrency(lineSubtotal)} − Discount {formatCurrency(lineDiscount)}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1279,6 +1373,27 @@ function InvoiceModal({ order, onClose }) {
                         }))
                       }
                     />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
+                  <label className="form-label">Discount (Flat $)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={lineValue.discount}
+                    onChange={(event) =>
+                      setLineOverrides((current) => ({
+                        ...current,
+                        [item.id]: { ...current[item.id], discount: event.target.value },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                  <div style={{ marginTop: 4, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                    Subtracted from the line total before tax. Capped at the line subtotal.
                   </div>
                 </div>
 
@@ -1330,6 +1445,7 @@ function EditInvoiceModal({ order, onClose }) {
           quantity: String(item.invoiceQty ?? item.fulfilledQty),
           price: String(item.overridePrice ?? item.clientPrice ?? item.basePrice),
           reason: item.overrideReason ?? '',
+          discount: String(item.discountAmount ?? 0),
         },
       ])
     )
@@ -1358,6 +1474,9 @@ function EditInvoiceModal({ order, onClose }) {
         const defaultPrice = item.clientPrice ?? item.basePrice;
         const maxQuantity = Math.max(0, Number(item.fulfilledQty));
         const hasPriceOverride = Number(nextPrice.toFixed(2)) !== Number(defaultPrice.toFixed(2));
+        const discountValue = Number(draft.discount);
+        const nextDiscount = Number.isFinite(discountValue) && discountValue > 0 ? discountValue : 0;
+        const lineSubtotal = nextQuantity * nextPrice;
 
         if (!Number.isFinite(nextQuantity) || nextQuantity < 0 || nextQuantity > maxQuantity) {
           throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} quantity must be between 0 and ${maxQuantity}.`);
@@ -1375,11 +1494,16 @@ function EditInvoiceModal({ order, onClose }) {
           throw new Error(`Provide a price override reason for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
         }
 
+        if (nextDiscount > lineSubtotal) {
+          throw new Error(`Discount cannot exceed the line subtotal for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
+        }
+
         return {
           orderItemId: item.id,
           invoiceQty: nextQuantity,
           overridePrice: hasPriceOverride ? nextPrice : null,
           overrideReason: hasPriceOverride ? draft.reason.trim() : null,
+          discount: nextDiscount,
         };
       });
 
@@ -1469,6 +1593,10 @@ function EditInvoiceModal({ order, onClose }) {
             const quantity = Number(draft.quantity) || 0;
             const draftPrice = Number(draft.price);
             const price = Number.isFinite(draftPrice) ? draftPrice : defaultPrice;
+            const draftDiscount = Number(draft.discount);
+            const lineDiscount = Number.isFinite(draftDiscount) && draftDiscount > 0 ? draftDiscount : 0;
+            const lineSubtotal = quantity * price;
+            const lineTotal = Math.max(lineSubtotal - lineDiscount, 0);
             const maxQuantity = Math.max(0, Number(item.fulfilledQty));
 
             return (
@@ -1483,7 +1611,14 @@ function EditInvoiceModal({ order, onClose }) {
                       </div>
                     </div>
                   </div>
-                  <div className="cell-monospace">{formatCurrency(quantity * price)}</div>
+                  <div className="cell-monospace" style={{ textAlign: 'right' }}>
+                    <div>{formatCurrency(lineTotal)}</div>
+                    {lineDiscount > 0 ? (
+                      <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                        Subtotal {formatCurrency(lineSubtotal)} − Discount {formatCurrency(lineDiscount)}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="grid-2" style={{ marginTop: 'var(--space-4)' }}>
@@ -1494,7 +1629,7 @@ function EditInvoiceModal({ order, onClose }) {
                       type="number"
                       min="0"
                       max={maxQuantity}
-                      step="1"
+                      step="0.01"
                       value={draft.quantity}
                       onChange={(event) =>
                         setLineDrafts((current) => ({
@@ -1520,6 +1655,27 @@ function EditInvoiceModal({ order, onClose }) {
                         }))
                       }
                     />
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
+                  <label className="form-label">Discount (Flat $)</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={draft.discount}
+                    onChange={(event) =>
+                      setLineDrafts((current) => ({
+                        ...current,
+                        [item.id]: { ...current[item.id], discount: event.target.value },
+                      }))
+                    }
+                    placeholder="0.00"
+                  />
+                  <div style={{ marginTop: 4, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                    Subtracted from the line total. Capped at the line subtotal.
                   </div>
                 </div>
 
@@ -1598,11 +1754,6 @@ function AddOrderModal({ onClose }) {
 
     if (!validLines.length) {
       addToast('Add at least one product line.', 'warning');
-      return;
-    }
-
-    if (validLines.some((line) => !Number.isInteger(Number(line.quantity)))) {
-      addToast('Order quantities must be whole numbers.', 'warning');
       return;
     }
 
@@ -1786,6 +1937,137 @@ function AddOrderModal({ onClose }) {
   );
 }
 
+function BulkSelectAllCheckbox({ eligibleIds, selectedIds, onChange }) {
+  const checkboxRef = useRef(null);
+  const eligibleCount = eligibleIds.length;
+  const selectedEligibleCount = eligibleIds.filter((id) => selectedIds.has(id)).length;
+  const allSelected = eligibleCount > 0 && selectedEligibleCount === eligibleCount;
+  const someSelected = selectedEligibleCount > 0 && !allSelected;
+
+  useEffect(() => {
+    if (checkboxRef.current) {
+      checkboxRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected]);
+
+  return (
+    <input
+      ref={checkboxRef}
+      type="checkbox"
+      disabled={eligibleCount === 0}
+      checked={allSelected}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => {
+        const next = new Set(selectedIds);
+        if (event.target.checked) {
+          eligibleIds.forEach((id) => next.add(id));
+        } else {
+          eligibleIds.forEach((id) => next.delete(id));
+        }
+        onChange(next);
+      }}
+      aria-label={allSelected ? 'Deselect all eligible orders' : 'Select all eligible orders'}
+      title={
+        eligibleCount === 0
+          ? 'No eligible shipped orders in the current view'
+          : allSelected
+            ? `Deselect ${eligibleCount} eligible order${eligibleCount === 1 ? '' : 's'}`
+            : `Select ${eligibleCount} eligible order${eligibleCount === 1 ? '' : 's'}`
+      }
+    />
+  );
+}
+
+function BulkAssignDriverModal({ orderIds, onClose, onAssigned }) {
+  const { state, dispatch, addToast } = useApp();
+  useModalBehavior(onClose);
+  const drivers = state.users.filter((user) => user.role === 'driver' && !user.disabledAt);
+  const selectedOrders = orderIds
+    .map((id) => state.orders.find((order) => order.id === id))
+    .filter(Boolean);
+  const [driverUserId, setDriverUserId] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleAssign() {
+    if (saving) return;
+    if (!driverUserId) {
+      addToast('Select a driver before assigning.', 'warning');
+      return;
+    }
+    setSaving(true);
+    const result = await dispatch({
+      type: 'BULK_ASSIGN_DRIVER',
+      payload: { orderIds, driverUserId },
+    });
+    setSaving(false);
+    if (!result?.ok) return;
+    const driverName = drivers.find((driver) => driver.id === driverUserId)?.name ?? 'driver';
+    addToast(`${driverName} assigned to ${orderIds.length} order${orderIds.length === 1 ? '' : 's'}.`);
+    onAssigned();
+  }
+
+  return (
+    <div className="modal-overlay" onClick={handleOverlayClick(saving ? () => {} : onClose)}>
+      <div className="modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="bulk-assign-title">
+        <div className="modal-header">
+          <h3 id="bulk-assign-title" className="modal-title">Bulk Assign Driver</h3>
+          <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving} aria-label="Close bulk assign">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div style={{ marginBottom: 'var(--space-4)', color: 'var(--color-text-secondary)' }}>
+            Assigning {selectedOrders.length} shipped order{selectedOrders.length === 1 ? '' : 's'} to a single driver. This replaces any existing assignment on each order.
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Driver</label>
+            <select
+              className="form-select"
+              value={driverUserId}
+              onChange={(event) => setDriverUserId(event.target.value)}
+              disabled={saving || drivers.length === 0}
+            >
+              <option value="">- Select driver -</option>
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>{driver.name}</option>
+              ))}
+            </select>
+            {drivers.length === 0 ? (
+              <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
+                No active drivers registered. Invite a driver from Settings → User Management.
+              </div>
+            ) : null}
+          </div>
+
+          <div className="card" style={{ padding: 'var(--space-3)', maxHeight: 240, overflowY: 'auto' }}>
+            <div className="card-title" style={{ marginBottom: 'var(--space-3)' }}>Selected orders</div>
+            {selectedOrders.map((order) => (
+              <div
+                key={order.id}
+                style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-3)', padding: '6px 0', borderBottom: '1px solid var(--color-border-light)' }}
+              >
+                <span style={{ fontWeight: 600 }}>#{order.orderNumber}</span>
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+                  {getClientName(state.clients, order.clientId)} · {getLocationName(state.locations, order.locationId)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" type="button" onClick={handleAssign} disabled={saving || !driverUserId || drivers.length === 0}>
+            {saving ? 'Assigning...' : `Assign to ${selectedOrders.length} order${selectedOrders.length === 1 ? '' : 's'}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) {
   const selectedProduct = getProduct(products, line.productId);
   return (
@@ -1830,7 +2112,8 @@ function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) 
         <input
           className="form-input"
           type="number"
-          min="1"
+          min="0.01"
+          step="0.01"
           value={line.quantity}
           onChange={(event) => onUpdateLine({ quantity: event.target.value })}
         />

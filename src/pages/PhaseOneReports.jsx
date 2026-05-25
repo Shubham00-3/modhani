@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BarChart3, RotateCcw, X } from 'lucide-react';
+import { BarChart3, RotateCcw, Trash2, X } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -16,6 +16,7 @@ import {
 import { useApp } from '../context/useApp';
 import {
   formatCurrency,
+  formatDate,
   formatDateTime,
   getBatchLabel,
   getClientName,
@@ -442,6 +443,8 @@ export default function PhaseOneReports() {
         </>
       )}
 
+      <TrashReportSection />
+
       {selectedOrder ? (
         <>
           <div className="slide-panel-overlay" onClick={() => setSelectedOrderId(null)} />
@@ -466,6 +469,187 @@ export default function PhaseOneReports() {
           </div>
         </>
       ) : null}
+    </div>
+  );
+}
+
+function TrashReportSection() {
+  const { state } = useApp();
+  const [productFilter, setProductFilter] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  const rows = useMemo(() => state.trashReportRows ?? [], [state.trashReportRows]);
+
+  const filtered = useMemo(() => {
+    return rows.filter((row) => {
+      if (productFilter && row.productId !== productFilter) return false;
+      if (fromDate && row.deletedAt && new Date(row.deletedAt) < new Date(fromDate)) return false;
+      if (toDate && row.deletedAt && new Date(row.deletedAt) > new Date(`${toDate}T23:59:59`)) return false;
+      return true;
+    });
+  }, [rows, productFilter, fromDate, toDate]);
+
+  const summary = useMemo(() => {
+    const monthKey = new Date().toISOString().slice(0, 7);
+    let totalUnits = 0;
+    let unitsThisMonth = 0;
+    let lotsThisMonth = 0;
+    filtered.forEach((row) => {
+      const qty = Number(row.qtyTrashed) || 0;
+      totalUnits += qty;
+      if (row.deletedAt?.slice(0, 7) === monthKey) {
+        unitsThisMonth += qty;
+        lotsThisMonth += 1;
+      }
+    });
+    return {
+      lots: filtered.length,
+      totalUnits,
+      unitsThisMonth,
+      lotsThisMonth,
+    };
+  }, [filtered]);
+
+  const trashByProduct = useMemo(() => {
+    const grouped = new Map();
+    filtered.forEach((row) => {
+      const name = row.productDisplayName || row.productName || 'Unknown';
+      grouped.set(name, (grouped.get(name) ?? 0) + (Number(row.qtyTrashed) || 0));
+    });
+    return [...grouped.entries()]
+      .map(([name, units]) => ({ name, units }))
+      .sort((a, b) => b.units - a.units)
+      .slice(0, 10);
+  }, [filtered]);
+
+  const productOptions = useMemo(() => {
+    const seen = new Map();
+    rows.forEach((row) => {
+      if (!seen.has(row.productId)) {
+        seen.set(row.productId, row.productDisplayName || row.productName || row.productId);
+      }
+    });
+    return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows]);
+
+  const hasActiveFilters = Boolean(productFilter || fromDate || toDate);
+
+  return (
+    <div className="section">
+      <div className="card">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <div>
+            <div className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <Trash2 size={18} /> Trash Report
+            </div>
+            <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+              Production lots that were soft-deleted from inventory. Restore from Production &amp; Lots if a lot was trashed in error.
+            </div>
+          </div>
+        </div>
+
+        <div className="grid-4 section" style={{ marginTop: 'var(--space-4)' }}>
+          <ReportInfoCard label="Trashed Lots" value={summary.lots.toLocaleString()} />
+          <ReportInfoCard label="Total Units Trashed" value={summary.totalUnits.toLocaleString()} />
+          <ReportInfoCard label="Lots Trashed This Month" value={summary.lotsThisMonth.toLocaleString()} />
+          <ReportInfoCard label="Units Trashed This Month" value={summary.unitsThisMonth.toLocaleString()} />
+        </div>
+
+        <div className="filter-bar">
+          <select
+            className="form-select"
+            aria-label="Filter trash by product"
+            value={productFilter}
+            onChange={(event) => setProductFilter(event.target.value)}
+          >
+            <option value="">All Products</option>
+            {productOptions.map((product) => (
+              <option key={product.id} value={product.id}>{product.name}</option>
+            ))}
+          </select>
+          <input
+            className="form-input"
+            type="date"
+            aria-label="Trashed from date"
+            value={fromDate}
+            onChange={(event) => setFromDate(event.target.value)}
+          />
+          <input
+            className="form-input"
+            type="date"
+            aria-label="Trashed to date"
+            value={toDate}
+            onChange={(event) => setToDate(event.target.value)}
+          />
+          <button
+            className="btn btn-secondary"
+            type="button"
+            disabled={!hasActiveFilters}
+            onClick={() => {
+              setProductFilter('');
+              setFromDate('');
+              setToDate('');
+            }}
+          >
+            <RotateCcw size={14} /> Reset
+          </button>
+        </div>
+
+        <ChartCard title="Trashed Units by Product">
+          {trashByProduct.length ? (
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={trashByProduct} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
+                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }} tickMargin={6} interval={0} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} width={40} allowDecimals={false} />
+                <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(239, 68, 68, 0.06)' }} />
+                <Bar dataKey="units" fill="#EF4444" name="Units" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <ChartEmptyState message="No trashed units in the selected range." />
+          )}
+        </ChartCard>
+
+        {filtered.length ? (
+          <div className="table-scroll-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Lot Code</th>
+                  <th>Product</th>
+                  <th>Production Date</th>
+                  <th className="cell-align-right">Qty Trashed</th>
+                  <th>Trashed At</th>
+                  <th>By</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((row) => (
+                  <tr key={row.batchId}>
+                    <td className="cell-monospace cell-align-left">{row.lotCode}</td>
+                    <td style={{ fontWeight: 600 }}>{row.productDisplayName || row.productName}</td>
+                    <td>{row.productionDate ? formatDate(row.productionDate) : '-'}</td>
+                    <td className="cell-monospace">{Number(row.qtyTrashed || 0).toLocaleString()}</td>
+                    <td>{row.deletedAt ? formatDateTime(row.deletedAt) : '-'}</td>
+                    <td>{row.deletedUserName || '-'}</td>
+                    <td style={{ color: 'var(--color-text-secondary)' }}>{row.deletedReason || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+            <div className="empty-state-title">No trashed lots</div>
+            <div className="empty-state-description">
+              Damaged or discarded production lots will show up here once staff moves them to trash from the Production &amp; Lots page.
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

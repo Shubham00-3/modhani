@@ -356,6 +356,20 @@ export function getEffectiveItemPrice(item) {
   return item.overridePrice ?? item.clientPrice ?? item.basePrice ?? 0;
 }
 
+export function getItemDiscountAmount(item) {
+  const raw = Number(item?.discountAmount);
+  return Number.isFinite(raw) && raw > 0 ? raw : 0;
+}
+
+export function getInvoiceLineSubtotal(item) {
+  const qty = item.invoiceQty ?? item.fulfilledQty ?? 0;
+  return qty * getEffectiveItemPrice(item);
+}
+
+export function getInvoiceLineTotal(item) {
+  return Math.max(getInvoiceLineSubtotal(item) - getItemDiscountAmount(item), 0);
+}
+
 export function getItemOutstandingQty(item) {
   return Math.max(item.quantity - item.fulfilledQty - (item.declinedQty ?? 0), 0);
 }
@@ -374,13 +388,16 @@ export function getOrderFulfilmentBucket(order) {
 export function getOrderValue(order) {
   if (order.invoiceTotal != null) return order.invoiceTotal;
   return order.items.reduce((sum, item) => {
-    return sum + getEffectiveItemPrice(item) * Math.max(item.quantity - (item.declinedQty ?? 0), 0);
+    const billable = Math.max(item.quantity - (item.declinedQty ?? 0), 0);
+    const lineSubtotal = getEffectiveItemPrice(item) * billable;
+    return sum + Math.max(lineSubtotal - getItemDiscountAmount(item), 0);
   }, 0);
 }
 
 export function getInvoiceableTotal(order) {
   return order.items.reduce((sum, item) => {
-    return sum + getEffectiveItemPrice(item) * item.fulfilledQty;
+    const lineSubtotal = getEffectiveItemPrice(item) * item.fulfilledQty;
+    return sum + Math.max(lineSubtotal - getItemDiscountAmount(item), 0);
   }, 0);
 }
 
@@ -441,10 +458,11 @@ export function buildReportRowsFromOrders({ orders, clients, locations, products
         basePrice: item.basePrice,
         clientPrice: item.clientPrice,
         overridePrice: item.overridePrice,
+        discountAmount: getItemDiscountAmount(item),
         effectivePrice: getEffectiveItemPrice(item),
         hasPriceOverride: item.overridePrice != null,
-        fulfilledValue: item.fulfilledQty * getEffectiveItemPrice(item),
-        orderedValue: Math.max(item.quantity - (item.declinedQty ?? 0), 0) * getEffectiveItemPrice(item),
+        fulfilledValue: Math.max(item.fulfilledQty * getEffectiveItemPrice(item) - getItemDiscountAmount(item), 0),
+        orderedValue: Math.max(Math.max(item.quantity - (item.declinedQty ?? 0), 0) * getEffectiveItemPrice(item) - getItemDiscountAmount(item), 0),
       };
     })
   );

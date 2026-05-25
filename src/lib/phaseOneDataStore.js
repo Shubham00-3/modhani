@@ -170,6 +170,25 @@ function quickBooksToUi(settings) {
   };
 }
 
+function trashReportLineToUi(row) {
+  return {
+    batchId: row.batch_id,
+    lotCode: row.lot_code,
+    productId: row.product_id,
+    productName: row.product_name,
+    unitSize: row.unit_size,
+    productDisplayName: row.product_display_name,
+    category: row.category,
+    productionDate: row.production_date,
+    qtyProduced: Number(row.qty_produced ?? 0),
+    qtyTrashed: Number(row.qty_trashed ?? 0),
+    deletedAt: row.deleted_at,
+    deletedBy: row.deleted_by,
+    deletedUserName: row.deleted_user_name,
+    deletedReason: row.deleted_reason,
+  };
+}
+
 function reportLineToUi(row) {
   return {
     orderId: row.order_id,
@@ -395,6 +414,7 @@ function orderItemToDb(orderId, item) {
     client_price: Number(item.clientPrice),
     override_price: item.overridePrice == null ? null : Number(item.overridePrice),
     override_reason: item.overrideReason ?? null,
+    discount_amount: Number(item.discountAmount ?? 0),
     qb_txn_line_id: item.qbTxnLineId ?? null,
   };
 }
@@ -456,6 +476,7 @@ export async function fetchRemoteState(supabase, userId) {
     customerContactsResult,
     customerClientAssignmentsResult,
     customerLocationAssignmentsResult,
+    trashReportRowsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('clients').select('*').order('name'),
@@ -480,6 +501,7 @@ export async function fetchRemoteState(supabase, userId) {
     supabase.from('customer_contacts').select('*').order('created_at', { ascending: false }),
     supabase.from('customer_client_assignments').select('*'),
     supabase.from('customer_location_assignments').select('*'),
+    supabase.from('report_trashed_lots').select('*').order('deleted_at', { ascending: false }),
   ]);
 
   const results = [
@@ -500,6 +522,7 @@ export async function fetchRemoteState(supabase, userId) {
     customerContactsResult,
     customerClientAssignmentsResult,
     customerLocationAssignmentsResult,
+    trashReportRowsResult,
   ];
 
   const firstError = results
@@ -510,7 +533,8 @@ export async function fetchRemoteState(supabase, userId) {
         result !== quickBooksJobsResult &&
         result !== customerContactsResult &&
         result !== customerClientAssignmentsResult &&
-        result !== customerLocationAssignmentsResult
+        result !== customerLocationAssignmentsResult &&
+        result !== trashReportRowsResult
     )
     .find((result) => result.error)?.error;
   if (firstError) {
@@ -538,6 +562,7 @@ export async function fetchRemoteState(supabase, userId) {
       clientPrice: Number(item.client_price),
       overridePrice: item.override_price == null ? null : Number(item.override_price),
       overrideReason: item.override_reason,
+      discountAmount: Number(item.discount_amount ?? 0),
       qbTxnLineId: item.qb_txn_line_id ?? null,
       assignedBatches: assignmentsByItemId.get(item.id) ?? [],
     });
@@ -575,6 +600,8 @@ export async function fetchRemoteState(supabase, userId) {
     podSignedTimezone: order.pod_signed_timezone ?? null,
     podNotes: order.pod_notes ?? null,
     podCapturedBy: order.pod_captured_by ?? null,
+    podPhotoUrls: Array.isArray(order.pod_photo_urls) ? order.pod_photo_urls : [],
+    podPhotoPaths: Array.isArray(order.pod_photo_paths) ? order.pod_photo_paths : [],
     driverUserId: order.driver_user_id ?? null,
     driverAssignedAt: order.driver_assigned_at ?? null,
     driverAssignedBy: order.driver_assigned_by ?? null,
@@ -618,6 +645,7 @@ export async function fetchRemoteState(supabase, userId) {
     customerContacts: customerContactsResult.error ? [] : (customerContactsResult.data ?? []).map(customerContactToUi),
     customerClientAssignments: customerClientAssignmentsResult.error ? [] : (customerClientAssignmentsResult.data ?? []).map(customerClientAssignmentToUi),
     customerLocationAssignments: customerLocationAssignmentsResult.error ? [] : (customerLocationAssignmentsResult.data ?? []).map(customerLocationAssignmentToUi),
+    trashReportRows: trashReportRowsResult.error ? [] : (trashReportRowsResult.data ?? []).map(trashReportLineToUi),
   };
 }
 
@@ -928,6 +956,8 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_packing_slip_sent_at: action.payload.packingSlipSentAt,
       });
     case 'COMPLETE_DELIVERY_POD': {
+      const photoUrls = Array.isArray(action.payload.photoUrls) ? action.payload.photoUrls : [];
+      const photoPaths = Array.isArray(action.payload.photoPaths) ? action.payload.photoPaths : [];
       const podResult = await callRpc(supabase, 'modhanios_complete_delivery_pod', {
         p_order_id: action.payload.orderId,
         p_user_id: currentUser.id,
@@ -938,6 +968,8 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_signed_at_unix_ms: action.payload.signedAtUnixMs ?? null,
         p_signed_at_local: action.payload.signedAtLocal ?? null,
         p_signed_timezone: action.payload.signedTimezone ?? null,
+        p_photo_urls: photoUrls,
+        p_photo_paths: photoPaths,
       });
       if (!podResult.error) return podResult;
 
@@ -949,6 +981,12 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
 
       if (!shouldFallbackToLegacyPod) return podResult;
 
+      // Fallback to the pre-photo signature. Photo arrays will be lost on
+      // the legacy RPC path, so log a warning so we know to roll the new
+      // migration in production.
+      if (photoUrls.length > 0) {
+        console.warn('Delivery POD photos discarded: legacy modhanios_complete_delivery_pod is in use.');
+      }
       return callRpc(supabase, 'modhanios_complete_delivery_pod', {
         p_order_id: action.payload.orderId,
         p_user_id: currentUser.id,
@@ -987,6 +1025,12 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
     case 'ASSIGN_DRIVER':
       return callRpc(supabase, 'modhanios_assign_driver', {
         p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+        p_driver_user_id: action.payload.driverUserId ?? null,
+      });
+    case 'BULK_ASSIGN_DRIVER':
+      return callRpc(supabase, 'modhanios_bulk_assign_driver', {
+        p_order_ids: action.payload.orderIds,
         p_user_id: currentUser.id,
         p_driver_user_id: action.payload.driverUserId ?? null,
       });

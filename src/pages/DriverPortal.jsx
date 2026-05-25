@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ClipboardSignature, LogOut, MapPin, Printer, RotateCcw, Truck } from 'lucide-react';
+import { Camera, ClipboardSignature, LogOut, MapPin, Printer, RotateCcw, Trash2, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
+import { supabase } from '../lib/supabaseClient';
 import {
   formatDateTime,
   formatTorontoDateTime,
@@ -165,6 +166,141 @@ function SignaturePad({ onChange }) {
   );
 }
 
+const MAX_POD_PHOTOS = 5;
+
+function PhotoCapture({ photos, setPhotos, disabled, addToast }) {
+  const inputRef = useRef(null);
+
+  async function handleSelectFiles(event) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (!files.length) return;
+
+    const remaining = MAX_POD_PHOTOS - photos.length;
+    if (remaining <= 0) {
+      addToast(`Maximum ${MAX_POD_PHOTOS} photos.`, 'warning');
+      return;
+    }
+
+    const toUpload = files.slice(0, remaining);
+    if (files.length > remaining) {
+      addToast(`Only the first ${remaining} photo${remaining === 1 ? '' : 's'} were added; max ${MAX_POD_PHOTOS}.`, 'warning');
+    }
+
+    if (!supabase) {
+      addToast('Photo upload needs Supabase Storage configured.', 'warning');
+      return;
+    }
+
+    for (const file of toUpload) {
+      const tempId = `photo-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const previewUrl = URL.createObjectURL(file);
+      setPhotos((current) => [...current, { id: tempId, previewUrl, uploading: true }]);
+
+      const extension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const path = `pending/${tempId}.${extension}`;
+      const { error: uploadError } = await supabase.storage
+        .from('delivery-photos')
+        .upload(path, file, { cacheControl: '3600', upsert: false });
+
+      if (uploadError) {
+        setPhotos((current) => current.filter((photo) => photo.id !== tempId));
+        URL.revokeObjectURL(previewUrl);
+        addToast(`Photo upload failed: ${uploadError.message}`, 'warning');
+        continue;
+      }
+
+      const { data } = supabase.storage.from('delivery-photos').getPublicUrl(path);
+      setPhotos((current) =>
+        current.map((photo) =>
+          photo.id === tempId
+            ? { ...photo, uploading: false, url: data.publicUrl, path }
+            : photo
+        )
+      );
+    }
+  }
+
+  async function removePhoto(photo) {
+    setPhotos((current) => current.filter((entry) => entry.id !== photo.id));
+    if (photo.previewUrl) URL.revokeObjectURL(photo.previewUrl);
+    if (photo.path && supabase) {
+      await supabase.storage.from('delivery-photos').remove([photo.path]).catch(() => null);
+    }
+  }
+
+  return (
+    <div className="driver-photo-capture">
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-3)' }}>
+        {photos.map((photo) => (
+          <div
+            key={photo.id}
+            style={{
+              position: 'relative',
+              width: 96,
+              height: 96,
+              borderRadius: 'var(--radius-sm)',
+              overflow: 'hidden',
+              border: '1px solid var(--color-border)',
+              background: 'var(--color-bg)',
+            }}
+          >
+            <img
+              src={photo.previewUrl || photo.url}
+              alt="Delivery photo preview"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+            {photo.uploading ? (
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12 }}>
+                Uploading…
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => removePhoto(photo)}
+              disabled={disabled}
+              aria-label="Remove photo"
+              style={{
+                position: 'absolute',
+                top: 4,
+                right: 4,
+                background: 'rgba(0,0,0,0.6)',
+                color: '#fff',
+                border: 0,
+                borderRadius: 999,
+                width: 22,
+                height: 22,
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+              }}
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={() => inputRef.current?.click()}
+        disabled={disabled || photos.length >= MAX_POD_PHOTOS}
+      >
+        <Camera size={16} /> Add Photo ({photos.length}/{MAX_POD_PHOTOS})
+      </button>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        multiple
+        style={{ display: 'none' }}
+        onChange={handleSelectFiles}
+      />
+    </div>
+  );
+}
+
 export default function DriverPortal() {
   const { state, dispatch, addToast, logout } = useApp();
   // Start with no explicit selection; derived state below picks a sensible
@@ -173,6 +309,7 @@ export default function DriverPortal() {
   const [signedBy, setSignedBy] = useState('');
   const [signatureDataUrl, setSignatureDataUrl] = useState('');
   const [notes, setNotes] = useState('');
+  const [photos, setPhotos] = useState([]);
   const [saving, setSaving] = useState(false);
 
   const fallbackSelectedOrderId = useMemo(() => {
@@ -204,6 +341,7 @@ export default function DriverPortal() {
     setSignedBy('');
     setSignatureDataUrl('');
     setNotes('');
+    setPhotos([]);
   }
 
   async function handleSavePod(event) {
@@ -219,6 +357,13 @@ export default function DriverPortal() {
       addToast('Capture the receiver signature before saving POD.', 'warning');
       return;
     }
+
+    if (photos.some((photo) => photo.uploading)) {
+      addToast('Wait for photo uploads to finish before saving POD.', 'warning');
+      return;
+    }
+
+    const completedPhotos = photos.filter((photo) => photo.url && photo.path);
 
     setSaving(true);
     const justPoddedOrderId = selectedOrder.id;
@@ -236,6 +381,8 @@ export default function DriverPortal() {
           signedAtLocal: signedTimestamp.local,
           signedTimezone: signedTimestamp.timeZone,
           userId: state.currentUserId,
+          photoUrls: completedPhotos.map((photo) => photo.url),
+          photoPaths: completedPhotos.map((photo) => photo.path),
         },
       });
     } catch (error) {
@@ -247,11 +394,14 @@ export default function DriverPortal() {
 
     if (result?.ok) {
       addToast(`POD saved for order #${selectedOrder.orderNumber}.`);
-      // Keep the just-POD'd order selected so the driver sees the confirmation panel
       setSelectedOrderId(justPoddedOrderId);
       setSignedBy('');
       setSignatureDataUrl('');
       setNotes('');
+      photos.forEach((photo) => {
+        if (photo.previewUrl) URL.revokeObjectURL(photo.previewUrl);
+      });
+      setPhotos([]);
     }
   }
 
@@ -352,21 +502,35 @@ export default function DriverPortal() {
               </div>
 
               {selectedOrder.podSignedAt ? (
-                <div className="driver-pod-summary">
-                  <div>
-                    <div className="driver-section-title">Proof of Delivery</div>
-                    <p>
-                      Signed by <strong>{selectedOrder.podSignedBy}</strong> on {formatDateTime(selectedOrder.podSignedAt)}
-                    </p>
-                    <div style={{ display: 'grid', gap: 4, marginTop: 10, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
-                      <span>Local timestamp: {selectedOrder.podSignedAtLocal ?? formatTorontoDateTime(selectedOrder.podSignedAt)}</span>
-                      <span>Timezone: {selectedOrder.podSignedTimezone ?? POD_TIME_ZONE}</span>
+                <>
+                  <div className="driver-pod-summary">
+                    <div>
+                      <div className="driver-section-title">Proof of Delivery</div>
+                      <p>
+                        Signed by <strong>{selectedOrder.podSignedBy}</strong> on {formatDateTime(selectedOrder.podSignedAt)}
+                      </p>
+                      <div style={{ display: 'grid', gap: 4, marginTop: 10, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
+                        <span>Local timestamp: {selectedOrder.podSignedAtLocal ?? formatTorontoDateTime(selectedOrder.podSignedAt)}</span>
+                        <span>Timezone: {selectedOrder.podSignedTimezone ?? POD_TIME_ZONE}</span>
+                      </div>
                     </div>
+                    {selectedOrder.podSignatureDataUrl ? (
+                      <img src={selectedOrder.podSignatureDataUrl} alt="Saved proof of delivery signature" />
+                    ) : null}
                   </div>
-                  {selectedOrder.podSignatureDataUrl ? (
-                    <img src={selectedOrder.podSignatureDataUrl} alt="Saved proof of delivery signature" />
+                  {Array.isArray(selectedOrder.podPhotoUrls) && selectedOrder.podPhotoUrls.length > 0 ? (
+                    <div style={{ marginTop: 'var(--space-3)' }}>
+                      <div className="driver-section-title">Delivery Photos</div>
+                      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+                        {selectedOrder.podPhotoUrls.map((url, index) => (
+                          <a key={url} href={url} target="_blank" rel="noopener noreferrer" style={{ display: 'block', width: 96, height: 96, borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--color-border)' }}>
+                            <img src={url} alt={`Delivery photo ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </a>
+                        ))}
+                      </div>
+                    </div>
                   ) : null}
-                </div>
+                </>
               ) : (
                 <form className="driver-pod-form" onSubmit={handleSavePod}>
                   <div className="driver-section-title">
@@ -383,6 +547,10 @@ export default function DriverPortal() {
                     />
                   </div>
                   <SignaturePad onChange={setSignatureDataUrl} />
+                  <div className="form-group">
+                    <label className="form-label">Delivery Photos (optional, up to {MAX_POD_PHOTOS})</label>
+                    <PhotoCapture photos={photos} setPhotos={setPhotos} disabled={saving} addToast={addToast} />
+                  </div>
                   <div className="form-group">
                     <label className="form-label">Delivery Notes</label>
                     <textarea

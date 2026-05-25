@@ -261,7 +261,7 @@ export default function CustomerPortal() {
                     className="form-input"
                     type="number"
                     min="0"
-                    step="1"
+                    step="0.01"
                     value={quantity}
                     onChange={(event) => updateProductQuantity(product.id, event.target.value)}
                     aria-label={`${getProductDisplayName(product)} quantity`}
@@ -401,7 +401,7 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
                 className="form-input"
                 type="number"
                 min="0"
-                step="1"
+                step="0.01"
                 value={quantity}
                 onChange={(e) => onQuantityChange(e.target.value)}
               />

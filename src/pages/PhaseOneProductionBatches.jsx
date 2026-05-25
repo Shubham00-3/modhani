@@ -427,8 +427,8 @@ function EditBatchModal({ batch, onClose, onSave }) {
             <input
               className="form-input"
               type="number"
-              min="1"
-              step="1"
+              min="0.01"
+              step="0.01"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               required
@@ -645,7 +645,7 @@ function LogProductionModal({ onClose, onSave }) {
           </div>
           <div className="form-group">
             <label className="form-label">Quantity Produced</label>
-            <input className="form-input" type="number" min="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+            <input className="form-input" type="number" min="0.01" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
           </div>
         </div>
         <div className="modal-footer">

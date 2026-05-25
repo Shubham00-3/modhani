@@ -4,6 +4,7 @@ import {
   formatTorontoDateTime,
   getClientName,
   getEffectiveItemPrice,
+  getItemDiscountAmount,
   getOrderShipToSnapshot,
   getProduct,
   getProductDisplayName,
@@ -85,24 +86,8 @@ function formatAddressBlock(name, location) {
     .join('<br />');
 }
 
-function getOrderLotCodes(order, batches) {
-  return [
-    ...new Set(
-      order.items
-        .flatMap((item) => item.assignedBatches ?? [])
-        .map((assigned) => normalizeLotCode(batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId))
-        .filter(Boolean)
-    ),
-  ];
-}
-
-function getInvoiceHeaderNumber(order, batches) {
-  const savedNumber = order.invoiceNumber ?? `MOD-${order.orderNumber}`;
-  if (!String(savedNumber).startsWith('DRAFT-')) return savedNumber;
-
-  const lotCodes = getOrderLotCodes(order, batches);
-
-  return lotCodes.length ? lotCodes.join(', ') : savedNumber;
+function getInvoiceHeaderNumber(order) {
+  return order.qbInvoiceNumber ?? order.invoiceNumber ?? `MOD-${order.orderNumber}`;
 }
 
 export function printPackingSlip({ order, clients, locations, products, batches }) {
@@ -185,14 +170,21 @@ export function printInvoice({ order, clients, locations, products, batches = []
   const shipToSnapshot = getOrderShipToSnapshot(order, location);
   const logoSrc = getLogoSrc();
   const invoiceLines = order.items.filter((item) => item.fulfilledQty > 0);
-  const invoiceTotal = order.invoiceTotal ?? invoiceLines.reduce((sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item), 0);
-  const invoiceHeaderNumber = getInvoiceHeaderNumber(order, batches);
+  const invoiceTotal =
+    order.invoiceTotal
+    ?? invoiceLines.reduce((sum, item) => {
+      const subtotal = (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item);
+      return sum + Math.max(subtotal - getItemDiscountAmount(item), 0);
+    }, 0);
+  const invoiceHeaderNumber = getInvoiceHeaderNumber(order);
   const rows = invoiceLines
     .map((item) => {
       const product = getProduct(products, item.productId);
       const unitPrice = getEffectiveItemPrice(item);
       const invoiceQty = item.invoiceQty ?? item.fulfilledQty;
-      const lineTotal = unitPrice * invoiceQty;
+      const subtotal = unitPrice * invoiceQty;
+      const discount = getItemDiscountAmount(item);
+      const lineTotal = Math.max(subtotal - discount, 0);
       const lotCode =
         item.assignedBatches
           ?.map((assigned) => normalizeLotCode(batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId))
@@ -202,15 +194,15 @@ export function printInvoice({ order, clients, locations, products, batches = []
 
       return `
         <tr>
-          <td>${escapeHtml(product?.qbItemName || '')}</td>
+          <td>${escapeHtml(product?.itemNumber || '')}</td>
           <td class="description">${escapeHtml(description)}</td>
           <td>${escapeHtml(lotCode)}</td>
           <td class="number">${invoiceQty.toLocaleString()}</td>
           <td>${escapeHtml(product?.unitSize || '')}</td>
           <td></td>
           <td class="number">${Number(unitPrice).toFixed(2)}</td>
+          <td class="number">${discount > 0 ? Number(discount).toFixed(2) : ''}</td>
           <td class="number">${Number(lineTotal).toFixed(2)}</td>
-          <td>E</td>
         </tr>
       `;
     })
@@ -312,15 +304,15 @@ export function printInvoice({ order, clients, locations, products, batches = []
 
         <table class="line-table">
           <colgroup>
-            <col style="width:7%;" />
-            <col style="width:42%;" />
-            <col style="width:10%;" />
-            <col style="width:7%;" />
-            <col style="width:7%;" />
-            <col style="width:7%;" />
             <col style="width:6%;" />
+            <col style="width:35%;" />
+            <col style="width:10%;" />
+            <col style="width:6%;" />
+            <col style="width:6%;" />
+            <col style="width:7%;" />
             <col style="width:8%;" />
-            <col style="width:4%;" />
+            <col style="width:11%;" />
+            <col style="width:11%;" />
           </colgroup>
           <thead>
             <tr>
@@ -331,8 +323,8 @@ export function printInvoice({ order, clients, locations, products, batches = []
               <th>U/M</th>
               <th>Unit</th>
               <th>Rate</th>
+              <th>Discount</th>
               <th>Amount</th>
-              <th>Tax</th>
             </tr>
           </thead>
           <tbody>${rows}${blankRows}</tbody>
@@ -385,6 +377,21 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
   const signatureImage = order.podSignatureDataUrl
     ? `<img src="${order.podSignatureDataUrl}" alt="POD signature" style="max-width:320px;max-height:120px;object-fit:contain;" />`
     : '<div style="height:90px;border-bottom:1px solid #111827;"></div>';
+  const photoUrls = Array.isArray(order.podPhotoUrls) ? order.podPhotoUrls : [];
+  const photosSection = photoUrls.length
+    ? `
+        <section class="pod-section" style="margin-top:18px;">
+          <div style="font-size:12px;text-transform:uppercase;color:#6b7280;margin-bottom:8px;">Delivery Photos</div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            ${photoUrls
+              .map(
+                (url) => `<img src="${url}" alt="Delivery photo" style="width:160px;height:160px;object-fit:cover;border:1px solid #e5e7eb;border-radius:8px;" />`
+              )
+              .join('')}
+          </div>
+        </section>
+      `
+    : '';
   const signedAt = order.podSignedAt ?? new Date().toISOString();
   const signedLocal = order.podSignedAtLocal ?? formatTorontoDateTime(signedAt);
   const signedTimezone = order.podSignedTimezone ?? 'America/Toronto';
@@ -459,6 +466,8 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
             <div><strong>Delivery Notes:</strong> ${escapeHtml(order.podNotes ?? '-')}</div>
           </div>
         </section>
+
+        ${photosSection}
       </main>
     `
   );

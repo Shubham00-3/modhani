@@ -13,6 +13,7 @@ import {
   USERS,
   buildReportRowsFromOrders,
   getEffectiveItemPrice,
+  getItemDiscountAmount,
   getActiveCatalogProducts,
   getProductTierPrice,
   normalizePriceTier,
@@ -49,6 +50,7 @@ const demoState = {
   customerLocationAssignments: [],
   customerPortal: null,
   quickBooks: QUICKBOOKS_SETTINGS,
+  trashReportRows: [],
   reportRows: buildReportRowsFromOrders({
     orders: ORDERS,
     clients: CLIENTS,
@@ -84,6 +86,7 @@ const remoteBootState = {
   customerPortal: null,
   quickBooks: QUICKBOOKS_SETTINGS,
   reportRows: [],
+  trashReportRows: [],
   sidebarCollapsed: false,
   toasts: [],
   initialized: false,
@@ -206,6 +209,7 @@ function trimFulfilmentToInvoiceLines(order, batches, lines) {
       declinedQty: (item.declinedQty ?? 0) + removedFulfilmentQty,
       overridePrice: line.overridePrice,
       overrideReason: line.overrideReason,
+      discountAmount: line.discount == null ? (item.discountAmount ?? 0) : Number(line.discount) || 0,
       assignedBatches: nextAssignedBatches,
     };
   });
@@ -564,6 +568,7 @@ function reducer(state, action) {
               return {
                 ...item,
                 invoiceQty: item.fulfilledQty,
+                discountAmount: item.discountAmount ?? 0,
               };
             }
             return {
@@ -571,10 +576,14 @@ function reducer(state, action) {
               invoiceQty: item.fulfilledQty,
               overridePrice: override.overridePrice,
               overrideReason: override.overrideReason,
+              discountAmount: Number(override.discount ?? 0) || 0,
             };
           });
 
-          const invoiceTotal = nextItems.reduce((sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item), 0);
+          const invoiceTotal = nextItems.reduce(
+            (sum, item) => sum + Math.max((item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item) - getItemDiscountAmount(item), 0),
+            0
+          );
 
           return {
             ...order,
@@ -605,7 +614,10 @@ function reducer(state, action) {
             const result = trimFulfilmentToInvoiceLines(order, state.batches, action.payload.lines);
             nextBatches = result.batches;
             const nextItems = result.items;
-            const invoiceTotal = nextItems.reduce((sum, item) => sum + (item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item), 0);
+            const invoiceTotal = nextItems.reduce(
+              (sum, item) => sum + Math.max((item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item) - getItemDiscountAmount(item), 0),
+              0
+            );
 
             return {
               ...order,
@@ -717,6 +729,8 @@ function reducer(state, action) {
                 podSignedTimezone: action.payload.signedTimezone ?? null,
                 podNotes: action.payload.notes ?? null,
                 podCapturedBy: action.payload.userId ?? state.currentUserId,
+                podPhotoUrls: Array.isArray(action.payload.photoUrls) ? action.payload.photoUrls : (order.podPhotoUrls ?? []),
+                podPhotoPaths: Array.isArray(action.payload.photoPaths) ? action.payload.photoPaths : (order.podPhotoPaths ?? []),
               }
             : order
         ),
@@ -783,6 +797,7 @@ const serverWorkflowActions = new Set([
   'SOFT_DELETE_BATCH',
   'RESTORE_BATCH',
   'ASSIGN_DRIVER',
+  'BULK_ASSIGN_DRIVER',
 ]);
 const serverAdminActions = new Set([
   'ADD_PRODUCT',

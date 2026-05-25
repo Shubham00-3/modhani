@@ -146,8 +146,8 @@ export default function CustomerCart() {
                   <input
                     className="form-input"
                     type="number"
-                    min="1"
-                    step="1"
+                    min="0.01"
+                    step="0.01"
                     value={quantity}
                     onChange={(e) => updateProductQuantity(product.id, e.target.value)}
                     aria-label={`${getProductDisplayName(product)} quantity`}
