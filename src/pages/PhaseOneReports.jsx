@@ -405,22 +405,24 @@ export default function PhaseOneReports() {
       </div>
 
       <div className="grid-2 section">
-        <ChartCard title="Fulfilment Rate">
-          {fulfilmentRate.length ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie data={fulfilmentRate} dataKey="value" nameKey="name" innerRadius={50} outerRadius={86}>
-                  {fulfilmentRate.map((entry, index) => (
-                    <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ChartTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <ChartEmptyState message="No fulfilment data yet." />
-          )}
-        </ChartCard>
+        <div style={{ gridColumn: '1 / -1', width: 'min(720px, 100%)', justifySelf: 'center' }}>
+          <ChartCard title="Fulfilment Rate">
+            {fulfilmentRate.length ? (
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie data={fulfilmentRate} dataKey="value" nameKey="name" innerRadius={50} outerRadius={86}>
+                    {fulfilmentRate.map((entry, index) => (
+                      <Cell key={entry.name} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <ChartEmptyState message="No fulfilment data yet." />
+            )}
+          </ChartCard>
+        </div>
       </div>
 
       <div className="card">
