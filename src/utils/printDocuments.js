@@ -177,6 +177,7 @@ export function printInvoice({ order, clients, locations, products, batches = []
       return sum + Math.max(subtotal - getItemDiscountAmount(item), 0);
     }, 0);
   const invoiceHeaderNumber = getInvoiceHeaderNumber(order);
+  let renderedRowCount = 0;
   const rows = invoiceLines
     .map((item) => {
       const product = getProduct(products, item.productId);
@@ -184,7 +185,6 @@ export function printInvoice({ order, clients, locations, products, batches = []
       const invoiceQty = item.invoiceQty ?? item.fulfilledQty;
       const subtotal = unitPrice * invoiceQty;
       const discount = getItemDiscountAmount(item);
-      const lineTotal = Math.max(subtotal - discount, 0);
       const lotCode =
         item.assignedBatches
           ?.map((assigned) => normalizeLotCode(batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId))
@@ -192,7 +192,8 @@ export function printInvoice({ order, clients, locations, products, batches = []
           .join(', ') || '';
       const description = product ? getProductDisplayName(product) : item.productId;
 
-      return `
+      renderedRowCount += 1;
+      const productRow = `
         <tr>
           <td>${escapeHtml(product?.itemNumber || '')}</td>
           <td class="description">${escapeHtml(description)}</td>
@@ -201,14 +202,32 @@ export function printInvoice({ order, clients, locations, products, batches = []
           <td>${escapeHtml(product?.unitSize || '')}</td>
           <td></td>
           <td class="number">${Number(unitPrice).toFixed(2)}</td>
-          <td class="number">${discount > 0 ? Number(discount).toFixed(2) : ''}</td>
-          <td class="number">${Number(lineTotal).toFixed(2)}</td>
+          <td class="number">${Number(subtotal).toFixed(2)}</td>
         </tr>
       `;
+
+      if (discount <= 0) return productRow;
+
+      renderedRowCount += 1;
+      const unitDiscount = invoiceQty > 0 ? discount / invoiceQty : 0;
+      const discountRow = `
+        <tr>
+          <td>Discount</td>
+          <td class="description">on above</td>
+          <td></td>
+          <td class="number">${invoiceQty > 0 ? invoiceQty.toLocaleString() : ''}</td>
+          <td></td>
+          <td></td>
+          <td class="number">${invoiceQty > 0 ? `-${unitDiscount.toFixed(2)}` : ''}</td>
+          <td class="number">-${Number(discount).toFixed(2)}</td>
+        </tr>
+      `;
+
+      return productRow + discountRow;
     })
     .join('');
-  const blankRows = Array.from({ length: Math.max(8, 14 - invoiceLines.length) })
-    .map(() => '<tr class="blank-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>')
+  const blankRows = Array.from({ length: Math.max(8, 14 - renderedRowCount) })
+    .map(() => '<tr class="blank-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>')
     .join('');
   const invoiceTo = formatAddressBlock(clientName, location);
   const shipTo = formatAddressBlock(shipToSnapshot.name, shipToSnapshot);
@@ -304,15 +323,14 @@ export function printInvoice({ order, clients, locations, products, batches = []
 
         <table class="line-table">
           <colgroup>
-            <col style="width:6%;" />
-            <col style="width:35%;" />
-            <col style="width:10%;" />
-            <col style="width:6%;" />
+            <col style="width:8%;" />
+            <col style="width:38%;" />
+            <col style="width:11%;" />
+            <col style="width:7%;" />
             <col style="width:6%;" />
             <col style="width:7%;" />
-            <col style="width:8%;" />
-            <col style="width:11%;" />
-            <col style="width:11%;" />
+            <col style="width:10%;" />
+            <col style="width:13%;" />
           </colgroup>
           <thead>
             <tr>
@@ -323,7 +341,6 @@ export function printInvoice({ order, clients, locations, products, batches = []
               <th>U/M</th>
               <th>Unit</th>
               <th>Rate</th>
-              <th>Discount</th>
               <th>Amount</th>
             </tr>
           </thead>
