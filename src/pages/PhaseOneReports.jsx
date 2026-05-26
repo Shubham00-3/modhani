@@ -73,6 +73,11 @@ function formatBucket(date, period) {
   return date.toISOString().slice(0, 10);
 }
 
+function compactAxisLabel(value, maxLength = 12) {
+  const label = String(value ?? '');
+  return label.length > maxLength ? `${label.slice(0, maxLength - 1)}...` : label;
+}
+
 export default function PhaseOneReports() {
   const { state } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -347,13 +352,22 @@ export default function PhaseOneReports() {
         </ChartCard>
       </div>
 
-      <div className="grid-3 section">
+      <div className="grid-2 section">
         <ChartCard title="Top Products by Units Shipped">
           {topProducts.length ? (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={topProducts} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+              <BarChart data={topProducts} margin={{ top: 8, right: 12, left: 0, bottom: 46 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }} tickMargin={6} interval={0} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }}
+                  tickFormatter={(value) => compactAxisLabel(value, 18)}
+                  tickMargin={10}
+                  angle={-32}
+                  textAnchor="end"
+                  height={56}
+                  interval={0}
+                />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} width={40} allowDecimals={false} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(209, 161, 78, 0.08)' }} />
                 <Bar dataKey="units" fill="#D1A14E" name="Units" radius={[4, 4, 0, 0]} />
@@ -367,9 +381,18 @@ export default function PhaseOneReports() {
         <ChartCard title="Orders by Location">
           {ordersByLocation.length ? (
             <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={ordersByLocation} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+              <BarChart data={ordersByLocation} margin={{ top: 8, right: 12, left: 0, bottom: 46 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-light)" />
-                <XAxis dataKey="name" tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }} tickMargin={6} interval={0} />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 10, fill: 'var(--color-text-secondary)' }}
+                  tickFormatter={(value) => compactAxisLabel(value, 18)}
+                  tickMargin={10}
+                  angle={-32}
+                  textAnchor="end"
+                  height={56}
+                  interval={0}
+                />
                 <YAxis tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }} width={40} allowDecimals={false} />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(143, 168, 153, 0.08)' }} />
                 <Bar dataKey="orders" fill="#8FA899" name="Orders" radius={[4, 4, 0, 0]} />
@@ -379,7 +402,9 @@ export default function PhaseOneReports() {
             <ChartEmptyState message="No orders to break down by location." />
           )}
         </ChartCard>
+      </div>
 
+      <div className="grid-2 section">
         <ChartCard title="Fulfilment Rate">
           {fulfilmentRate.length ? (
             <ResponsiveContainer width="100%" height={260}>
