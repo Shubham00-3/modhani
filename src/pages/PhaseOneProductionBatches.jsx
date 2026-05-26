@@ -395,6 +395,10 @@ function EditBatchModal({ batch, onClose, onSave }) {
       window.alert('Enter a positive quantity.');
       return;
     }
+    if (!Number.isInteger(numericQty)) {
+      window.alert('Production quantity must be a whole number.');
+      return;
+    }
     if (numericQty < alreadyUsed) {
       window.alert(`This lot already shipped ${alreadyUsed.toLocaleString()} units. New produced quantity must be at least ${alreadyUsed.toLocaleString()}.`);
       return;
@@ -427,8 +431,8 @@ function EditBatchModal({ batch, onClose, onSave }) {
             <input
               className="form-input"
               type="number"
-              min="0.01"
-              step="0.01"
+              min="1"
+              step="1"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               required
@@ -645,7 +649,7 @@ function LogProductionModal({ onClose, onSave }) {
           </div>
           <div className="form-group">
             <label className="form-label">Quantity Produced</label>
-            <input className="form-input" type="number" min="0.01" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+            <input className="form-input" type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
           </div>
         </div>
         <div className="modal-footer">
@@ -659,8 +663,14 @@ function LogProductionModal({ onClose, onSave }) {
             onClick={async () => {
               if (isSaving) return;
 
-              if (!productId || Number(quantity) <= 0 || !lotCode.trim()) {
+              const numericQuantity = Number(quantity);
+              if (!productId || !Number.isFinite(numericQuantity) || numericQuantity <= 0 || !lotCode.trim()) {
                 addToast('Complete all production fields.', 'warning');
+                return;
+              }
+
+              if (!Number.isInteger(numericQuantity)) {
+                addToast('Production quantity must be a whole number.', 'warning');
                 return;
               }
 
@@ -676,8 +686,8 @@ function LogProductionModal({ onClose, onSave }) {
                   batchNumber: normalizeLotCode(lotCode),
                   productId,
                   productionDate,
-                  qtyProduced: Number(quantity),
-                  qtyRemaining: Number(quantity),
+                  qtyProduced: numericQuantity,
+                  qtyRemaining: numericQuantity,
                   status: 'active',
                 });
               } finally {

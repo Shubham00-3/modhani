@@ -7,6 +7,7 @@ import {
   getProductDisplayName,
   getProductImageUrl,
   getProductOrderUnitLabel,
+  formatCaseQuantityBreakdown,
   hasProductImage,
 } from '../data/phaseOneData';
 
@@ -18,6 +19,7 @@ export default function CustomerPortal() {
     quantities,
     activeProducts,
     cartItemCount,
+    formattedCartItemCount,
     updateProductQuantity,
     hasMultipleClients,
     portalClients,
@@ -264,12 +266,15 @@ export default function CustomerPortal() {
                     step="0.01"
                     value={quantity}
                     onChange={(event) => updateProductQuantity(product.id, event.target.value)}
-                    aria-label={`${getProductDisplayName(product)} quantity`}
+                    aria-label={`${getProductDisplayName(product)} case quantity`}
                   />
                   <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity + 1)} aria-label={`Increase ${getProductDisplayName(product)}`}>
                     <Plus size={16} />
                   </button>
                 </div>
+                {numericQuantity > 0 ? (
+                  <div className="cp-product-unit">{formatCaseQuantityBreakdown(product, numericQuantity)}</div>
+                ) : null}
               </article>
             );
           })
@@ -291,7 +296,7 @@ export default function CustomerPortal() {
         <div className="cp-floating-cart">
           <div className="cp-floating-cart-info">
             <ShoppingCart size={20} />
-            <span>{cartItemCount} item{cartItemCount !== 1 ? 's' : ''} in cart</span>
+            <span>{formattedCartItemCount} case{cartItemCount !== 1 ? 's' : ''} in cart</span>
           </div>
           <div className="cp-floating-cart-actions">
             <Link to="/cart" className="btn btn-primary cp-floating-cart-btn">
@@ -404,6 +409,7 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
                 step="0.01"
                 value={quantity}
                 onChange={(e) => onQuantityChange(e.target.value)}
+                aria-label={`${getProductDisplayName(product)} case quantity`}
               />
               <button
                 className="btn btn-secondary btn-icon"
@@ -416,7 +422,7 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
             </div>
             {numericQuantity > 0 && (
               <div className="cp-detail-line-total">
-                <strong>{numericQuantity} unit{numericQuantity !== 1 ? 's' : ''}</strong> in cart
+                <strong>{formatCaseQuantityBreakdown(product, numericQuantity)}</strong> in cart
               </div>
             )}
           </div>

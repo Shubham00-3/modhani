@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useApp } from './useApp';
 import { CartContext } from './cartContext';
+import { formatCaseQuantity } from '../data/phaseOneData';
 
 export default function CartProvider({ children }) {
   const { state } = useApp();
@@ -55,12 +56,24 @@ export default function CartProvider({ children }) {
   );
 
   const cartItemCount = selectedLines.reduce((sum, line) => sum + line.quantity, 0);
+  const formattedCartItemCount = formatCaseQuantity(cartItemCount);
 
   const updateProductQuantity = useCallback((productId, nextValue) => {
-    const nextQuantity = Math.max(0, Number(nextValue) || 0);
+    if (nextValue === '') {
+      setQuantities((current) => ({
+        ...current,
+        [productId]: '',
+      }));
+      return;
+    }
+
+    const rawValue = String(nextValue).trim();
+    if (!/^\d*\.?\d{0,2}$/.test(rawValue)) return;
+
+    const nextQuantity = Math.max(0, Number(rawValue) || 0);
     setQuantities((current) => ({
       ...current,
-      [productId]: nextQuantity ? String(nextQuantity) : '',
+      [productId]: nextQuantity || rawValue === '0' || rawValue === '0.' ? rawValue : '',
     }));
   }, []);
 
@@ -96,6 +109,7 @@ export default function CartProvider({ children }) {
       selectedLines,
       orderTotal,
       cartItemCount,
+      formattedCartItemCount,
     }),
     [
       quantities,
@@ -115,6 +129,7 @@ export default function CartProvider({ children }) {
       selectedLines,
       orderTotal,
       cartItemCount,
+      formattedCartItemCount,
     ]
   );
 

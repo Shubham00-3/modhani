@@ -33,6 +33,7 @@ import {
   getProduct,
   getProductDisplayName,
   getProductImageUrl,
+  formatCaseQuantityBreakdown,
   hasProductImage,
   isLocationShipToReady,
 } from '../data/phaseOneData';
@@ -798,9 +799,9 @@ function OrderDetailPanel({
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700 }}>{getProductDisplayName(product)}</div>
                       <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
-                        Ordered {item.quantity.toLocaleString()} | Fulfilled {item.fulfilledQty.toLocaleString()} | Outstanding{' '}
-                        {getItemOutstandingQty(item).toLocaleString()}
-                        {(item.declinedQty ?? 0) > 0 ? ` | Declined ${item.declinedQty.toLocaleString()}` : ''}
+                        Ordered {item.quantity.toLocaleString()} cases | Fulfilled {item.fulfilledQty.toLocaleString()} cases | Outstanding{' '}
+                        {getItemOutstandingQty(item).toLocaleString()} cases
+                        {(item.declinedQty ?? 0) > 0 ? ` | Declined ${item.declinedQty.toLocaleString()} cases` : ''}
                       </div>
                     </div>
                   </div>
@@ -1133,7 +1134,7 @@ function FulfilmentPanel({ order, onBack }) {
                     <th>Batch</th>
                     <th>Production Date</th>
                     <th>Remaining</th>
-                    <th>Assign</th>
+                    <th>Assign Cases</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1338,7 +1339,7 @@ function InvoiceModal({ order, onClose }) {
                     <div style={{ minWidth: 0 }}>
                     <div style={{ fontWeight: 700 }}>{getProductDisplayName(product)}</div>
                     <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                      Bill {item.fulfilledQty.toLocaleString()} units
+                      Bill {item.fulfilledQty.toLocaleString()} cases
                     </div>
                     </div>
                   </div>
@@ -1606,7 +1607,7 @@ function EditInvoiceModal({ order, onClose }) {
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontWeight: 700 }}>{getProductDisplayName(product)}</div>
                       <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                        Fulfilled {item.fulfilledQty.toLocaleString()} | Max invoice qty {maxQuantity.toLocaleString()}
+                        Fulfilled {item.fulfilledQty.toLocaleString()} cases | Max invoice qty {maxQuantity.toLocaleString()} cases
                       </div>
                     </div>
                   </div>
@@ -1622,7 +1623,7 @@ function EditInvoiceModal({ order, onClose }) {
 
                 <div className="grid-2" style={{ marginTop: 'var(--space-4)' }}>
                   <div className="form-group">
-                    <label className="form-label">Invoice Quantity</label>
+                    <label className="form-label">Invoice Quantity (Cases)</label>
                     <input
                       className="form-input"
                       type="number"
@@ -2068,9 +2069,10 @@ function BulkAssignDriverModal({ orderIds, onClose, onAssigned }) {
 
 function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) {
   const selectedProduct = getProduct(products, line.productId);
+  const quantityBreakdown = selectedProduct ? formatCaseQuantityBreakdown(selectedProduct, line.quantity) : '';
   return (
     <div className="order-line-editor">
-      <div className="form-group">
+      <div className="form-group order-line-product-field">
         <label className="form-label">Product</label>
         <div className="product-select-with-thumb">
           <ProductThumbnail product={selectedProduct} />
@@ -2103,10 +2105,15 @@ function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) 
             onChange={(productId) => onUpdateLine({ productId })}
           />
         </div>
+        {selectedProduct ? (
+          <div className="order-line-selected-product" title={getProductDisplayName(selectedProduct)}>
+            {getProductDisplayName(selectedProduct)}
+          </div>
+        ) : null}
       </div>
 
-      <div className="form-group">
-        <label className="form-label">Quantity</label>
+      <div className="form-group order-line-quantity-field">
+        <label className="form-label">Case Quantity</label>
         <input
           className="form-input"
           type="number"
@@ -2115,6 +2122,7 @@ function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) 
           value={line.quantity}
           onChange={(event) => onUpdateLine({ quantity: event.target.value })}
         />
+        {quantityBreakdown ? <div className="form-hint">{quantityBreakdown}</div> : null}
       </div>
       <div className="order-line-remove-wrap">
         <button

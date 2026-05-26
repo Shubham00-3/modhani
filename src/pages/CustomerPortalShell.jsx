@@ -26,6 +26,7 @@ export default function CustomerPortalShell({ children }) {
   const { state, logout } = useApp();
   const {
     cartItemCount,
+    formattedCartItemCount,
     activeClientId,
     activeLocationId,
     portalClients,
@@ -62,7 +63,7 @@ export default function CustomerPortalShell({ children }) {
             <Link to="/cart" className="cp-nav-link">
               <ShoppingCart size={16} />
               Cart
-              {cartItemCount > 0 && <span className="cp-cart-badge">{cartItemCount}</span>}
+              {cartItemCount > 0 && <span className="cp-cart-badge">{formattedCartItemCount}</span>}
             </Link>
             <Link to="/recent-orders" className="cp-nav-link">Recent Orders</Link>
             <button className="cp-signout-btn" type="button" onClick={logout}>

@@ -7,6 +7,8 @@ import {
   getProductDisplayName,
   getProductImageUrl,
   getProductOrderUnitLabel,
+  formatCaseQuantity,
+  formatCaseQuantityBreakdown,
   hasProductImage,
 } from '../data/phaseOneData';
 import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
@@ -27,6 +29,7 @@ export default function CustomerCart() {
     handleClientChange,
     updateProductQuantity,
     clearCart,
+    formattedCartItemCount,
   } = useCart();
 
   const [submitting, setSubmitting] = useState(false);
@@ -92,7 +95,7 @@ export default function CustomerCart() {
   return (
     <section className="cp-cart-page">
       <div className="cp-cart-header">
-        <h1>Your Cart ({cartItemCount} item{cartItemCount !== 1 ? 's' : ''})</h1>
+        <h1>Your Cart ({formattedCartItemCount} case{cartItemCount !== 1 ? 's' : ''})</h1>
         <Link to="/" className="cp-cart-continue">
           &larr; Continue Shopping
         </Link>
@@ -124,6 +127,9 @@ export default function CustomerCart() {
                       .filter(Boolean)
                       .join(' - ')}
                   </span>
+                  {quantity > 0 ? (
+                    <span>{formatCaseQuantityBreakdown(product, quantity)}</span>
+                  ) : null}
                 </div>
 
                 <div className="cp-cart-item-qty">
@@ -150,7 +156,7 @@ export default function CustomerCart() {
                     step="0.01"
                     value={quantity}
                     onChange={(e) => updateProductQuantity(product.id, e.target.value)}
-                    aria-label={`${getProductDisplayName(product)} quantity`}
+                    aria-label={`${getProductDisplayName(product)} case quantity`}
                   />
                   <button
                     className="btn btn-secondary btn-icon"
@@ -225,12 +231,12 @@ export default function CustomerCart() {
           {selectedLines.map((line) => (
             <div key={line.product.id} className="cp-cart-summary-row">
               <span>{getProductDisplayName(line.product)}</span>
-              <span>x {line.quantity}</span>
+              <span>{formatCaseQuantityBreakdown(line.product, line.quantity) || `x ${formatCaseQuantity(line.quantity)}`}</span>
             </div>
           ))}
           <div className="cp-cart-summary-total">
-            <span>Total items</span>
-            <span>{cartItemCount}</span>
+            <span>Total cases</span>
+            <span>{formattedCartItemCount}</span>
           </div>
 
           {error && (
@@ -292,7 +298,7 @@ function ConfirmOrderModal({ lines, locationName, companyName, submitting, onCan
           </div>
 
           <div style={{ fontSize: 12, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
-            Items ({lines.reduce((sum, l) => sum + l.quantity, 0)})
+            Items ({formatCaseQuantity(lines.reduce((sum, l) => sum + l.quantity, 0))} cases)
           </div>
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, borderTop: '1px solid var(--color-border-light, #f1f1ef)' }}>
             {lines.map((line) => (
@@ -307,7 +313,7 @@ function ConfirmOrderModal({ lines, locationName, companyName, submitting, onCan
                 }}
               >
                 <span>{getProductDisplayName(line.product)}</span>
-                <strong>x {line.quantity}</strong>
+                <strong>{formatCaseQuantityBreakdown(line.product, line.quantity) || `x ${formatCaseQuantity(line.quantity)}`}</strong>
               </li>
             ))}
           </ul>

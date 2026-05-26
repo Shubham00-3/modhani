@@ -179,6 +179,44 @@ export function getProductOrderUnitLabel(product) {
   return 'Case';
 }
 
+export function getProductUnitsPerCase(product) {
+  const unitsPerCase = Number(product?.unitsPerCase);
+  return Number.isFinite(unitsPerCase) && unitsPerCase > 0 ? unitsPerCase : 1;
+}
+
+export function formatCaseQuantity(value) {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity)) return '0';
+  return quantity.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+}
+
+export function getCaseQuantityUnitCount(product, value) {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity) || quantity <= 0) return 0;
+  const rawUnits = quantity * getProductUnitsPerCase(product);
+  const roundedUnits = Math.round(rawUnits);
+  return Math.abs(rawUnits - roundedUnits) < 0.000001 ? roundedUnits : rawUnits;
+}
+
+export function formatCaseQuantityBreakdown(product, value) {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity) || quantity <= 0) return '';
+
+  const unitsPerCase = getProductUnitsPerCase(product);
+  const caseLabel = quantity === 1 ? 'case' : 'cases';
+  if (unitsPerCase <= 1) return `${formatCaseQuantity(quantity)} ${caseLabel}`;
+
+  const unitCount = getCaseQuantityUnitCount(product, quantity);
+  const formattedUnits = unitCount.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
+  return `${formatCaseQuantity(quantity)} ${caseLabel} = ${formattedUnits} units`;
+}
+
 export function getClientTier(tiers, clientOrTierId) {
   if (!clientOrTierId) return null;
   const tierId = typeof clientOrTierId === 'string' ? clientOrTierId : clientOrTierId.tierId;
