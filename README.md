@@ -131,7 +131,13 @@ npm run dev
 
 Use targeted ESLint because local temporary Chrome profile folders may cause plain `npm run lint` to scan generated files:
 
+
 ```bash
 npm run build
 npx eslint src api scripts --ext .js,.jsx,.mjs
 ```
+
+
+
+
+SUPABASE : https://supabase.com/docs/guides/deployment/branching/github-integration#set-the-working-directory
