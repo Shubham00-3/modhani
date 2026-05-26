@@ -36,6 +36,7 @@ import {
   formatCaseQuantityBreakdown,
   hasProductImage,
   isLocationShipToReady,
+  isValidCaseQuantityStep,
 } from '../data/phaseOneData';
 import { printInvoice, printPackingSlip, printProofOfDelivery } from '../utils/printDocuments';
 
@@ -1008,6 +1009,10 @@ function FulfilmentPanel({ order, onBack }) {
       addToast('Enter at least one batch assignment.', 'warning');
       return;
     }
+    if (flattened.some((entry) => !isValidCaseQuantityStep(entry.qty))) {
+      addToast('Use quarter-case assignment quantities only: 0.25, 0.5, 0.75, 1, and so on.', 'warning');
+      return;
+    }
 
     const result = await dispatch({
       type: 'APPLY_FULFILMENT',
@@ -1067,6 +1072,10 @@ function FulfilmentPanel({ order, onBack }) {
     const alreadyFulfilled = order.items.some((item) => item.fulfilledQty > 0);
     if (!flattened.length && !alreadyFulfilled) {
       addToast('Assign some quantity first, or use Decline Order for a full decline.', 'warning');
+      return;
+    }
+    if (flattened.some((entry) => !isValidCaseQuantityStep(entry.qty))) {
+      addToast('Use quarter-case assignment quantities only: 0.25, 0.5, 0.75, 1, and so on.', 'warning');
       return;
     }
 
@@ -1149,7 +1158,7 @@ function FulfilmentPanel({ order, onBack }) {
                           style={{ width: 96 }}
                           type="number"
                           min="0"
-                          step="0.01"
+                          step="0.25"
                           value={itemAssignments[batch.id] ?? ''}
                           onChange={(event) => updateAssignment(item.id, batch.id, event.target.value, outstanding)}
                         />
@@ -1481,6 +1490,9 @@ function EditInvoiceModal({ order, onClose }) {
         if (!Number.isFinite(nextQuantity) || nextQuantity < 0 || nextQuantity > maxQuantity) {
           throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} quantity must be between 0 and ${maxQuantity}.`);
         }
+        if (nextQuantity > 0 && !isValidCaseQuantityStep(nextQuantity)) {
+          throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} invoice quantity must use quarter cases.`);
+        }
 
         if (!Number.isFinite(nextPrice) || nextPrice < 0) {
           throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} price is invalid.`);
@@ -1629,7 +1641,7 @@ function EditInvoiceModal({ order, onClose }) {
                       type="number"
                       min="0"
                       max={maxQuantity}
-                      step="0.01"
+                      step="0.25"
                       value={draft.quantity}
                       onChange={(event) =>
                         setLineDrafts((current) => ({
@@ -1759,6 +1771,10 @@ function AddOrderModal({ onClose }) {
 
     const duplicateProductIds = new Set();
     for (const line of validLines) {
+      if (!isValidCaseQuantityStep(line.quantity)) {
+        addToast('Use quarter-case quantities only: 0.25, 0.5, 0.75, 1, and so on.', 'warning');
+        return;
+      }
       if (duplicateProductIds.has(line.productId)) {
         addToast('Combine duplicate products into a single line item.', 'warning');
         return;
@@ -2117,8 +2133,8 @@ function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) 
         <input
           className="form-input"
           type="number"
-          min="0.01"
-          step="0.01"
+          min="0.25"
+          step="0.25"
           value={line.quantity}
           onChange={(event) => onUpdateLine({ quantity: event.target.value })}
         />

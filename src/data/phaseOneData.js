@@ -193,6 +193,21 @@ export function formatCaseQuantity(value) {
   });
 }
 
+export const CASE_QUANTITY_STEP = 0.25;
+
+export function isValidCaseQuantityStep(value) {
+  const quantity = Number(value);
+  if (!Number.isFinite(quantity) || quantity <= 0) return false;
+  const stepCount = quantity / CASE_QUANTITY_STEP;
+  return Math.abs(stepCount - Math.round(stepCount)) < 0.000001;
+}
+
+export function getNextCaseQuantity(value, deltaSteps) {
+  const quantity = Number(value) || 0;
+  const nextStepCount = Math.max(0, Math.round(quantity / CASE_QUANTITY_STEP) + deltaSteps);
+  return Number((nextStepCount * CASE_QUANTITY_STEP).toFixed(2));
+}
+
 export function getCaseQuantityUnitCount(product, value) {
   const quantity = Number(value);
   if (!Number.isFinite(quantity) || quantity <= 0) return 0;

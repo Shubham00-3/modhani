@@ -8,6 +8,7 @@ import {
   getProductImageUrl,
   getProductOrderUnitLabel,
   formatCaseQuantityBreakdown,
+  getNextCaseQuantity,
   hasProductImage,
 } from '../data/phaseOneData';
 
@@ -253,7 +254,7 @@ export default function CustomerPortal() {
                   <button
                     className="btn btn-secondary btn-icon"
                     type="button"
-                    onClick={() => updateProductQuantity(product.id, numericQuantity - 1)}
+                    onClick={() => updateProductQuantity(product.id, getNextCaseQuantity(numericQuantity, -1))}
                     disabled={numericQuantity <= 0}
                     aria-label={`Decrease ${getProductDisplayName(product)}`}
                   >
@@ -263,12 +264,12 @@ export default function CustomerPortal() {
                     className="form-input"
                     type="number"
                     min="0"
-                    step="0.01"
+                    step="0.25"
                     value={quantity}
                     onChange={(event) => updateProductQuantity(product.id, event.target.value)}
                     aria-label={`${getProductDisplayName(product)} case quantity`}
                   />
-                  <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, numericQuantity + 1)} aria-label={`Increase ${getProductDisplayName(product)}`}>
+                  <button className="btn btn-secondary btn-icon" type="button" onClick={() => updateProductQuantity(product.id, getNextCaseQuantity(numericQuantity, 1))} aria-label={`Increase ${getProductDisplayName(product)}`}>
                     <Plus size={16} />
                   </button>
                 </div>
@@ -396,7 +397,7 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
               <button
                 className="btn btn-secondary btn-icon"
                 type="button"
-                onClick={() => onQuantityChange(numericQuantity - 1)}
+                onClick={() => onQuantityChange(getNextCaseQuantity(numericQuantity, -1))}
                 disabled={numericQuantity <= 0}
                 aria-label="Decrease quantity"
               >
@@ -406,7 +407,7 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
                 className="form-input"
                 type="number"
                 min="0"
-                step="0.01"
+                step="0.25"
                 value={quantity}
                 onChange={(e) => onQuantityChange(e.target.value)}
                 aria-label={`${getProductDisplayName(product)} case quantity`}
@@ -414,7 +415,7 @@ function ProductDetailModal({ product, quantity, onQuantityChange, onClose }) {
               <button
                 className="btn btn-secondary btn-icon"
                 type="button"
-                onClick={() => onQuantityChange(numericQuantity + 1)}
+                onClick={() => onQuantityChange(getNextCaseQuantity(numericQuantity, 1))}
                 aria-label="Increase quantity"
               >
                 <Plus size={18} />

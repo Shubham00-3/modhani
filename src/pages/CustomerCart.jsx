@@ -9,7 +9,9 @@ import {
   getProductOrderUnitLabel,
   formatCaseQuantity,
   formatCaseQuantityBreakdown,
+  getNextCaseQuantity,
   hasProductImage,
+  isValidCaseQuantityStep,
 } from '../data/phaseOneData';
 import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
 
@@ -48,6 +50,10 @@ export default function CustomerCart() {
     }
     if (!selectedLines.length) {
       setError('Your cart is empty. Add products before submitting.');
+      return;
+    }
+    if (selectedLines.some((line) => !isValidCaseQuantityStep(line.quantity))) {
+      setError('Use quarter-case quantities only: 0.25, 0.5, 0.75, 1, and so on.');
       return;
     }
 
@@ -137,13 +143,13 @@ export default function CustomerCart() {
                     className="btn btn-secondary btn-icon"
                     type="button"
                     onClick={() => {
-                      if (quantity <= 1) {
+                      if (quantity <= 0.25) {
                         const ok = window.confirm(
                           `Remove ${getProductDisplayName(product)} from your cart?`
                         );
                         if (!ok) return;
                       }
-                      updateProductQuantity(product.id, quantity - 1);
+                      updateProductQuantity(product.id, getNextCaseQuantity(quantity, -1));
                     }}
                     aria-label={`Decrease ${getProductDisplayName(product)}`}
                   >
@@ -152,8 +158,8 @@ export default function CustomerCart() {
                   <input
                     className="form-input"
                     type="number"
-                    min="0.01"
-                    step="0.01"
+                    min="0.25"
+                    step="0.25"
                     value={quantity}
                     onChange={(e) => updateProductQuantity(product.id, e.target.value)}
                     aria-label={`${getProductDisplayName(product)} case quantity`}
@@ -161,7 +167,7 @@ export default function CustomerCart() {
                   <button
                     className="btn btn-secondary btn-icon"
                     type="button"
-                    onClick={() => updateProductQuantity(product.id, quantity + 1)}
+                    onClick={() => updateProductQuantity(product.id, getNextCaseQuantity(quantity, 1))}
                     aria-label={`Increase ${getProductDisplayName(product)}`}
                   >
                     <Plus size={16} />
