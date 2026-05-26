@@ -1,17 +1,8 @@
 import { useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../../hooks/useModalBehavior';
-import {
-  PRICE_TIERS,
-  formatCurrency,
-  getActiveCatalogProducts,
-  getProductDisplayName,
-  getProductImageUrl,
-  getProductTierPrice,
-  hasProductImage,
-  normalizePriceTier,
-} from '../../data/phaseOneData';
+import { getProductImageUrl } from '../../data/phaseOneData';
 import { isSupabaseConfigured, supabase } from '../../lib/supabaseClient';
 
 export function ProductModal({ product, onClose }) {
@@ -22,14 +13,14 @@ export function ProductModal({ product, onClose }) {
     product
       ? {
           ...product,
-          tierPrices: buildTierPriceForm(product),
+          baseCataloguePrice:
+            product.baseCataloguePrice == null ? '' : String(product.baseCataloguePrice),
         }
       : {
           name: '',
           unitSize: '',
           category: '',
           baseCataloguePrice: '',
-          tierPrices: buildTierPriceForm(null),
           itemNumber: '',
           upc: '',
           packagingDetails: '',
@@ -51,8 +42,8 @@ export function ProductModal({ product, onClose }) {
         const name = form.name.trim();
         const unitSize = String(form.unitSize ?? '').trim();
         const qbItemName = (form.qbItemName || `${name} ${unitSize}`).trim();
-        const tierPrices = buildTierPricesFromForm(form.tierPrices);
-        const baseCataloguePrice = tierPrices[1];
+        const rawBasePrice = String(form.baseCataloguePrice ?? '').trim();
+        const baseCataloguePrice = rawBasePrice === '' ? 0 : Number(rawBasePrice);
         const productId = product?.id ?? `prod-${Date.now()}`;
         const unitsPerCase = parseOptionalNumber(form.unitsPerCase);
         const shelfLifeDays = parseOptionalInteger(form.shelfLifeDays);
@@ -70,12 +61,8 @@ export function ProductModal({ product, onClose }) {
           return false;
         }
 
-        const hasInvalidTierPrice = PRICE_TIERS.some(
-          (tier) => Number.isNaN(Number(form.tierPrices?.[tier])) || Number(form.tierPrices?.[tier]) < 0
-        );
-
-        if (hasInvalidTierPrice) {
-          addToast('Tier prices must be zero or greater.', 'warning');
+        if (!Number.isFinite(baseCataloguePrice) || baseCataloguePrice < 0) {
+          addToast('Base catalogue price must be zero or greater.', 'warning');
           return false;
         }
 
@@ -129,7 +116,6 @@ export function ProductModal({ product, onClose }) {
             unitSize,
             id: productId,
             baseCataloguePrice,
-            tierPrices,
             itemNumber: String(form.itemNumber ?? '').trim(),
             upc: String(form.upc ?? '').trim(),
             packagingDetails: String(form.packagingDetails ?? '').trim(),
@@ -165,32 +151,12 @@ export function ProductModal({ product, onClose }) {
       <FormInput label="Shelf Life Days" type="number" value={form.shelfLifeDays ?? ''} onChange={(value) => setForm((current) => ({ ...current, shelfLifeDays: value }))} />
       <FormInput label="Lead Time Days" type="number" value={form.leadTimeDays ?? ''} onChange={(value) => setForm((current) => ({ ...current, leadTimeDays: value }))} />
       <FormInput label="Order Unit Label" value={form.orderUnitLabel ?? ''} onChange={(value) => setForm((current) => ({ ...current, orderUnitLabel: value }))} />
-      <div className="form-group">
-        <label className="form-label">Tier Prices</label>
-        <div className="tier-price-grid">
-          {PRICE_TIERS.map((tier) => (
-            <label key={tier} className="tier-price-field">
-              <span>{tier === 1 ? 'Tier 1 / Base' : `Tier ${tier}`}</span>
-              <input
-                className="form-input"
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.tierPrices?.[tier] ?? ''}
-                onChange={(event) =>
-                  setForm((current) => ({
-                    ...current,
-                    tierPrices: {
-                      ...current.tierPrices,
-                      [tier]: event.target.value,
-                    },
-                  }))
-                }
-              />
-            </label>
-          ))}
-        </div>
-      </div>
+      <FormInput
+        label="Base Catalogue Price"
+        type="number"
+        value={form.baseCataloguePrice ?? ''}
+        onChange={(value) => setForm((current) => ({ ...current, baseCataloguePrice: value }))}
+      />
       <FormInput label="QuickBooks Item Name" value={form.qbItemName ?? ''} onChange={(value) => setForm((current) => ({ ...current, qbItemName: value }))} />
       <div className="form-group">
         <label className="form-label">Product Image</label>
@@ -461,140 +427,6 @@ export function LocationModal({ location, onClose }) {
   );
 }
 
-export function PricingModal({ clientId, onClose }) {
-  const { state, dispatch, addToast } = useApp();
-  const client = state.clients.find((entry) => entry.id === clientId);
-  const [selectedTier, setSelectedTier] = useState(normalizePriceTier(client?.priceTier));
-  const [searchQuery, setSearchQuery] = useState('');
-  const [enabledProductIds, setEnabledProductIds] = useState(
-    () =>
-      new Set(
-        state.clientPricing
-          .filter((pricing) => pricing.clientId === clientId && pricing.isActive)
-          .map((pricing) => pricing.productId)
-      )
-  );
-  const activeProducts = getActiveCatalogProducts(state.products);
-  const filteredProducts = activeProducts.filter((product) =>
-    [
-      getProductDisplayName(product),
-      product.category,
-      product.itemNumber,
-      product.upc,
-      product.packagingDetails,
-      product.orderUnitLabel,
-      product.qbItemName,
-      getProductTierPrice(product, selectedTier),
-    ]
-      .filter(Boolean)
-      .join(' ')
-      .toLowerCase()
-      .includes(searchQuery.trim().toLowerCase())
-  );
-
-  function toggleProduct(productId) {
-    setEnabledProductIds((current) => {
-      const next = new Set(current);
-      if (next.has(productId)) {
-        next.delete(productId);
-      } else {
-        next.add(productId);
-      }
-      return next;
-    });
-  }
-
-  return (
-    <SimpleModal
-      title={`Pricing & Products - ${client?.name}`}
-      onClose={onClose}
-      onSave={async () => {
-        if (!client) {
-          addToast('Client not found.', 'warning');
-          return false;
-        }
-
-        const result = await dispatch({
-          type: 'SAVE_CLIENT_CATALOGUE',
-          payload: {
-            clientId,
-            priceTier: selectedTier,
-            enabledProductIds: Array.from(enabledProductIds),
-          },
-        });
-
-        if (result.ok) {
-          onClose();
-        }
-
-        return result.ok;
-      }}
-    >
-      <div className="form-group">
-        <label className="form-label">Client Pricing Tier</label>
-        <select
-          className="form-select"
-          value={selectedTier}
-          onChange={(event) => setSelectedTier(normalizePriceTier(event.target.value))}
-        >
-          {PRICE_TIERS.map((tier) => (
-            <option key={tier} value={tier}>
-              Tier {tier}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <label className="pricing-product-search">
-        <Search size={16} />
-        <input
-          type="search"
-          value={searchQuery}
-          onChange={(event) => setSearchQuery(event.target.value)}
-          placeholder="Search products..."
-        />
-      </label>
-
-      <div className="pricing-product-list">
-        {filteredProducts.length ? (
-          filteredProducts.map((product) => {
-            const checked = enabledProductIds.has(product.id);
-            const imageUrl = getProductImageUrl(product, { fallback: true });
-            const usesFallback = !hasProductImage(product);
-
-            return (
-              <label key={product.id} className={`pricing-product-row ${checked ? 'is-enabled' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleProduct(product.id)}
-                />
-                <span className={`product-thumb product-thumb-sm ${usesFallback ? 'product-thumb-fallback' : ''}`}>
-                  <img src={imageUrl} alt={usesFallback ? 'Modhani logo placeholder' : getProductDisplayName(product)} />
-                </span>
-                <span className="pricing-product-main">
-                  <strong>{getProductDisplayName(product)}</strong>
-                  <span className="pricing-product-meta">
-                    {[product.category, product.itemNumber ? `Item ${product.itemNumber}` : '', product.packagingDetails].filter(Boolean).join(' - ') || 'Catalogue item'}
-                  </span>
-                </span>
-                <span className="pricing-product-price">
-                  {formatCurrency(getProductTierPrice(product, selectedTier))}
-                </span>
-              </label>
-            );
-          })
-        ) : (
-          <div className="empty-state" style={{ padding: 'var(--space-6)' }}>
-            <div className="empty-state-title">No products match that search</div>
-            <div className="empty-state-description">Clear the search to review the full catalogue.</div>
-          </div>
-        )}
-      </div>
-    </SimpleModal>
-  );
-}
-
 function SimpleModal({ title, children, onClose, onSave }) {
   const [saving, setSaving] = useState(false);
   useModalBehavior(onClose, { enabled: !saving });
@@ -644,21 +476,6 @@ function FormInput({ label, value, onChange, type = 'text', placeholder }) {
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
-  );
-}
-
-function buildTierPriceForm(product) {
-  return Object.fromEntries(
-    PRICE_TIERS.map((tier) => [tier, product ? String(getProductTierPrice(product, tier)) : ''])
-  );
-}
-
-function buildTierPricesFromForm(tierPrices) {
-  return Object.fromEntries(
-    PRICE_TIERS.map((tier) => {
-      const value = Number(tierPrices?.[tier] ?? 0);
-      return [tier, Number.isFinite(value) && value >= 0 ? value : 0];
-    })
   );
 }
 

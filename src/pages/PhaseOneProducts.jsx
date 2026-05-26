@@ -7,7 +7,6 @@ import {
   getProductDisplayName,
   getProductImageUrl,
   getProductOrderUnitLabel,
-  getProductTierPrice,
   getActiveCatalogProducts,
   hasProductImage,
 } from '../data/phaseOneData';
@@ -43,7 +42,6 @@ export default function PhaseOneProducts() {
         product.leadTimeDays,
         product.orderUnitLabel,
         product.baseCataloguePrice,
-        ...Object.values(product.tierPrices ?? {}),
       ]
         .filter(Boolean)
         .join(' ')
@@ -108,7 +106,7 @@ export default function PhaseOneProducts() {
                 <th>Product</th>
                 <th>Category</th>
                 <th>Packaging</th>
-                <th className="cell-align-right">Tier 1 Price</th>
+                <th className="cell-align-right">Base Price</th>
                 <th>Shelf Life</th>
                 <th />
               </tr>
@@ -133,7 +131,7 @@ export default function PhaseOneProducts() {
                         {getProductOrderUnitLabel(product)}
                       </div>
                     </td>
-                    <td className="cell-monospace">{formatCurrency(getProductTierPrice(product, 1))}</td>
+                    <td className="cell-monospace">{formatCurrency(product.baseCataloguePrice)}</td>
                     <td>{product.shelfLifeDays ? `${product.shelfLifeDays} days` : '-'}</td>
                     <td>
                       <button className="btn btn-ghost btn-sm" type="button" disabled={!canManage} onClick={() => setEditingProduct(product)}>

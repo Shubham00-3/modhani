@@ -10,13 +10,11 @@ import {
   ORDERS,
   PRODUCTS,
   QUICKBOOKS_SETTINGS,
+  TIERS,
   USERS,
   buildReportRowsFromOrders,
   getEffectiveItemPrice,
   getItemDiscountAmount,
-  getActiveCatalogProducts,
-  getProductTierPrice,
-  normalizePriceTier,
 } from '../data/phaseOneData';
 import { buildOperationalNotifications } from '../lib/notifications';
 import {
@@ -40,6 +38,7 @@ const demoState = {
   clients: CLIENTS,
   locations: LOCATIONS,
   clientPricing: CLIENT_PRICING,
+  tiers: TIERS,
   batches: BATCHES,
   orders: ORDERS,
   auditLog: AUDIT_LOG,
@@ -75,6 +74,7 @@ const remoteBootState = {
   clients: [],
   locations: [],
   clientPricing: [],
+  tiers: [],
   batches: [],
   orders: [],
   auditLog: [],
@@ -220,46 +220,17 @@ function trimFulfilmentToInvoiceLines(order, batches, lines) {
   };
 }
 
-function refreshClientPricingForProducts(clientPricing, clients, products, productIds = null) {
-  const productIdSet = productIds ? new Set(productIds) : null;
-
-  return clientPricing.map((pricing) => {
-    if (productIdSet && !productIdSet.has(pricing.productId)) return pricing;
-
-    const client = clients.find((entry) => entry.id === pricing.clientId);
-    const product = products.find((entry) => entry.id === pricing.productId);
-    if (!client || !product) return pricing;
-
-    return {
-      ...pricing,
-      price: getProductTierPrice(product, client.priceTier),
-    };
-  });
-}
-
-function buildClientCataloguePricing({ clientPricing, products, clientId, priceTier, enabledProductIds }) {
-  const enabledIds = new Set(enabledProductIds);
-  const activeProducts = getActiveCatalogProducts(products);
-  const existingByProductId = new Map(
-    clientPricing.filter((pricing) => pricing.clientId === clientId).map((pricing) => [pricing.productId, pricing])
-  );
-  const clientRows = activeProducts.map((product) => {
-    const existing = existingByProductId.get(product.id);
-
-    return {
-      id: existing?.id ?? `cp-${clientId}-${product.id}`,
-      clientId,
-      productId: product.id,
-      price: getProductTierPrice(product, priceTier),
-      isActive: enabledIds.has(product.id),
-    };
-  });
-  const clientProductIds = new Set(activeProducts.map((product) => product.id));
-
-  return [
-    ...clientPricing.filter((pricing) => pricing.clientId !== clientId || !clientProductIds.has(pricing.productId)),
-    ...clientRows,
-  ];
+function buildClientPricingForTier({ clientPricing, clientId, tier }) {
+  const otherRows = clientPricing.filter((row) => row.clientId !== clientId);
+  if (!tier) return otherRows;
+  const tierRows = (tier.products ?? []).map((entry) => ({
+    id: `cp-${clientId}-${entry.productId}`,
+    clientId,
+    productId: entry.productId,
+    price: Number(entry.price) || 0,
+    isActive: true,
+  }));
+  return [...otherRows, ...tierRows];
 }
 
 function reducer(state, action) {
@@ -349,12 +320,6 @@ function reducer(state, action) {
       return {
         ...state,
         products: nextProducts,
-        clientPricing: refreshClientPricingForProducts(
-          state.clientPricing,
-          state.clients,
-          nextProducts,
-          [action.payload.id]
-        ),
       };
     }
     case 'ADD_CLIENT':
@@ -457,24 +422,91 @@ function reducer(state, action) {
         ],
       };
     }
-    case 'SAVE_CLIENT_CATALOGUE': {
-      const priceTier = normalizePriceTier(action.payload.priceTier);
-      const enabledProductIds = action.payload.enabledProductIds ?? [];
-      const nextClients = state.clients.map((client) =>
-        client.id === action.payload.clientId ? { ...client, priceTier } : client
-      );
+    case 'UPSERT_TIER': {
+      const incoming = {
+        id: action.payload.id,
+        name: action.payload.name,
+        products: (action.payload.products ?? []).map((entry) => ({
+          productId: entry.productId,
+          price: Number(entry.price) || 0,
+        })),
+      };
+
+      const exists = state.tiers.some((tier) => tier.id === incoming.id);
+      const nextTiers = exists
+        ? state.tiers.map((tier) => (tier.id === incoming.id ? { ...tier, ...incoming } : tier))
+        : [...state.tiers, incoming];
+
+      let nextClientPricing = state.clientPricing;
+      state.clients
+        .filter((client) => client.tierId === incoming.id)
+        .forEach((client) => {
+          nextClientPricing = buildClientPricingForTier({
+            clientPricing: nextClientPricing,
+            clientId: client.id,
+            tier: incoming,
+          });
+        });
+
+      return { ...state, tiers: nextTiers, clientPricing: nextClientPricing };
+    }
+    case 'DELETE_TIER': {
+      const tierId = action.payload.tierId;
+      const affectedClientIds = state.clients
+        .filter((client) => client.tierId === tierId)
+        .map((client) => client.id);
+
+      let nextClientPricing = state.clientPricing;
+      affectedClientIds.forEach((clientId) => {
+        nextClientPricing = buildClientPricingForTier({
+          clientPricing: nextClientPricing,
+          clientId,
+          tier: null,
+        });
+      });
 
       return {
         ...state,
-        clients: nextClients,
-        clientPricing: buildClientCataloguePricing({
-          clientPricing: state.clientPricing,
-          products: state.products,
-          clientId: action.payload.clientId,
-          priceTier,
-          enabledProductIds,
-        }),
+        tiers: state.tiers.filter((tier) => tier.id !== tierId),
+        clients: state.clients.map((client) =>
+          client.tierId === tierId ? { ...client, tierId: null } : client
+        ),
+        clientPricing: nextClientPricing,
       };
+    }
+    case 'SET_TIER_CLIENT_MEMBERSHIP': {
+      const { tierId, clientIds } = action.payload;
+      const memberSet = new Set(clientIds);
+      const tier = state.tiers.find((entry) => entry.id === tierId);
+      if (!tier) return state;
+
+      let nextClientPricing = state.clientPricing;
+
+      const nextClients = state.clients.map((client) => {
+        // Newly added or kept on the tier.
+        if (memberSet.has(client.id)) {
+          if (client.tierId !== tierId) {
+            nextClientPricing = buildClientPricingForTier({
+              clientPricing: nextClientPricing,
+              clientId: client.id,
+              tier,
+            });
+          }
+          return { ...client, tierId };
+        }
+        // Was on this tier, now removed.
+        if (client.tierId === tierId) {
+          nextClientPricing = buildClientPricingForTier({
+            clientPricing: nextClientPricing,
+            clientId: client.id,
+            tier: null,
+          });
+          return { ...client, tierId: null };
+        }
+        return client;
+      });
+
+      return { ...state, clients: nextClients, clientPricing: nextClientPricing };
     }
     case 'ADD_BATCH':
     case 'LOG_PRODUCTION_BATCH':
@@ -807,7 +839,9 @@ const serverAdminActions = new Set([
   'ADD_LOCATION',
   'UPDATE_LOCATION',
   'SET_CLIENT_PRICING',
-  'SAVE_CLIENT_CATALOGUE',
+  'UPSERT_TIER',
+  'DELETE_TIER',
+  'SET_TIER_CLIENT_MEMBERSHIP',
   'UPDATE_CUSTOMER_CONTACT',
   'UPDATE_CUSTOMER_ASSIGNMENTS',
   'UPDATE_USER',
@@ -1044,6 +1078,7 @@ export function AppProvider({ children }) {
             clients: [],
             locations: [],
             clientPricing: [],
+            tiers: [],
             batches: [],
             orders: [],
             auditLog: [],
@@ -1121,6 +1156,7 @@ export function AppProvider({ children }) {
         'customer_contacts', 'customer_client_assignments', 'customer_location_assignments',
         'batches', 'batch_assignments',
         'clients', 'locations', 'products', 'client_product_prices',
+        'tiers', 'tier_products',
         'quickbooks_sync_jobs', 'quickbooks_settings',
       ];
     } else if (role === 'driver') {

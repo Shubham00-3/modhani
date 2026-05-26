@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronUp,
-  DollarSign,
+  Layers,
   MapPin,
   Pencil,
   Phone,
@@ -14,8 +14,8 @@ import {
   Users,
 } from 'lucide-react';
 import { useApp } from '../context/useApp';
-import { formatClientLocationScale } from '../data/phaseOneData';
-import { ClientModal, LocationModal, PricingModal } from '../components/settings/ManagementModals';
+import { formatClientLocationScale, getClientTier } from '../data/phaseOneData';
+import { ClientModal, LocationModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneClientsLocations() {
   const { state } = useApp();
@@ -23,7 +23,6 @@ export default function PhaseOneClientsLocations() {
   const canManage = state.currentUser.permissions.manageSettings;
   const [editingClient, setEditingClient] = useState(null);
   const [editingLocation, setEditingLocation] = useState(null);
-  const [pricingClientId, setPricingClientId] = useState(null);
   const [clientSearch, setClientSearch] = useState('');
   const dashboardSearch = searchParams.get('q') ?? '';
   const [showClientModal, setShowClientModal] = useState(false);
@@ -88,7 +87,8 @@ export default function PhaseOneClientsLocations() {
         <div>
           <h1 className="page-title">Clients & Locations</h1>
           <p className="page-subtitle">
-            Manage client accounts, store locations, pricing tiers, and visible products in one place.
+            Manage client accounts and store locations. Pricing and visible products are now controlled
+            from the <Link to="/tiers">Tiers</Link> page.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
@@ -143,9 +143,8 @@ export default function PhaseOneClientsLocations() {
           <div className="client-accordion">
             {filteredClients.map((client) => {
               const clientLocations = state.locations.filter((l) => l.clientId === client.id);
-              const enabledProductCount = state.clientPricing.filter(
-                (pricing) => pricing.clientId === client.id && pricing.isActive
-              ).length;
+              const assignedTier = getClientTier(state.tiers ?? [], client);
+              const enabledProductCount = assignedTier?.products.length ?? 0;
               const open = isExpanded(client.id);
               const displayName = client.operatingAs?.trim() || client.name;
               const hasOperatingAs = Boolean(client.operatingAs?.trim());
@@ -171,7 +170,8 @@ export default function PhaseOneClientsLocations() {
                         {clientLocations.length} {clientLocations.length === 1 ? 'location' : 'locations'}
                       </span>
                       <span className="client-accordion-pill">
-                        Tier {client.priceTier ?? 1}
+                        <Layers size={13} />
+                        {assignedTier ? assignedTier.name : 'No tier'}
                       </span>
                       <span className="client-accordion-chev">
                         {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
@@ -215,21 +215,18 @@ export default function PhaseOneClientsLocations() {
                             <dd>{formatClientLocationScale(client, clientLocations.length)}</dd>
                           </div>
                           <div>
-                            <dt>Pricing tier</dt>
+                            <dt>Assigned tier</dt>
                             <dd>
-                              Tier {client.priceTier ?? 1} · {enabledProductCount.toLocaleString()} visible products
+                              {assignedTier
+                                ? `${assignedTier.name} · ${enabledProductCount.toLocaleString()} visible products`
+                                : 'No tier assigned — customers will see no products'}
                             </dd>
                           </div>
                         </dl>
                         <div className="client-info-actions">
-                          <button
-                            className="btn btn-secondary btn-sm"
-                            type="button"
-                            disabled={!canManage}
-                            onClick={() => setPricingClientId(client.id)}
-                          >
-                            <DollarSign size={14} /> Manage Pricing & Products
-                          </button>
+                          <Link className="btn btn-secondary btn-sm" to="/tiers">
+                            <Layers size={14} /> Manage tiers
+                          </Link>
                         </div>
                       </section>
 
@@ -306,7 +303,6 @@ export default function PhaseOneClientsLocations() {
         />
       ) : null}
 
-      {pricingClientId ? <PricingModal clientId={pricingClientId} onClose={() => setPricingClientId(null)} /> : null}
     </div>
   );
 }

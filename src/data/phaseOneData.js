@@ -58,13 +58,15 @@ export const USERS = [
 export const PRODUCTS = [
 ];
 
-export const PRICE_TIERS = Array.from({ length: 10 }, (_, index) => index + 1);
+export const MAX_TIERS = 15;
+
+export const TIERS = [];
 
 export const CLIENTS = [
   {
     id: 'client-loblaws',
     name: 'Loblaws',
-    priceTier: 1,
+    tierId: null,
     locationCount: 100,
     emailPackingSlip: true,
     emailInvoice: true,
@@ -77,7 +79,7 @@ export const CLIENTS = [
   {
     id: 'client-chalo-freshco',
     name: 'Chalo FreshCo',
-    priceTier: 1,
+    tierId: null,
     locationCount: 100,
     emailPackingSlip: true,
     emailInvoice: true,
@@ -90,7 +92,7 @@ export const CLIENTS = [
   {
     id: 'client-a1-cash-carry',
     name: 'A1 Cash & Carry',
-    priceTier: 1,
+    tierId: null,
     locationCount: 10,
     emailPackingSlip: true,
     emailInvoice: true,
@@ -103,7 +105,7 @@ export const CLIENTS = [
   {
     id: 'client-desi-stores',
     name: 'Desi Stores',
-    priceTier: 1,
+    tierId: null,
     locationCount: 4,
     emailPackingSlip: true,
     emailInvoice: true,
@@ -177,32 +179,29 @@ export function getProductOrderUnitLabel(product) {
   return 'Case';
 }
 
-export function normalizePriceTier(value) {
-  const tier = Number(value);
-  if (!Number.isInteger(tier) || tier < 1 || tier > PRICE_TIERS.length) return 1;
-  return tier;
+export function getClientTier(tiers, clientOrTierId) {
+  if (!clientOrTierId) return null;
+  const tierId = typeof clientOrTierId === 'string' ? clientOrTierId : clientOrTierId.tierId;
+  if (!tierId) return null;
+  return tiers.find((tier) => tier.id === tierId) ?? null;
 }
 
-export function buildTierPrices(baseCataloguePrice = 0, tierPrices = {}) {
-  const basePrice = Number(baseCataloguePrice);
-  const fallbackPrice = Number.isFinite(basePrice) && basePrice >= 0 ? basePrice : 0;
-
-  return Object.fromEntries(
-    PRICE_TIERS.map((tier) => {
-      const tierValue = Number(tierPrices?.[tier] ?? tierPrices?.[String(tier)] ?? fallbackPrice);
-      return [tier, Number.isFinite(tierValue) && tierValue >= 0 ? tierValue : fallbackPrice];
-    })
-  );
+export function getTierProductPrice(tier, productId) {
+  if (!tier) return null;
+  const entry = (tier.products ?? []).find((row) => row.productId === productId);
+  if (!entry) return null;
+  const price = Number(entry.price);
+  return Number.isFinite(price) && price >= 0 ? price : null;
 }
 
-export function getProductTierPrice(product, tier = 1) {
-  if (!product) return 0;
+export function getTierProductIds(tier) {
+  if (!tier) return [];
+  return (tier.products ?? []).map((row) => row.productId);
+}
 
-  const normalizedTier = normalizePriceTier(tier);
-  const tierPrice = Number(product.tierPrices?.[normalizedTier] ?? product.tierPrices?.[String(normalizedTier)]);
-
-  if (Number.isFinite(tierPrice) && tierPrice >= 0) return tierPrice;
-  return Number(product.baseCataloguePrice ?? 0);
+export function getClientsForTier(clients, tierId) {
+  if (!tierId) return [];
+  return clients.filter((client) => client.tierId === tierId);
 }
 
 export const PRODUCT_IMAGE_FALLBACK_URL = '/modhani-logo.png';

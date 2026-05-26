@@ -1,9 +1,6 @@
 import {
   buildReportRowsFromOrders,
-  buildTierPrices,
-  getProductTierPrice,
   normalizeLotCode,
-  normalizePriceTier,
   QUICKBOOKS_SETTINGS,
 } from '../data/phaseOneData';
 
@@ -31,7 +28,7 @@ function clientToUi(client) {
   return {
     id: client.id,
     name: client.name,
-    priceTier: normalizePriceTier(client.price_tier),
+    tierId: client.tier_id ?? null,
     locationCount: client.location_count,
     emailPackingSlip: client.email_packing_slip,
     emailInvoice: client.email_invoice,
@@ -73,7 +70,6 @@ function productToUi(product) {
     unitSize: product.unit_size,
     category: product.category,
     baseCataloguePrice,
-    tierPrices: buildTierPrices(baseCataloguePrice, product.tier_prices),
     itemNumber: product.item_number ?? '',
     upc: product.upc ?? '',
     packagingDetails: product.packaging_details ?? '',
@@ -113,6 +109,21 @@ function pricingToUi(pricing) {
     price: Number(pricing.price),
     isActive: Boolean(pricing.is_active),
   };
+}
+
+function buildTiersUi(tierRows, tierProductRows) {
+  const productsByTierId = new Map();
+  (tierProductRows ?? []).forEach((row) => {
+    const list = productsByTierId.get(row.tier_id) ?? [];
+    list.push({ productId: row.product_id, price: Number(row.price) || 0 });
+    productsByTierId.set(row.tier_id, list);
+  });
+
+  return (tierRows ?? []).map((row) => ({
+    id: row.id,
+    name: row.name,
+    products: productsByTierId.get(row.id) ?? [],
+  }));
 }
 
 function batchToUi(batch) {
@@ -249,7 +260,7 @@ function clientToDb(client) {
   return {
     id: client.id,
     name: client.name,
-    price_tier: normalizePriceTier(client.priceTier),
+    tier_id: client.tierId ?? null,
     location_count: client.locationCount ?? 0,
     email_packing_slip: Boolean(client.emailPackingSlip),
     email_invoice: Boolean(client.emailInvoice),
@@ -283,15 +294,12 @@ function locationToDb(location) {
 }
 
 function productToDb(product) {
-  const tierPrices = buildTierPrices(product.baseCataloguePrice, product.tierPrices);
-
   return {
     id: product.id,
     name: product.name,
     unit_size: product.unitSize,
     category: product.category ?? null,
-    base_catalogue_price: getProductTierPrice({ ...product, tierPrices }, 1),
-    tier_prices: tierPrices,
+    base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
     item_number: product.itemNumber ?? null,
     upc: product.upc ?? null,
     packaging_details: product.packagingDetails ?? null,
@@ -464,6 +472,8 @@ export async function fetchRemoteState(supabase, userId) {
     locationsResult,
     productsResult,
     pricingResult,
+    tiersResult,
+    tierProductsResult,
     batchesResult,
     ordersResult,
     orderItemsResult,
@@ -483,6 +493,8 @@ export async function fetchRemoteState(supabase, userId) {
     supabase.from('locations').select('*').order('name'),
     supabase.from('products').select('*').order('name'),
     supabase.from('client_product_prices').select('*'),
+    supabase.from('tiers').select('*').order('name'),
+    supabase.from('tier_products').select('*'),
     supabase.from('batches').select('*').order('production_date', { ascending: false }),
     supabase.from('orders').select('*').order('created_at', { ascending: false }),
     supabase.from('order_items').select('*'),
@@ -510,6 +522,8 @@ export async function fetchRemoteState(supabase, userId) {
     locationsResult,
     productsResult,
     pricingResult,
+    tiersResult,
+    tierProductsResult,
     batchesResult,
     ordersResult,
     orderItemsResult,
@@ -534,7 +548,11 @@ export async function fetchRemoteState(supabase, userId) {
         result !== customerContactsResult &&
         result !== customerClientAssignmentsResult &&
         result !== customerLocationAssignmentsResult &&
-        result !== trashReportRowsResult
+        result !== trashReportRowsResult &&
+        // tiers tables are tolerated as empty on pre-migration databases so
+        // the UI can still mount; they'll show up after the migration runs.
+        result !== tiersResult &&
+        result !== tierProductsResult
     )
     .find((result) => result.error)?.error;
   if (firstError) {
@@ -633,6 +651,7 @@ export async function fetchRemoteState(supabase, userId) {
     locations: (locationsResult.data ?? []).map(locationToUi),
     products: (productsResult.data ?? []).map(productToUi),
     clientPricing: (pricingResult.data ?? []).map(pricingToUi),
+    tiers: tiersResult.error ? [] : buildTiersUi(tiersResult.data, tierProductsResult.data),
     batches: (batchesResult.data ?? []).map(batchToUi),
     orders,
     auditLog: (auditResult.data ?? []).map(auditToUi),
@@ -1051,7 +1070,6 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_unit_size: product.unitSize,
         p_category: product.category ?? null,
         p_base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
-        p_tier_prices: buildTierPrices(product.baseCataloguePrice, product.tierPrices),
         p_item_number: product.itemNumber ?? null,
         p_upc: product.upc ?? null,
         p_packaging_details: product.packagingDetails ?? null,
@@ -1121,12 +1139,26 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_is_active: Boolean(pricing.isActive),
       });
     }
-    case 'SAVE_CLIENT_CATALOGUE':
-      return callRpc(supabase, 'modhanios_save_client_catalogue', {
+    case 'UPSERT_TIER':
+      return callRpc(supabase, 'modhanios_upsert_tier', {
         p_user_id: currentUser.id,
-        p_client_id: action.payload.clientId,
-        p_price_tier: normalizePriceTier(action.payload.priceTier),
-        p_enabled_product_ids: action.payload.enabledProductIds ?? [],
+        p_id: action.payload.id,
+        p_name: action.payload.name,
+        p_products: (action.payload.products ?? []).map((entry) => ({
+          productId: entry.productId,
+          price: Number(entry.price) || 0,
+        })),
+      });
+    case 'DELETE_TIER':
+      return callRpc(supabase, 'modhanios_delete_tier', {
+        p_user_id: currentUser.id,
+        p_id: action.payload.tierId,
+      });
+    case 'SET_TIER_CLIENT_MEMBERSHIP':
+      return callRpc(supabase, 'modhanios_set_tier_client_membership', {
+        p_user_id: currentUser.id,
+        p_tier_id: action.payload.tierId,
+        p_client_ids: action.payload.clientIds ?? [],
       });
     case 'ADD_BATCH':
       return callRpc(supabase, 'modhanios_log_production_batch', {
@@ -1306,23 +1338,6 @@ export async function persistAction(supabase, action, previousState, nextState) 
       return supabase.from('client_product_prices').upsert(pricingToDb(action.payload), {
         onConflict: 'client_id,product_id',
       });
-    case 'SAVE_CLIENT_CATALOGUE': {
-      const client = nextState.clients.find((entry) => entry.id === action.payload.clientId);
-      const clientPricing = nextState.clientPricing.filter((entry) => entry.clientId === action.payload.clientId);
-
-      if (client) {
-        const { error: clientError } = await supabase
-          .from('clients')
-          .update({ price_tier: normalizePriceTier(client.priceTier) })
-          .eq('id', client.id);
-        if (clientError) return { error: clientError };
-      }
-
-      if (!clientPricing.length) return { error: null };
-      return supabase.from('client_product_prices').upsert(clientPricing.map(pricingToDb), {
-        onConflict: 'client_id,product_id',
-      });
-    }
     case 'ADD_BATCH':
     case 'UPDATE_BATCH':
       return upsertRow(supabase, 'batches', batchToDb(action.payload));

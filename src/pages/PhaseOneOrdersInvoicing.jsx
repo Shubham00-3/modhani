@@ -33,7 +33,6 @@ import {
   getProduct,
   getProductDisplayName,
   getProductImageUrl,
-  getProductTierPrice,
   hasProductImage,
   isLocationShipToReady,
 } from '../data/phaseOneData';
@@ -1772,13 +1771,12 @@ function AddOrderModal({ onClose }) {
 
     const items = validLines.map((line, index) => {
       const product = getProduct(state.products, line.productId);
-      const client = state.clients.find((entry) => entry.id === clientId);
-      const tierPrice = getProductTierPrice(product, client?.priceTier);
+      const basePrice = Number(product?.baseCataloguePrice ?? 0);
       const clientPrice = getClientPricingForProduct(
         state.clientPricing,
         clientId,
         line.productId,
-        tierPrice
+        basePrice
       );
 
       return {
@@ -1787,7 +1785,7 @@ function AddOrderModal({ onClose }) {
         quantity: Number(line.quantity),
         fulfilledQty: 0,
         declinedQty: 0,
-        basePrice: getProductTierPrice(product, 1),
+        basePrice,
         clientPrice,
         overridePrice: null,
         overrideReason: null,

@@ -4,6 +4,7 @@ import {
   BarChart3,
   Building2,
   FlaskConical,
+  Layers,
   LayoutDashboard,
   Package,
   ScrollText,
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/clients-locations', label: 'Clients & Locations', icon: Building2 },
   { to: '/customers', label: 'Customers', icon: UserRoundCheck },
   { to: '/products', label: 'Products', icon: Package },
+  { to: '/tiers', label: 'Tiers', icon: Layers },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 
