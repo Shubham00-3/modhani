@@ -14,7 +14,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useApp } from '../context/useApp';
-import { formatClientLocationScale, getClientTier } from '../data/phaseOneData';
+import { getClientTier } from '../data/phaseOneData';
 import { ClientModal, LocationModal } from '../components/settings/ManagementModals';
 
 export default function PhaseOneClientsLocations() {
@@ -181,89 +181,29 @@ export default function PhaseOneClientsLocations() {
 
                   {/* Expanded body */}
                   {open ? (
-                    <div className="client-accordion-body">
-                      {/* Client info section */}
-                      <section className="client-info-section">
-                        <header className="client-info-header">
-                          <h4>Client info</h4>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            disabled={!canManage}
-                            onClick={() => setEditingClient(client)}
-                          >
-                            <Pencil size={14} /> Edit info
-                          </button>
-                        </header>
-                        <dl className="client-info-grid">
-                          <div>
-                            <dt>Legal name</dt>
-                            <dd>{client.name}</dd>
-                          </div>
-                          {hasOperatingAs ? (
-                            <div>
-                              <dt>Operating as</dt>
-                              <dd>{client.operatingAs}</dd>
-                            </div>
-                          ) : null}
-                          <div>
-                            <dt>QuickBooks customer</dt>
-                            <dd>{client.qbCustomerName || client.name}</dd>
-                          </div>
-                          <div>
-                            <dt>Scale</dt>
-                            <dd>{formatClientLocationScale(client, clientLocations.length)}</dd>
-                          </div>
-                          <div>
-                            <dt>Assigned tier</dt>
-                            <dd>
-                              {assignedTier
-                                ? `${assignedTier.name} · ${enabledProductCount.toLocaleString()} visible products`
-                                : 'No tier assigned — customers will see no products'}
-                            </dd>
-                          </div>
-                        </dl>
-                        <div className="client-info-actions">
-                          <Link className="btn btn-secondary btn-sm" to="/tiers">
-                            <Layers size={14} /> Manage tiers
-                          </Link>
-                        </div>
-                      </section>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 'var(--space-6)',
+                        padding: 'var(--space-5) var(--space-6) var(--space-6)',
+                      }}
+                    >
+                      <ClientInfoSection
+                        client={client}
+                        assignedTier={assignedTier}
+                        enabledProductCount={enabledProductCount}
+                        hasOperatingAs={hasOperatingAs}
+                        canManage={canManage}
+                        onEdit={() => setEditingClient(client)}
+                      />
 
-                      {/* Locations section */}
-                      <section className="client-locations-section">
-                        <header className="client-locations-header">
-                          <h4>
-                            Locations
-                            <span className="client-locations-count">{clientLocations.length}</span>
-                          </h4>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            type="button"
-                            disabled={!canManage}
-                            onClick={() => handleAddLocationForClient(client.id)}
-                          >
-                            <Plus size={14} /> Add Location
-                          </button>
-                        </header>
-
-                        {clientLocations.length === 0 ? (
-                          <div className="client-locations-empty">
-                            No locations yet. Click <strong>Add Location</strong> to create the first one.
-                          </div>
-                        ) : (
-                          <div className="client-location-grid">
-                            {clientLocations.map((location) => (
-                              <LocationCard
-                                key={location.id}
-                                location={location}
-                                canManage={canManage}
-                                onEdit={() => setEditingLocation(location)}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </section>
+                      <ClientLocationsSection
+                        clientLocations={clientLocations}
+                        canManage={canManage}
+                        onAddLocation={() => handleAddLocationForClient(client.id)}
+                        onEditLocation={(location) => setEditingLocation(location)}
+                      />
                     </div>
                   ) : null}
                 </div>
@@ -304,6 +244,154 @@ export default function PhaseOneClientsLocations() {
       ) : null}
 
     </div>
+  );
+}
+
+function ClientInfoSection({ client, assignedTier, enabledProductCount, hasOperatingAs, canManage, onEdit }) {
+  const qbCustomerName = client.qbCustomerName?.trim();
+  const showQbName = qbCustomerName && qbCustomerName !== client.name && qbCustomerName !== client.operatingAs?.trim();
+  const tierLabel = assignedTier
+    ? `${assignedTier.name} · ${enabledProductCount.toLocaleString()} visible product${enabledProductCount === 1 ? '' : 's'}`
+    : 'No tier assigned';
+
+  return (
+    <section>
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 'var(--space-3)',
+        }}
+      >
+        <h4 style={{ margin: 0, fontSize: 'var(--font-size-md, 15px)', fontWeight: 600 }}>Client info</h4>
+        <button
+          className="btn btn-secondary btn-sm"
+          type="button"
+          disabled={!canManage}
+          onClick={onEdit}
+        >
+          <Pencil size={14} /> Edit info
+        </button>
+      </header>
+
+      <dl
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+          columnGap: 'var(--space-6)',
+          rowGap: 'var(--space-3)',
+          margin: 0,
+        }}
+      >
+        <ClientInfoField label="Legal name" value={client.name} />
+        {hasOperatingAs ? <ClientInfoField label="Operating as" value={client.operatingAs} /> : null}
+        {showQbName ? <ClientInfoField label="QuickBooks customer" value={qbCustomerName} /> : null}
+        <ClientInfoField
+          label="Assigned tier"
+          value={
+            assignedTier ? (
+              tierLabel
+            ) : (
+              <span style={{ color: 'var(--color-text-muted)' }}>
+                {tierLabel} — customers will see no products
+              </span>
+            )
+          }
+          action={
+            <Link
+              to="/tiers"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                fontSize: 'var(--font-size-sm, 13px)',
+                color: 'var(--color-primary, #1f3a2e)',
+                textDecoration: 'none',
+              }}
+            >
+              <Layers size={13} /> Manage in Tiers
+            </Link>
+          }
+        />
+      </dl>
+    </section>
+  );
+}
+
+function ClientInfoField({ label, value, action }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+      <dt
+        style={{
+          color: 'var(--color-text-muted)',
+          fontSize: 'var(--font-size-xs, 12px)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.04em',
+          fontWeight: 600,
+          margin: 0,
+        }}
+      >
+        {label}
+      </dt>
+      <dd style={{ margin: 0, fontWeight: 500, color: 'var(--color-text-primary)' }}>{value}</dd>
+      {action ? <div style={{ marginTop: 4 }}>{action}</div> : null}
+    </div>
+  );
+}
+
+function ClientLocationsSection({ clientLocations, canManage, onAddLocation, onEditLocation }) {
+  return (
+    <section>
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 'var(--space-3)',
+        }}
+      >
+        <h4 style={{ margin: 0, fontSize: 'var(--font-size-md, 15px)', fontWeight: 600 }}>
+          Locations{' '}
+          <span style={{ color: 'var(--color-text-muted)', fontWeight: 500 }}>
+            ({clientLocations.length})
+          </span>
+        </h4>
+        <button
+          className="btn btn-secondary btn-sm"
+          type="button"
+          disabled={!canManage}
+          onClick={onAddLocation}
+        >
+          <Plus size={14} /> Add location
+        </button>
+      </header>
+
+      {clientLocations.length === 0 ? (
+        <div
+          style={{
+            padding: 'var(--space-5) var(--space-4)',
+            background: 'var(--color-surface-muted, #f6f7f6)',
+            borderRadius: 'var(--radius-md, 8px)',
+            color: 'var(--color-text-muted)',
+            textAlign: 'center',
+          }}
+        >
+          No locations yet. Click <strong>Add location</strong> to create the first one.
+        </div>
+      ) : (
+        <div className="client-location-grid">
+          {clientLocations.map((location) => (
+            <LocationCard
+              key={location.id}
+              location={location}
+              canManage={canManage}
+              onEdit={() => onEditLocation(location)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
