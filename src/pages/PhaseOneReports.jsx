@@ -217,6 +217,18 @@ export default function PhaseOneReports() {
             Persisted operational reporting across clients, locations, products, status, dates, and lot traceability.
           </p>
         </div>
+        <div className="page-header-actions">
+          <button
+            className="btn btn-secondary"
+            type="button"
+            onClick={() => {
+              const target = document.getElementById('trash-report-section');
+              if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }}
+          >
+            <Trash2 size={16} /> Trash Report
+          </button>
+        </div>
       </div>
 
       <div className="filter-bar">
@@ -563,7 +575,7 @@ function TrashReportSection() {
   const hasActiveFilters = Boolean(productFilter || fromDate || toDate);
 
   return (
-    <div className="section">
+    <div className="section" id="trash-report-section">
       <div className="card">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-4)', flexWrap: 'wrap' }}>
           <div>

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Mail, Settings2 } from 'lucide-react';
+import { Mail, Search, Settings2 } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatDateTime } from '../data/phaseOneData';
 import UserManagementSection from '../components/settings/UserManagementSection';
@@ -8,6 +8,7 @@ import UserManagementSection from '../components/settings/UserManagementSection'
 export default function PhaseOneSettings() {
   const { state, dispatch, addToast } = useApp();
   const [searchParams] = useSearchParams();
+  const [emailClientSearch, setEmailClientSearch] = useState('');
   const canManage = state.currentUser.permissions.manageSettings;
   const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
   const settingSearchMatches = (values) => {
@@ -18,16 +19,27 @@ export default function PhaseOneSettings() {
       .toLowerCase()
       .includes(dashboardSearch);
   };
-  const visibleEmailClients = state.clients.filter((client) =>
-    settingSearchMatches([
-      'client email preferences packing slip invoice delivery method',
-      client.name,
-      client.qbCustomerName,
-      client.invoiceEmail,
-      client.packingSlipEmail,
-      client.deliveryMethod,
-    ])
-  );
+  const visibleEmailClients = useMemo(() => {
+    const localQuery = emailClientSearch.trim().toLowerCase();
+    return state.clients.filter((client) => {
+      const matchesGlobal = settingSearchMatches([
+        'client email preferences packing slip invoice delivery method',
+        client.name,
+        client.qbCustomerName,
+        client.invoiceEmail,
+        client.packingSlipEmail,
+        client.deliveryMethod,
+      ]);
+      if (!matchesGlobal) return false;
+      if (!localQuery) return true;
+      return [client.name, client.qbCustomerName, client.invoiceEmail, client.packingSlipEmail]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(localQuery);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.clients, emailClientSearch, dashboardSearch]);
   const showQuickBooksSettings = settingSearchMatches([
     'quickbooks connection connector company sync desktop settings',
     state.quickBooks.companyName,
@@ -86,8 +98,37 @@ export default function PhaseOneSettings() {
       ) : null}
 
       <div className="card">
-        <div className="card-title">
-          <Mail size={18} /> Client Email Preferences
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 'var(--space-4)',
+            flexWrap: 'wrap',
+            marginBottom: 'var(--space-3)',
+          }}
+        >
+          <div className="card-title" style={{ margin: 0 }}>
+            <Mail size={18} /> Client Email Preferences
+          </div>
+          <label
+            className="client-directory-search"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              minWidth: 240,
+            }}
+          >
+            <Search size={16} />
+            <input
+              type="search"
+              value={emailClientSearch}
+              onChange={(event) => setEmailClientSearch(event.target.value)}
+              placeholder="Search clients..."
+              aria-label="Search clients in email preferences"
+            />
+          </label>
         </div>
         <div className="table-scroll-wrapper">
         <table className="data-table">
@@ -100,6 +141,13 @@ export default function PhaseOneSettings() {
             </tr>
           </thead>
           <tbody>
+              {visibleEmailClients.length === 0 ? (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--color-text-muted)', padding: 'var(--space-5)' }}>
+                    No clients match that search.
+                  </td>
+                </tr>
+              ) : null}
               {visibleEmailClients.map((client) => (
               <tr key={client.id}>
                 <td style={{ fontWeight: 600 }}>{client.name}</td>
