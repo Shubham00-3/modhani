@@ -4,12 +4,14 @@ import { AlertTriangle, FlaskConical, Pencil, Plus, RotateCcw, Trash2, Undo2, X 
 import { useApp } from '../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
 import {
+  formatCaseQuantityBreakdown,
   formatDate,
   getActiveCatalogProducts,
   getItemOutstandingQty,
   getNextLotCode,
   getProduct,
   getProductDisplayName,
+  isValidCaseQuantityStep,
   normalizeLotCode,
 } from '../data/phaseOneData';
 
@@ -347,6 +349,7 @@ export default function PhaseOneProductionBatches() {
       {editingBatch ? (
         <EditBatchModal
           batch={editingBatch}
+          products={state.products}
           onClose={() => setEditingBatch(null)}
           onSave={async ({ qtyProduced, reason }) => {
             const result = await dispatch({
@@ -381,12 +384,14 @@ export default function PhaseOneProductionBatches() {
   );
 }
 
-function EditBatchModal({ batch, onClose, onSave }) {
+function EditBatchModal({ batch, products, onClose, onSave }) {
   useModalBehavior(onClose);
   const [qty, setQty] = useState(String(batch.qtyProduced));
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const alreadyUsed = batch.qtyProduced - batch.qtyRemaining;
+  const product = getProduct(products, batch.productId);
+  const quantityBreakdown = formatCaseQuantityBreakdown(product, qty);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -395,12 +400,12 @@ function EditBatchModal({ batch, onClose, onSave }) {
       window.alert('Enter a positive quantity.');
       return;
     }
-    if (!Number.isInteger(numericQty)) {
-      window.alert('Production quantity must be a whole number.');
+    if (!isValidCaseQuantityStep(numericQty)) {
+      window.alert('Production quantity can use up to 2 decimal places.');
       return;
     }
     if (numericQty < alreadyUsed) {
-      window.alert(`This lot already shipped ${alreadyUsed.toLocaleString()} units. New produced quantity must be at least ${alreadyUsed.toLocaleString()}.`);
+      window.alert(`This lot already shipped ${alreadyUsed.toLocaleString()} cases. New produced quantity must be at least ${alreadyUsed.toLocaleString()}.`);
       return;
     }
     if (numericQty === batch.qtyProduced) {
@@ -408,7 +413,7 @@ function EditBatchModal({ batch, onClose, onSave }) {
       return;
     }
     const ok = window.confirm(
-      `Update lot ${batch.batchNumber} from ${batch.qtyProduced.toLocaleString()} to ${numericQty.toLocaleString()} units?`
+      `Update lot ${batch.batchNumber} from ${batch.qtyProduced.toLocaleString()} to ${numericQty.toLocaleString()} cases?`
     );
     if (!ok) return;
     setSaving(true);
@@ -427,21 +432,22 @@ function EditBatchModal({ batch, onClose, onSave }) {
         </div>
         <form className="modal-body" onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Quantity produced</label>
+            <label className="form-label">Case Quantity Produced</label>
             <input
               className="form-input"
               type="number"
-              min="1"
-              step="1"
+              min="0.01"
+              step="0.01"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
               required
               autoFocus
             />
             <div className="form-hint">
-              Already shipped from this lot: {alreadyUsed.toLocaleString()} units.
+              Already shipped from this lot: {alreadyUsed.toLocaleString()} cases.
               New quantity must be at least that.
             </div>
+            {quantityBreakdown ? <div className="form-hint">{quantityBreakdown}</div> : null}
           </div>
           <div className="form-group">
             <label className="form-label">Reason (optional)</label>
@@ -648,8 +654,11 @@ function LogProductionModal({ onClose, onSave }) {
             </div>
           </div>
           <div className="form-group">
-            <label className="form-label">Quantity Produced</label>
-            <input className="form-input" type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+            <label className="form-label">Case Quantity Produced</label>
+            <input className="form-input" type="number" min="0.01" step="0.01" value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+            {selectedProduct && quantity ? (
+              <div className="form-hint">{formatCaseQuantityBreakdown(selectedProduct, quantity)}</div>
+            ) : null}
           </div>
         </div>
         <div className="modal-footer">
@@ -669,8 +678,8 @@ function LogProductionModal({ onClose, onSave }) {
                 return;
               }
 
-              if (!Number.isInteger(numericQuantity)) {
-                addToast('Production quantity must be a whole number.', 'warning');
+              if (!isValidCaseQuantityStep(numericQuantity)) {
+                addToast('Production quantity can use up to 2 decimal places.', 'warning');
                 return;
               }
 

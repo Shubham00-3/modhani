@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { History, ImageOff, PackageSearch, RotateCcw } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
+  formatCaseQuantityBreakdown,
   formatDate,
   formatDateTime,
   getBatchLabel,
@@ -420,7 +421,7 @@ function buildInventoryHistory(state) {
       productName: getProductDisplayName(product),
       lotCode: batch.batchNumber,
       quantity: batch.qtyProduced.toLocaleString(),
-      details: `${batch.status} lot with ${batch.qtyRemaining.toLocaleString()} units remaining`,
+      details: `${batch.status} lot with ${formatCaseQuantityBreakdown(product, batch.qtyRemaining) || `${batch.qtyRemaining.toLocaleString()} cases`} remaining`,
     });
   });
 

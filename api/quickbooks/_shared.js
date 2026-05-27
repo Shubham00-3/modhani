@@ -596,26 +596,28 @@ function buildInvoiceModRequest({ order, lines }) {
 }
 
 function buildInvoiceLine({ item, product, batches }) {
-  const unitPrice = item.override_price ?? item.client_price ?? item.base_price ?? 0;
+  const { quantity, rate } = getDiscountedQuickBooksLine(item);
   const batchText = batches
-    .map((assignment) => `${assignment.batches?.batch_number ?? assignment.batch_id}: ${Number(assignment.qty).toLocaleString()} units`)
+    .map((assignment) => `${assignment.batches?.batch_number ?? assignment.batch_id}: ${Number(assignment.qty).toLocaleString()} cases`)
     .join(', ');
+  const desc = buildInvoiceLineDescription({ item, product, batchText });
 
   return `<InvoiceLineAdd>
           <ItemRef>
             <FullName>${escapeXml(getQuickBooksItemName(product))}</FullName>
           </ItemRef>
-          <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Lots: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
-          <Quantity>${Number(item.invoice_qty ?? item.fulfilled_qty)}</Quantity>
-          <Rate>${Number(unitPrice).toFixed(2)}</Rate>
+          <Desc>${escapeXml(desc)}</Desc>
+          <Quantity>${formatQuickBooksNumber(quantity)}</Quantity>
+          <Rate>${formatQuickBooksRate(rate)}</Rate>
         </InvoiceLineAdd>`;
 }
 
 function buildInvoiceLineMod({ item, product, batches }) {
-  const unitPrice = item.override_price ?? item.client_price ?? item.base_price ?? 0;
+  const { quantity, rate } = getDiscountedQuickBooksLine(item);
   const batchText = batches
-    .map((assignment) => `${assignment.batches?.batch_number ?? assignment.batch_id}: ${Number(assignment.qty).toLocaleString()} units`)
+    .map((assignment) => `${assignment.batches?.batch_number ?? assignment.batch_id}: ${Number(assignment.qty).toLocaleString()} cases`)
     .join(', ');
+  const desc = buildInvoiceLineDescription({ item, product, batchText });
   const txnLineId = item.qb_txn_line_id;
 
   if (!txnLineId) {
@@ -627,10 +629,52 @@ function buildInvoiceLineMod({ item, product, batches }) {
           <ItemRef>
             <FullName>${escapeXml(getQuickBooksItemName(product))}</FullName>
           </ItemRef>
-          <Desc>${escapeXml(batchText ? `${product.name} ${product.unit_size} | Lots: ${batchText}` : `${product.name} ${product.unit_size}`)}</Desc>
-          <Quantity>${Number(item.invoice_qty ?? item.fulfilled_qty)}</Quantity>
-          <Rate>${Number(unitPrice).toFixed(2)}</Rate>
+          <Desc>${escapeXml(desc)}</Desc>
+          <Quantity>${formatQuickBooksNumber(quantity)}</Quantity>
+          <Rate>${formatQuickBooksRate(rate)}</Rate>
         </InvoiceLineMod>`;
+}
+
+function getDiscountedQuickBooksLine(item) {
+  const quantity = Number(item.invoice_qty ?? item.fulfilled_qty ?? 0);
+  const unitPrice = Number(item.override_price ?? item.client_price ?? item.base_price ?? 0);
+  const discount = Math.max(Number(item.discount_amount ?? 0), 0);
+  const grossAmount = quantity * unitPrice;
+  const netAmount = Math.max(grossAmount - discount, 0);
+  const rate = quantity > 0 ? netAmount / quantity : 0;
+
+  return { quantity, unitPrice, discount, grossAmount, netAmount, rate };
+}
+
+function buildInvoiceLineDescription({ item, product, batchText }) {
+  const { discount, grossAmount } = getDiscountedQuickBooksLine(item);
+  const productText = `${product.name} ${product.unit_size}`.trim();
+  const parts = [productText];
+
+  if (batchText) parts.push(`Lots: ${batchText}`);
+  if (discount > 0) {
+    parts.push(`Discount applied: ${formatCurrency(discount)} off ${formatCurrency(grossAmount)}`);
+  }
+
+  return parts.join(' | ');
+}
+
+function formatQuickBooksNumber(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '0';
+  return String(Number(number.toFixed(6)));
+}
+
+function formatQuickBooksRate(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '0.00';
+  return String(Number(number.toFixed(6)));
+}
+
+function formatCurrency(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return '$0.00';
+  return `$${number.toFixed(2)}`;
 }
 
 function toDate(value) {

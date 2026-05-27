@@ -1010,7 +1010,7 @@ function FulfilmentPanel({ order, onBack }) {
       return;
     }
     if (flattened.some((entry) => !isValidCaseQuantityStep(entry.qty))) {
-      addToast('Use quarter-case assignment quantities only: 0.25, 0.5, 0.75, 1, and so on.', 'warning');
+      addToast('Enter assignment quantities with up to 2 decimal places.', 'warning');
       return;
     }
 
@@ -1030,7 +1030,7 @@ function FulfilmentPanel({ order, onBack }) {
 
     addToast(
       remainingAfter > 0
-        ? `Partial fulfilment saved. ${remainingAfter.toLocaleString()} units remain outstanding.`
+        ? `Partial fulfilment saved. ${remainingAfter.toLocaleString()} cases remain outstanding.`
         : `Order #${order.orderNumber} fulfilled and ready for invoicing.`
     );
 
@@ -1075,7 +1075,7 @@ function FulfilmentPanel({ order, onBack }) {
       return;
     }
     if (flattened.some((entry) => !isValidCaseQuantityStep(entry.qty))) {
-      addToast('Use quarter-case assignment quantities only: 0.25, 0.5, 0.75, 1, and so on.', 'warning');
+      addToast('Enter assignment quantities with up to 2 decimal places.', 'warning');
       return;
     }
 
@@ -1126,7 +1126,7 @@ function FulfilmentPanel({ order, onBack }) {
               <div>
                 <div style={{ fontWeight: 700 }}>{getProductDisplayName(product)}</div>
                 <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                  Need {outstanding.toLocaleString()} units
+                  Need {outstanding.toLocaleString()} cases
                   {(item.declinedQty ?? 0) > 0 ? ` | Declined ${item.declinedQty.toLocaleString()}` : ''}
                 </div>
               </div>
@@ -1158,7 +1158,7 @@ function FulfilmentPanel({ order, onBack }) {
                           style={{ width: 96 }}
                           type="number"
                           min="0"
-                          step="0.25"
+                          step="0.01"
                           value={itemAssignments[batch.id] ?? ''}
                           onChange={(event) => updateAssignment(item.id, batch.id, event.target.value, outstanding)}
                         />
@@ -1491,7 +1491,7 @@ function EditInvoiceModal({ order, onClose }) {
           throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} quantity must be between 0 and ${maxQuantity}.`);
         }
         if (nextQuantity > 0 && !isValidCaseQuantityStep(nextQuantity)) {
-          throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} invoice quantity must use quarter cases.`);
+          throw new Error(`${getProductDisplayName(getProduct(state.products, item.productId))} invoice quantity can use up to 2 decimal places.`);
         }
 
         if (!Number.isFinite(nextPrice) || nextPrice < 0) {
@@ -1641,7 +1641,7 @@ function EditInvoiceModal({ order, onClose }) {
                       type="number"
                       min="0"
                       max={maxQuantity}
-                      step="0.25"
+                      step="0.01"
                       value={draft.quantity}
                       onChange={(event) =>
                         setLineDrafts((current) => ({
@@ -1772,7 +1772,7 @@ function AddOrderModal({ onClose }) {
     const duplicateProductIds = new Set();
     for (const line of validLines) {
       if (!isValidCaseQuantityStep(line.quantity)) {
-        addToast('Use quarter-case quantities only: 0.25, 0.5, 0.75, 1, and so on.', 'warning');
+        addToast('Enter positive case quantities with up to 2 decimal places.', 'warning');
         return;
       }
       if (duplicateProductIds.has(line.productId)) {
@@ -2133,8 +2133,8 @@ function OrderLineEditor({ line, lines, products, onUpdateLine, onRemoveLine }) 
         <input
           className="form-input"
           type="number"
-          min="0.25"
-          step="0.25"
+          min="0.01"
+          step="0.01"
           value={line.quantity}
           onChange={(event) => onUpdateLine({ quantity: event.target.value })}
         />

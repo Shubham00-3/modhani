@@ -53,7 +53,7 @@ export default function CustomerCart() {
       return;
     }
     if (selectedLines.some((line) => !isValidCaseQuantityStep(line.quantity))) {
-      setError('Use quarter-case quantities only: 0.25, 0.5, 0.75, 1, and so on.');
+      setError('Enter positive case quantities with up to 2 decimal places.');
       return;
     }
 
@@ -143,7 +143,7 @@ export default function CustomerCart() {
                     className="btn btn-secondary btn-icon"
                     type="button"
                     onClick={() => {
-                      if (quantity <= 0.25) {
+                      if (quantity <= 1) {
                         const ok = window.confirm(
                           `Remove ${getProductDisplayName(product)} from your cart?`
                         );
@@ -158,8 +158,8 @@ export default function CustomerCart() {
                   <input
                     className="form-input"
                     type="number"
-                    min="0.25"
-                    step="0.25"
+                    min="0.01"
+                    step="0.01"
                     value={quantity}
                     onChange={(e) => updateProductQuantity(product.id, e.target.value)}
                     aria-label={`${getProductDisplayName(product)} case quantity`}

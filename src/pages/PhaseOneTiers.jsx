@@ -26,7 +26,7 @@ import {
 
 export default function PhaseOneTiers() {
   const { state } = useApp();
-  const canManage = state.currentUser.permissions.manageSettings;
+  const canManage = state.currentUser.role === 'admin';
   const tiers = useMemo(() => state.tiers ?? [], [state.tiers]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -84,7 +84,7 @@ export default function PhaseOneTiers() {
           <div className="alert-content">
             <div className="alert-title">Read-only tier management</div>
             <div className="alert-description">
-              This user can view tiers, but only settings admins can create, edit, or assign them.
+              This user can view tiers, but only admins can create, edit, or assign them.
             </div>
           </div>
         </div>
