@@ -1,6 +1,10 @@
 -- Fill exact product image matches found in the supplied ZIP archives.
 -- These products existed in the catalogue but had no image_url/image_path.
 
+alter table public.products
+  add column if not exists image_url text,
+  add column if not exists image_path text;
+
 with image_updates (id, image_url) as (
   values
     ('product-item-5121', '/product-images/balkan-yogurt-10kg.jpg'),
