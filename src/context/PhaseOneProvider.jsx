@@ -210,6 +210,7 @@ function trimFulfilmentToInvoiceLines(order, batches, lines) {
       overridePrice: line.overridePrice,
       overrideReason: line.overrideReason,
       discountAmount: line.discount == null ? (item.discountAmount ?? 0) : Number(line.discount) || 0,
+      discountReason: line.discountReason == null ? (item.discountReason ?? '') : line.discountReason,
       assignedBatches: nextAssignedBatches,
     };
   });
@@ -601,6 +602,7 @@ function reducer(state, action) {
                 ...item,
                 invoiceQty: item.fulfilledQty,
                 discountAmount: item.discountAmount ?? 0,
+                discountReason: item.discountReason ?? '',
               };
             }
             return {
@@ -609,6 +611,7 @@ function reducer(state, action) {
               overridePrice: override.overridePrice,
               overrideReason: override.overrideReason,
               discountAmount: Number(override.discount ?? 0) || 0,
+              discountReason: override.discountReason ?? '',
             };
           });
 

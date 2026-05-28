@@ -413,6 +413,11 @@ export function getItemDiscountAmount(item) {
   return Number.isFinite(raw) && raw > 0 ? raw : 0;
 }
 
+export function getItemDiscountReason(item) {
+  const reason = item?.discountReason ?? item?.discount_reason ?? '';
+  return typeof reason === 'string' ? reason.trim() : '';
+}
+
 export function getInvoiceLineSubtotal(item) {
   const qty = item.invoiceQty ?? item.fulfilledQty ?? 0;
   return qty * getEffectiveItemPrice(item);
@@ -511,6 +516,7 @@ export function buildReportRowsFromOrders({ orders, clients, locations, products
         clientPrice: item.clientPrice,
         overridePrice: item.overridePrice,
         discountAmount: getItemDiscountAmount(item),
+        discountReason: getItemDiscountReason(item),
         effectivePrice: getEffectiveItemPrice(item),
         hasPriceOverride: item.overridePrice != null,
         fulfilledValue: Math.max(item.fulfilledQty * getEffectiveItemPrice(item) - getItemDiscountAmount(item), 0),

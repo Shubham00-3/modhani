@@ -24,6 +24,7 @@ import {
   getClientName,
   getClientPricingForProduct,
   getInvoiceableTotal,
+  getItemDiscountReason,
   getItemOutstandingQty,
   getLocationName,
   getQuickBooksSyncLabel,
@@ -227,6 +228,11 @@ export default function PhaseOneOrdersInvoicing() {
   }
 
   async function handleConfirmShipment(order) {
+    if (!order.driverUserId) {
+      addToast('Assign a driver before confirming shipment.', 'warning');
+      return;
+    }
+
     const client = state.clients.find((entry) => entry.id === order.clientId);
     const timestamp = new Date().toISOString();
     const packingSlipNumber = order.packingSlipNumber ?? `PS-${order.orderNumber}`;
@@ -726,6 +732,7 @@ function OrderDetailPanel({
     order.qbSyncStatus !== 'syncing' &&
     order.qbSyncStatus !== 'failed' &&
     !quickBooksJob;
+  const needsDriverBeforeShipment = order.status === 'invoiced' && !order.driverUserId;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -866,7 +873,13 @@ function OrderDetailPanel({
         ) : null}
 
         {order.status === 'invoiced' ? (
-          <button className="btn btn-primary" type="button" onClick={() => onConfirmShipment(order)}>
+          <button
+            className="btn btn-primary"
+            type="button"
+            disabled={needsDriverBeforeShipment}
+            title={needsDriverBeforeShipment ? 'Assign a driver before confirming shipment' : undefined}
+            onClick={() => onConfirmShipment(order)}
+          >
             <Truck size={16} /> Confirm Shipment
           </button>
         ) : null}
@@ -889,6 +902,16 @@ function OrderDetailPanel({
           </button>
         ) : null}
       </div>
+
+      {needsDriverBeforeShipment ? (
+        <div className="alert alert-warning" style={{ marginTop: 'var(--space-4)' }}>
+          <AlertTriangle size={18} />
+          <div className="alert-content">
+            <div className="alert-title">Driver required before shipment</div>
+            <div className="alert-description">Assign a driver to this order before confirming shipment.</div>
+          </div>
+        </div>
+      ) : null}
 
       {order.podSignedAt ? (
         <div className="card" style={{ padding: 'var(--space-4)' }}>
@@ -1252,6 +1275,7 @@ function InvoiceModal({ order, onClose }) {
           price: String(item.overridePrice ?? item.clientPrice ?? item.basePrice),
           reason: item.overrideReason ?? '',
           discount: String(item.discountAmount ?? 0),
+          discountReason: getItemDiscountReason(item),
         },
       ])
     )
@@ -1266,6 +1290,7 @@ function InvoiceModal({ order, onClose }) {
         const hasOverride = Number(nextPrice.toFixed(2)) !== Number(defaultPrice.toFixed(2));
         const discountValue = Number(nextLine.discount);
         const nextDiscount = Number.isFinite(discountValue) && discountValue > 0 ? discountValue : 0;
+        const nextDiscountReason = (nextLine.discountReason ?? '').trim();
         const lineSubtotal = item.fulfilledQty * nextPrice;
 
         if (hasOverride && !state.currentUser.permissions.overridePrices) {
@@ -1280,11 +1305,16 @@ function InvoiceModal({ order, onClose }) {
           throw new Error(`Discount cannot exceed the line subtotal for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
         }
 
+        if (nextDiscount > 0 && !nextDiscountReason) {
+          throw new Error(`Provide a discount reason for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
+        }
+
         return {
           orderItemId: item.id,
           overridePrice: hasOverride ? nextPrice : null,
           overrideReason: hasOverride ? nextLine.reason.trim() : null,
           discount: nextDiscount,
+          discountReason: nextDiscount > 0 ? nextDiscountReason : null,
         };
       });
 
@@ -1407,6 +1437,21 @@ function InvoiceModal({ order, onClose }) {
                 </div>
 
                 <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
+                  <label className="form-label">Discount Reason{lineDiscount > 0 ? ' *' : ''}</label>
+                  <input
+                    className="form-input"
+                    value={lineValue.discountReason ?? ''}
+                    onChange={(event) =>
+                      setLineOverrides((current) => ({
+                        ...current,
+                        [item.id]: { ...current[item.id], discountReason: event.target.value },
+                      }))
+                    }
+                    placeholder="Required when discount is greater than $0"
+                  />
+                </div>
+
+                <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
                   <label className="form-label">Override Reason</label>
                   <input
                     className="form-input"
@@ -1455,6 +1500,7 @@ function EditInvoiceModal({ order, onClose }) {
           price: String(item.overridePrice ?? item.clientPrice ?? item.basePrice),
           reason: item.overrideReason ?? '',
           discount: String(item.discountAmount ?? 0),
+          discountReason: getItemDiscountReason(item),
         },
       ])
     )
@@ -1485,6 +1531,7 @@ function EditInvoiceModal({ order, onClose }) {
         const hasPriceOverride = Number(nextPrice.toFixed(2)) !== Number(defaultPrice.toFixed(2));
         const discountValue = Number(draft.discount);
         const nextDiscount = Number.isFinite(discountValue) && discountValue > 0 ? discountValue : 0;
+        const nextDiscountReason = (draft.discountReason ?? '').trim();
         const lineSubtotal = nextQuantity * nextPrice;
 
         if (!Number.isFinite(nextQuantity) || nextQuantity < 0 || nextQuantity > maxQuantity) {
@@ -1510,12 +1557,17 @@ function EditInvoiceModal({ order, onClose }) {
           throw new Error(`Discount cannot exceed the line subtotal for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
         }
 
+        if (nextDiscount > 0 && !nextDiscountReason) {
+          throw new Error(`Provide a discount reason for ${getProductDisplayName(getProduct(state.products, item.productId))}.`);
+        }
+
         return {
           orderItemId: item.id,
           invoiceQty: nextQuantity,
           overridePrice: hasPriceOverride ? nextPrice : null,
           overrideReason: hasPriceOverride ? draft.reason.trim() : null,
           discount: nextDiscount,
+          discountReason: nextDiscount > 0 ? nextDiscountReason : null,
         };
       });
 
@@ -1689,6 +1741,21 @@ function EditInvoiceModal({ order, onClose }) {
                   <div style={{ marginTop: 4, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' }}>
                     Subtracted from the line total. Capped at the line subtotal.
                   </div>
+                </div>
+
+                <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
+                  <label className="form-label">Discount Reason{lineDiscount > 0 ? ' *' : ''}</label>
+                  <input
+                    className="form-input"
+                    value={draft.discountReason ?? ''}
+                    onChange={(event) =>
+                      setLineDrafts((current) => ({
+                        ...current,
+                        [item.id]: { ...current[item.id], discountReason: event.target.value },
+                      }))
+                    }
+                    placeholder="Required when discount is greater than $0"
+                  />
                 </div>
 
                 <div className="form-group" style={{ marginTop: 'var(--space-4)' }}>
