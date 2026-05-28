@@ -581,6 +581,7 @@ export async function fetchRemoteState(supabase, userId) {
       overridePrice: item.override_price == null ? null : Number(item.override_price),
       overrideReason: item.override_reason,
       discountAmount: Number(item.discount_amount ?? 0),
+      discountReason: item.discount_reason ?? '',
       qbTxnLineId: item.qb_txn_line_id ?? null,
       assignedBatches: assignmentsByItemId.get(item.id) ?? [],
     });
@@ -839,6 +840,8 @@ export async function fetchCustomerPortalState(supabase, user) {
       clientPrice: Number(item.client_price),
       overridePrice: item.override_price == null ? null : Number(item.override_price),
       overrideReason: item.override_reason,
+      discountAmount: Number(item.discount_amount ?? 0),
+      discountReason: item.discount_reason ?? '',
       assignedBatches: [],
     });
     itemsByOrderId.set(item.order_id, current);

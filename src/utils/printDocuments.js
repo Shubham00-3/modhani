@@ -5,6 +5,7 @@ import {
   getClientName,
   getEffectiveItemPrice,
   getItemDiscountAmount,
+  getItemDiscountReason,
   getOrderShipToSnapshot,
   getProduct,
   getProductDisplayName,
@@ -185,6 +186,7 @@ export function printInvoice({ order, clients, locations, products, batches = []
       const invoiceQty = item.invoiceQty ?? item.fulfilledQty;
       const subtotal = unitPrice * invoiceQty;
       const discount = getItemDiscountAmount(item);
+      const discountReason = getItemDiscountReason(item);
       const lotCode =
         item.assignedBatches
           ?.map((assigned) => normalizeLotCode(batches.find((batch) => batch.id === assigned.batchId)?.batchNumber ?? assigned.batchId))
@@ -213,7 +215,7 @@ export function printInvoice({ order, clients, locations, products, batches = []
       const discountRow = `
         <tr>
           <td>Discount</td>
-          <td class="description">on above</td>
+          <td class="description">${escapeHtml(discountReason ? `Discount: ${discountReason}` : 'Discount on above')}</td>
           <td></td>
           <td class="number">${invoiceQty > 0 ? invoiceQty.toLocaleString() : ''}</td>
           <td></td>

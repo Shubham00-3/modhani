@@ -646,14 +646,20 @@ function getDiscountedQuickBooksLine(item) {
   return { quantity, unitPrice, discount, grossAmount, netAmount, rate };
 }
 
+function getOrderItemDiscountReason(item) {
+  return compactText(item?.discount_reason);
+}
+
 function buildInvoiceLineDescription({ item, product, batchText }) {
   const { discount, grossAmount } = getDiscountedQuickBooksLine(item);
+  const discountReason = getOrderItemDiscountReason(item);
   const productText = `${product.name} ${product.unit_size}`.trim();
   const parts = [productText];
 
   if (batchText) parts.push(`Lots: ${batchText}`);
   if (discount > 0) {
-    parts.push(`Discount applied: ${formatCurrency(discount)} off ${formatCurrency(grossAmount)}`);
+    const discountText = `Discount applied: ${formatCurrency(discount)} off ${formatCurrency(grossAmount)}`;
+    parts.push(discountReason ? `${discountText}. Reason: ${discountReason}` : discountText);
   }
 
   return parts.join(' | ');
