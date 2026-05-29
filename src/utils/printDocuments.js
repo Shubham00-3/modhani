@@ -1,12 +1,16 @@
 import {
   buildBatchSummary,
+  formatCurrency,
   formatDate,
+  formatDateTime,
   formatTorontoDateTime,
   getClientName,
   getEffectiveItemPrice,
   getItemDiscountAmount,
   getItemDiscountReason,
+  getLocationName,
   getOrderShipToSnapshot,
+  getOrderValue,
   getProduct,
   getProductDisplayName,
   normalizeLotCode,
@@ -487,6 +491,213 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
         </section>
 
         ${photosSection}
+      </main>
+    `
+  );
+}
+
+function reportMetricCards(summary) {
+  const cards = [
+    { label: 'Matching Orders', value: Number(summary.orders ?? 0).toLocaleString() },
+    { label: 'Fulfilled Units', value: Number(summary.fulfilledUnits ?? 0).toLocaleString() },
+    { label: 'Outstanding Units', value: Number(summary.outstandingUnits ?? 0).toLocaleString() },
+    { label: 'Invoiceable Revenue', value: formatCurrency(summary.invoiceableRevenue ?? 0) },
+  ];
+
+  return cards
+    .map(
+      (card) => `
+        <div class="metric-card">
+          <div class="metric-label">${escapeHtml(card.label)}</div>
+          <div class="metric-value">${escapeHtml(card.value)}</div>
+        </div>
+      `
+    )
+    .join('');
+}
+
+function reportBreakdownTable(title, columns, rows) {
+  if (!rows.length) return '';
+
+  const head = columns.map((column) => `<th class="${column.align === 'right' ? 'number' : ''}">${escapeHtml(column.label)}</th>`).join('');
+  const body = rows
+    .map(
+      (row) =>
+        `<tr>${columns
+          .map((column) => `<td class="${column.align === 'right' ? 'number' : ''}">${escapeHtml(row[column.key])}</td>`)
+          .join('')}</tr>`
+    )
+    .join('');
+
+  return `
+    <section class="report-section">
+      <h2 class="section-title">${escapeHtml(title)}</h2>
+      <table class="report-table">
+        <thead><tr>${head}</tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </section>
+  `;
+}
+
+/**
+ * Build a printable summary of the Reports page (metrics, breakdowns and the
+ * orders table) reflecting the currently active filters. Opens the standard
+ * print window so the user can "Save as PDF" — matching the invoice/packing
+ * slip export convention.
+ */
+export function printReport({
+  generatedAt = new Date().toISOString(),
+  filterSummary = [],
+  summary = {},
+  salesVolume = [],
+  salesVolumePeriod = 'daily',
+  revenueByClient = [],
+  topProducts = [],
+  ordersByLocation = [],
+  fulfilmentRate = [],
+  orders = [],
+  clients = [],
+  locations = [],
+}) {
+  const logoSrc = getLogoSrc();
+
+  const filtersBlock = filterSummary.length
+    ? `<div class="filter-summary">${filterSummary
+        .map((entry) => `<span class="filter-pill"><strong>${escapeHtml(entry.label)}:</strong> ${escapeHtml(entry.value)}</span>`)
+        .join('')}</div>`
+    : '<div class="filter-summary"><span class="filter-pill">No filters applied — showing all report data</span></div>';
+
+  const breakdowns = [
+    reportBreakdownTable(
+      `Sales Volume (${salesVolumePeriod})`,
+      [
+        { key: 'label', label: 'Period' },
+        { key: 'units', label: 'Units', align: 'right' },
+      ],
+      salesVolume.map((row) => ({ label: row.label, units: Number(row.units ?? 0).toLocaleString() }))
+    ),
+    reportBreakdownTable(
+      'Revenue by Client',
+      [
+        { key: 'name', label: 'Client' },
+        { key: 'revenue', label: 'Revenue', align: 'right' },
+      ],
+      revenueByClient.map((row) => ({ name: row.name, revenue: formatCurrency(row.revenue ?? 0) }))
+    ),
+    reportBreakdownTable(
+      'Top Products by Units Shipped',
+      [
+        { key: 'name', label: 'Product' },
+        { key: 'units', label: 'Units', align: 'right' },
+      ],
+      topProducts.map((row) => ({ name: row.name, units: Number(row.units ?? 0).toLocaleString() }))
+    ),
+    reportBreakdownTable(
+      'Orders by Location',
+      [
+        { key: 'name', label: 'Location' },
+        { key: 'orders', label: 'Orders', align: 'right' },
+      ],
+      ordersByLocation.map((row) => ({ name: row.name, orders: Number(row.orders ?? 0).toLocaleString() }))
+    ),
+    reportBreakdownTable(
+      'Fulfilment Rate',
+      [
+        { key: 'name', label: 'Bucket' },
+        { key: 'value', label: 'Orders', align: 'right' },
+      ],
+      fulfilmentRate.map((row) => ({ name: row.name, value: Number(row.value ?? 0).toLocaleString() }))
+    ),
+  ].join('');
+
+  const orderRows = orders
+    .map(
+      (order) => `
+        <tr>
+          <td>${escapeHtml(order.status)}</td>
+          <td>${escapeHtml(getClientName(clients, order.clientId))}</td>
+          <td>${escapeHtml(getLocationName(locations, order.locationId))}</td>
+          <td class="number">${escapeHtml(formatCurrency(getOrderValue(order)))}</td>
+          <td>${escapeHtml(order.qbInvoiceNumber ?? '-')}</td>
+          <td>${escapeHtml(order.packingSlipNumber ?? '-')}</td>
+        </tr>
+      `
+    )
+    .join('');
+
+  const ordersTable = orders.length
+    ? `
+      <section class="report-section">
+        <h2 class="section-title">Orders (${orders.length.toLocaleString()})</h2>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Client</th>
+              <th>Location</th>
+              <th class="number">Total Value</th>
+              <th>QB Invoice</th>
+              <th>Packing Slip</th>
+            </tr>
+          </thead>
+          <tbody>${orderRows}</tbody>
+        </table>
+      </section>
+    `
+    : '<section class="report-section"><p class="empty">No matching orders for the current filters.</p></section>';
+
+  openPrintableWindow(
+    'Operations Report',
+    `
+      <style>
+        @page { size: letter; margin: 0.5in; }
+        * { box-sizing: border-box; }
+        body { background: #fff !important; }
+        .report-sheet { font-family: Segoe UI, Arial, sans-serif; color: #111827; }
+        .report-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 24px; margin-bottom: 24px; }
+        .report-header img { width: 168px; height: auto; object-fit: contain; }
+        .report-title { font-size: 26px; font-weight: 700; }
+        .report-subtitle { margin-top: 6px; color: #6b7280; }
+        .report-meta { text-align: right; color: #4b5563; font-size: 13px; line-height: 1.6; }
+        .filter-summary { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 24px; }
+        .filter-pill { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 999px; padding: 4px 12px; font-size: 12px; color: #374151; }
+        .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 28px; }
+        .metric-card { border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px; }
+        .metric-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: #6b7280; }
+        .metric-value { font-size: 22px; font-weight: 700; margin-top: 6px; }
+        .report-section { margin-bottom: 24px; break-inside: avoid; page-break-inside: avoid; }
+        .section-title { font-size: 15px; font-weight: 700; margin: 0 0 10px; padding-bottom: 6px; border-bottom: 2px solid #1A3021; }
+        .report-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .report-table th, .report-table td { border: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; }
+        .report-table th { background: #f9fafb; font-weight: 600; }
+        .report-table .number { text-align: right; }
+        .empty { color: #6b7280; font-size: 13px; }
+        @media print {
+          .report-sheet { padding: 0; }
+        }
+      </style>
+      <main class="report-sheet" style="padding:24px;">
+        <header class="report-header">
+          <div style="display:flex;align-items:center;gap:18px;">
+            <img src="${logoSrc}" alt="Modhani" />
+            <div>
+              <div class="report-title">Operations Report</div>
+              <div class="report-subtitle">ModhaniOS Reporting Export</div>
+            </div>
+          </div>
+          <div class="report-meta">
+            <div><strong>Generated:</strong> ${escapeHtml(formatDateTime(generatedAt))}</div>
+          </div>
+        </header>
+
+        ${filtersBlock}
+
+        <div class="metric-grid">${reportMetricCards(summary)}</div>
+
+        ${breakdowns}
+
+        ${ordersTable}
       </main>
     `
   );
