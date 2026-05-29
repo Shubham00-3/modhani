@@ -1403,6 +1403,12 @@
   box-shadow: none;
 }
 
+/* Secondary actions sitting beside the header CTA match its height so the
+   button row stays visually aligned. */
+.page-header-actions .btn {
+  padding: 10px 18px;
+}
+
 .inventory-history-count {
   display: inline-flex;
   align-items: center;

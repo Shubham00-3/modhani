@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { BarChart3, RotateCcw, Trash2, X } from 'lucide-react';
+import { BarChart3, Download, RotateCcw, Trash2, X } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -28,6 +28,7 @@ import {
   getProduct,
   getProductDisplayName,
 } from '../data/phaseOneData';
+import { printReport } from '../utils/printDocuments';
 
 const CHART_COLORS = ['#1A3021', '#587B66', '#D1A14E', '#8FA899', '#D97706', '#EF4444'];
 
@@ -206,6 +207,33 @@ export default function PhaseOneReports() {
     };
   }, [filteredOrders.length, filteredReportRows]);
 
+  const handleDownloadPdf = () => {
+    const filterSummary = [];
+    if (filters.clientId) filterSummary.push({ label: 'Client', value: getClientName(state.clients, filters.clientId) });
+    if (filters.locationId) filterSummary.push({ label: 'Location', value: getLocationName(state.locations, filters.locationId) });
+    if (filters.productId) filterSummary.push({ label: 'Product', value: getProductDisplayName(getProduct(state.products, filters.productId)) });
+    if (filters.status) filterSummary.push({ label: 'Status', value: filters.status });
+    if (filters.batchNumber) filterSummary.push({ label: 'Lot code', value: filters.batchNumber });
+    if (filters.from) filterSummary.push({ label: 'From', value: filters.from });
+    if (filters.to) filterSummary.push({ label: 'To', value: filters.to });
+    if (filters.period !== 'daily') filterSummary.push({ label: 'Period', value: filters.period });
+    if (dashboardSearch) filterSummary.push({ label: 'Search', value: dashboardSearch });
+
+    printReport({
+      filterSummary,
+      summary: reportingSummary,
+      salesVolume,
+      salesVolumePeriod: filters.period,
+      revenueByClient,
+      topProducts,
+      ordersByLocation,
+      fulfilmentRate,
+      orders: filteredOrders,
+      clients: state.clients,
+      locations: state.locations,
+    });
+  };
+
   return (
     <div>
       <div className="page-header">
@@ -218,6 +246,14 @@ export default function PhaseOneReports() {
           </p>
         </div>
         <div className="page-header-actions">
+          <button
+            className="btn btn-primary"
+            type="button"
+            onClick={handleDownloadPdf}
+            title="Download the current report view as a PDF"
+          >
+            <Download size={16} /> Download PDF
+          </button>
           <button
             className="btn btn-secondary"
             type="button"
