@@ -801,6 +801,20 @@ function reducer(state, action) {
             : user
         ),
       };
+    case 'UPDATE_USER_PROFILE':
+      return {
+        ...state,
+        users: state.users.map((user) =>
+          user.id === action.payload.id
+            ? {
+                ...user,
+                ...(action.payload.name !== undefined ? { name: action.payload.name } : {}),
+                ...(action.payload.phone !== undefined ? { phone: action.payload.phone } : {}),
+                ...(action.payload.joinedAt !== undefined ? { joinedAt: action.payload.joinedAt } : {}),
+              }
+            : user
+        ),
+      };
     case 'UPDATE_QB_SETTINGS':
       return { ...state, quickBooks: { ...state.quickBooks, ...action.payload } };
     case 'ADD_AUDIT':
@@ -848,6 +862,7 @@ const serverAdminActions = new Set([
   'UPDATE_CUSTOMER_CONTACT',
   'UPDATE_CUSTOMER_ASSIGNMENTS',
   'UPDATE_USER',
+  'UPDATE_USER_PROFILE',
   'UPDATE_QB_SETTINGS',
   // Production batch mutations — LOG_PRODUCTION_BATCH is the canonical RPC path
   // in serverWorkflowActions; these keep legacy/manual dispatches routed

@@ -1,0 +1,115 @@
+name: Supabase External Backup
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 07:00 UTC is 3 AM Toronto during daylight saving time.
+    - cron: "0 7 * * *"
+
+jobs:
+  backup:
+    name: Dump Supabase DB and upload to Cloudflare R2
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      BACKUP_PREFIX: ${{ vars.BACKUP_PREFIX || 'modhanios-live' }}
+      R2_PREFIX: ${{ vars.R2_PREFIX || 'database' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate required secrets
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in SUPABASE_DB_URL R2_ENDPOINT R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_BUCKET; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+
+      - name: Install backup tools
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          python -m pip install --user awscli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Dump database
+        run: |
+          set -euo pipefail
+          timestamp="$(date -u +"%Y-%m-%dT%H-%M-%SZ")"
+          backup_dir="backups/$timestamp"
+          mkdir -p "$backup_dir"
+
+          full_dump="$backup_dir/${BACKUP_PREFIX}-${timestamp}-full.dump"
+          schema_dump="$backup_dir/${BACKUP_PREFIX}-${timestamp}-schema.sql"
+          metadata_file="$backup_dir/${BACKUP_PREFIX}-${timestamp}-metadata.txt"
+          checksums_file="$backup_dir/${BACKUP_PREFIX}-${timestamp}-SHA256SUMS.txt"
+
+          pg_dump \
+            --dbname="$SUPABASE_DB_URL" \
+            --format=custom \
+            --no-owner \
+            --no-acl \
+            --file="$full_dump"
+
+          pg_dump \
+            --dbname="$SUPABASE_DB_URL" \
+            --schema-only \
+            --no-owner \
+            --no-acl \
+            --file="$schema_dump"
+
+          gzip -9 "$schema_dump"
+          schema_gz="${schema_dump}.gz"
+          database_host="$(python -c 'import os; from urllib.parse import urlparse; print(urlparse(os.environ["SUPABASE_DB_URL"]).hostname or "unknown")')"
+
+          {
+            echo "backup_prefix=$BACKUP_PREFIX"
+            echo "created_at_utc=$timestamp"
+            echo "github_repository=$GITHUB_REPOSITORY"
+            echo "github_sha=$GITHUB_SHA"
+            echo "github_ref=$GITHUB_REF"
+            echo "database_host=$database_host"
+          } > "$metadata_file"
+
+          sha256sum "$full_dump" "$schema_gz" "$metadata_file" > "$checksums_file"
+
+          echo "BACKUP_DIR=$backup_dir" >> "$GITHUB_ENV"
+          echo "BACKUP_TIMESTAMP=$timestamp" >> "$GITHUB_ENV"
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      - name: Upload backup to Cloudflare R2
+        run: |
+          set -euo pipefail
+          aws s3 cp "$BACKUP_DIR/" "s3://${R2_BUCKET}/${R2_PREFIX}/${BACKUP_TIMESTAMP}/" \
+            --recursive \
+            --endpoint-url "$R2_ENDPOINT"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+
+      - name: Upload workflow artifact for quick inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-backup-${{ env.BACKUP_TIMESTAMP }}
+          path: ${{ env.BACKUP_DIR }}
+          retention-days: 3

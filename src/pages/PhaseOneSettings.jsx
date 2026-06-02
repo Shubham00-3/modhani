@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Mail, Search, Settings2 } from 'lucide-react';
+import { FileText, Mail, PackageCheck, Search, Settings2, ShieldCheck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { formatDateTime } from '../data/phaseOneData';
 import UserManagementSection from '../components/settings/UserManagementSection';
@@ -79,10 +79,30 @@ export default function PhaseOneSettings() {
       ) : null}
 
       <div className="grid-4">
-        <SummaryCard label="Fulfilment Access" value={`${staffSummary.fulfilment} staff`} />
-        <SummaryCard label="Override Access" value={`${staffSummary.pricing} staff`} />
-        <SummaryCard label="Invoice Editors" value={`${staffSummary.invoiceEditing} staff`} />
-        <SummaryCard label="Settings Admins" value={`${staffSummary.settings} staff`} />
+        <SummaryCard
+          icon={PackageCheck}
+          label="Fulfilment Access"
+          value={`${staffSummary.fulfilment} staff`}
+          tone="green"
+        />
+        <SummaryCard
+          icon={ShieldCheck}
+          label="Override Access"
+          value={`${staffSummary.pricing} staff`}
+          tone="gold"
+        />
+        <SummaryCard
+          icon={FileText}
+          label="Invoice Editors"
+          value={`${staffSummary.invoiceEditing} staff`}
+          tone="blue"
+        />
+        <SummaryCard
+          icon={Settings2}
+          label="Settings Admins"
+          value={`${staffSummary.settings} staff`}
+          tone="purple"
+        />
       </div>
 
       <UserManagementSection canManage={canManage} />
@@ -189,11 +209,17 @@ export default function PhaseOneSettings() {
   );
 }
 
-function SummaryCard({ label, value }) {
+function SummaryCard({ icon, label, value, tone = 'green' }) {
+  const SummaryIcon = icon;
   return (
-    <div className="report-info-card card">
-      <div className="report-info-card-label">{label}</div>
-      <div className="report-info-card-value">{value}</div>
+    <div className={`settings-summary-card settings-summary-${tone} card`}>
+      <div className="settings-summary-icon" aria-hidden="true">
+        <SummaryIcon size={20} />
+      </div>
+      <div className="settings-summary-copy">
+        <div className="settings-summary-label">{label}</div>
+        <div className="settings-summary-value">{value}</div>
+      </div>
     </div>
   );
 }
