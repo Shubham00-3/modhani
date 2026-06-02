@@ -11,6 +11,8 @@ function profileToUi(profile) {
     name: profile.full_name,
     initials: profile.initials,
     role: profile.role,
+    phone: profile.phone ?? null,
+    joinedAt: profile.joined_at ?? null,
     disabledAt: profile.disabled_at ?? null,
     disabledReason: profile.disabled_reason ?? null,
     failedLoginAttempts: Number(profile.failed_login_attempts ?? 0),
@@ -249,6 +251,8 @@ function profileToDb(user) {
     full_name: user.name,
     initials: user.initials,
     role: user.role,
+    phone: user.phone ?? null,
+    joined_at: user.joinedAt ?? null,
     fulfil_orders: user.permissions.fulfilOrders,
     override_prices: user.permissions.overridePrices,
     edit_invoices: Boolean(user.permissions.editInvoices),
@@ -1313,6 +1317,24 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_override_prices: Boolean(nextPermissions.overridePrices),
         p_edit_invoices: Boolean(nextPermissions.editInvoices),
         p_manage_settings: Boolean(nextPermissions.manageSettings),
+      });
+    }
+    case 'UPDATE_USER_PROFILE': {
+      const targetUser = currentState.users.find((user) => user.id === action.payload.id);
+      if (!targetUser) {
+        return { error: new Error('Target user not found.') };
+      }
+
+      const nextName = (action.payload.name ?? targetUser.name ?? '').trim();
+      const nextPhone = (action.payload.phone ?? targetUser.phone ?? '').trim();
+      const nextJoinedAt = action.payload.joinedAt ?? targetUser.joinedAt ?? null;
+
+      return callRpc(supabase, 'modhanios_update_staff_profile', {
+        p_user_id: currentUser.id,
+        p_target_user_id: targetUser.id,
+        p_full_name: nextName,
+        p_phone: nextPhone || null,
+        p_joined_at: nextJoinedAt || null,
       });
     }
     case 'UPDATE_QB_SETTINGS':
