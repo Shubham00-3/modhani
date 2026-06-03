@@ -2602,6 +2602,16 @@ input[type='checkbox']:disabled {
   animation: slideUp var(--transition-slow);
 }
 
+/* When a <form> wraps the body/footer it must itself be a flex column that can
+   shrink, otherwise the form grows past the modal's max-height and the body's
+   overflow scroll never engages (content spills out the bottom of the modal). */
+.modal > form {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
 .modal-order {
   max-width: 920px;
   width: 92vw;
@@ -3383,6 +3393,9 @@ input[type='checkbox']:disabled {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .searchable-chip-search {
@@ -3424,9 +3437,14 @@ input[type='checkbox']:disabled {
 .customer-multi-select {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   max-height: 240px;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--space-1) 0;
 }
 
@@ -3434,6 +3452,7 @@ input[type='checkbox']:disabled {
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
+  max-width: 100%;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
@@ -3442,6 +3461,12 @@ input[type='checkbox']:disabled {
   cursor: pointer;
   transition: all var(--transition-fast);
   user-select: none;
+}
+
+.multi-select-chip span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.3;
 }
 
 .multi-select-chip:hover {
@@ -4934,8 +4959,14 @@ input[type='checkbox']:disabled {
 }
 
 .customer-location-group-header strong {
+  min-width: 0;
   font-size: var(--font-size-sm);
   color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.customer-location-group-header .btn {
+  flex-shrink: 0;
 }
 
 /* ---------- Modal Large ---------- */
