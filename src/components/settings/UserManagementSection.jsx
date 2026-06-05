@@ -288,7 +288,6 @@ export default function UserManagementSection({ canManage }) {
   const [sortBy, setSortBy] = useState('name-asc');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
-  const [hoveredUserId, setHoveredUserId] = useState(null);
   const [pendingActionUserId, setPendingActionUserId] = useState(null);
 
   const currentUserId = state.currentUser?.id;
@@ -381,10 +380,9 @@ export default function UserManagementSection({ canManage }) {
     return sorted;
   }, [allRows, tab, search, statusFilter, sortBy]);
 
-  // The detail pane is hidden until a row is hovered or clicked. Hover gives a
-  // live preview; a click "pins" the selection so it stays open after the
-  // cursor leaves. The active row is the hovered one, or the pinned one.
-  const activeUserId = hoveredUserId ?? selectedUserId;
+  // The detail pane is hidden until a row is clicked. Clicking a row "pins" the
+  // selection so the pane stays open; clicking it again closes the pane.
+  const activeUserId = selectedUserId;
   const activeRow = useMemo(
     () => allRows.find((row) => row.userId === activeUserId) ?? null,
     [allRows, activeUserId]
@@ -556,20 +554,14 @@ export default function UserManagementSection({ canManage }) {
       </div>
 
       <div className={`um-detail-grid ${isPanelOpen ? 'is-open' : 'is-closed'}`}>
-        <div
-          className="um-list-pane"
-          onMouseLeave={() => setHoveredUserId(null)}
-        >
+        <div className="um-list-pane">
           <div className="um-list-pane-head">
             <span className="um-list-count">{rows.length} {rows.length === 1 ? 'user' : 'users'}</span>
             {selectedUserId ? (
               <button
                 type="button"
                 className="um-list-clear"
-                onClick={() => {
-                  setSelectedUserId(null);
-                  setHoveredUserId(null);
-                }}
+                onClick={() => setSelectedUserId(null)}
               >
                 Close details
               </button>
@@ -600,9 +592,6 @@ export default function UserManagementSection({ canManage }) {
                     type="button"
                     className={`um-listrow ${isActive ? 'is-active' : ''} ${isSelected ? 'is-selected' : ''} ${row.disabled ? 'is-disabled' : ''}`}
                     onClick={() => setSelectedUserId(isSelected ? null : row.userId)}
-                    onMouseEnter={() => setHoveredUserId(row.userId)}
-                    onFocus={() => setHoveredUserId(row.userId)}
-                    onBlur={() => setHoveredUserId(null)}
                     aria-pressed={isSelected}
                   >
                     <div className={`um-avatar um-avatar-${row.role}`} aria-hidden="true">
