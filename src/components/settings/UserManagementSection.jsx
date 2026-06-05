@@ -9,6 +9,8 @@ import {
   CheckCircle2,
   Circle,
   Clock,
+  Eye,
+  EyeOff,
   FlaskConical,
   KeyRound,
   LayoutDashboard,
@@ -44,6 +46,64 @@ const ROLE_ICON = { staff: Briefcase, driver: Truck, customer: ShoppingBag };
 // billing from seed data) fall back to a title-cased label.
 function roleLabel(role) {
   return ROLE_LABEL[role] ?? (role ? role[0].toUpperCase() + role.slice(1) : 'User');
+}
+
+function userContactLabel(row) {
+  return row?.contactEmail || row?.email || row?.username || row?.authEmail || 'Not set';
+}
+
+function userSearchText(row) {
+  return [row.name, row.username, row.contactEmail, row.email, row.authEmail].filter(Boolean).join(' ').toLowerCase();
+}
+
+function suggestUsername(name) {
+  return String(name ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '.')
+    .replace(/^[._-]+|[._-]+$/g, '')
+    .slice(0, 32);
+}
+
+async function callSettingsApi(addToast, path, body) {
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError || !sessionData.session) {
+    addToast('You must be signed in.', 'warning');
+    return { ok: false };
+  }
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${sessionData.session.access_token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await readApiResponse(response);
+  if (!response.ok && !data.warning) {
+    addToast(apiErrorMessage(data, response, 'Request failed.'), 'warning');
+    return { ok: false, data };
+  }
+  if (data.warning) addToast(data.warning, 'warning');
+  return { ok: true, data };
+}
+
+async function readApiResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text.trim().slice(0, 300) };
+  }
+}
+
+function apiErrorMessage(data, response, fallback) {
+  if (data?.error) return data.error;
+  if (response.status === 404) {
+    return 'Local API route was not found. Restart npm run dev so Vite loads the API middleware.';
+  }
+  return `${fallback} (${response.status})`;
 }
 
 // Date-only formatter (the Joined field is a DATE, so avoid a midnight time).
@@ -93,7 +153,7 @@ function initials(name) {
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All statuses' },
   { value: 'active', label: 'Active' },
-  { value: 'pending', label: 'Pending invites' },
+  { value: 'pending', label: 'Pending' },
   { value: 'locked', label: 'Locked' },
   { value: 'disabled', label: 'Disabled' },
 ];
@@ -217,7 +277,7 @@ function isLoginLockout(row) {
 
 /**
  * Unified user-management table for the Settings page. Lists staff, drivers,
- * and customers; lets settings admins invite new users, send password resets,
+ * and customers; lets settings admins create users, set passwords,
  * disable or re-enable users, and edit staff permissions inline.
  */
 export default function UserManagementSection({ canManage }) {
@@ -245,7 +305,10 @@ export default function UserManagementSection({ canManage }) {
       userId: user.id,
       role: user.role,
       name: user.name,
-      email: user.email,
+      username: user.username ?? '',
+      email: user.contactEmail || user.email || '',
+      contactEmail: user.contactEmail ?? '',
+      authEmail: user.authEmail ?? user.email ?? '',
       phone: user.phone ?? null,
       joinedAt: user.joinedAt ?? null,
       status: user.disabledAt ? 'disabled' : 'active',
@@ -265,8 +328,11 @@ export default function UserManagementSection({ canManage }) {
       id: c.userId,
       userId: c.userId,
       role: 'customer',
-      name: c.fullName || c.email,
-      email: c.email,
+      name: c.fullName || c.username || c.email,
+      username: c.username ?? '',
+      email: c.contactEmail || c.email || '',
+      contactEmail: c.contactEmail ?? '',
+      authEmail: c.authEmail ?? c.email ?? '',
       phone: c.phone ?? null,
       joinedAt: c.createdAt ?? null,
       status: c.status,
@@ -294,9 +360,7 @@ export default function UserManagementSection({ canManage }) {
 
     const query = search.trim().toLowerCase();
     if (query) {
-      next = next.filter((row) =>
-        `${row.name} ${row.email}`.toLowerCase().includes(query)
-      );
+      next = next.filter((row) => userSearchText(row).includes(query));
     }
 
     const sorted = [...next];
@@ -347,58 +411,7 @@ export default function UserManagementSection({ canManage }) {
   }), [allRows]);
 
   async function callAdminApi(path, body) {
-    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-    if (sessionError || !sessionData.session) {
-      addToast('You must be signed in.', 'warning');
-      return { ok: false };
-    }
-    const response = await fetch(path, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionData.session.access_token}`,
-      },
-      body: JSON.stringify(body),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok && !data.warning) {
-      addToast(data.error || `Request failed (${response.status}).`, 'warning');
-      return { ok: false };
-    }
-    if (data.warning) addToast(data.warning, 'warning');
-    return { ok: true, data };
-  }
-
-  async function handleSendReset(row) {
-    const loginLocked = isLoginLockout(row);
-    const confirmed = window.confirm(
-      loginLocked
-        ? `Unlock ${row.email} and send a password reset link so they can set a new password?`
-        : `Send a password reset email to ${row.email}?`
-    );
-    if (!confirmed) return;
-    setPendingActionUserId(row.userId);
-    const { ok, data } = await callAdminApi('/api/reset-user-password', { email: row.email });
-    setPendingActionUserId(null);
-    if (ok) {
-      if (data?.reenabled) {
-        await dispatch({
-          type: 'SET_USER_DISABLED',
-          payload: {
-            userId: row.userId,
-            role: row.role,
-            disabled: false,
-            disabledAt: null,
-            disabledReason: null,
-            failedLoginAttempts: 0,
-            failedLoginLastAt: null,
-          },
-        });
-      }
-      addToast(data?.reenabled
-        ? `${ROLE_LABEL[row.role]} ${row.email} unlocked and password reset link sent.`
-        : `Password reset email sent to ${row.email}.`);
-    }
+    return callSettingsApi(addToast, path, body);
   }
 
   async function handleToggleDisabled(row) {
@@ -415,7 +428,7 @@ export default function UserManagementSection({ canManage }) {
     const sessionNote = turningOff
       ? '\n\nThey will be immediately signed out and unable to log in until re-enabled. Their profile and history are kept on record.'
       : '\n\nThey will be able to sign in again with their existing password.';
-    const confirmed = window.confirm(`${verb} ${row.name} (${row.email})?${sessionNote}`);
+    const confirmed = window.confirm(`${verb} ${row.name} (${userContactLabel(row)})?${sessionNote}`);
     if (!confirmed) return;
 
     setPendingActionUserId(row.userId);
@@ -435,8 +448,8 @@ export default function UserManagementSection({ canManage }) {
         },
       });
       addToast(turningOff
-        ? `${ROLE_LABEL[row.role]} ${row.email} disabled.`
-        : `${ROLE_LABEL[row.role]} ${row.email} re-enabled.`);
+        ? `${ROLE_LABEL[row.role]} ${userContactLabel(row)} disabled.`
+        : `${ROLE_LABEL[row.role]} ${userContactLabel(row)} re-enabled.`);
     }
   }
 
@@ -496,8 +509,8 @@ export default function UserManagementSection({ canManage }) {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search users by name or email..."
-            aria-label="Search users by name or email"
+            placeholder="Search users by name, username, or contact email..."
+            aria-label="Search users by name, username, or contact email"
           />
         </div>
 
@@ -569,8 +582,8 @@ export default function UserManagementSection({ canManage }) {
               </div>
               <div className="empty-state-description">
                 {search.trim()
-                  ? 'Try a different name or email.'
-                  : 'Click "Add User" to invite the first one.'}
+                  ? 'Try a different name, username, or contact email.'
+                  : 'Click "Add User" to create the first one.'}
               </div>
             </div>
           ) : (
@@ -600,7 +613,7 @@ export default function UserManagementSection({ canManage }) {
                         <span className="um-name">{row.name}</span>
                         {row.isSelf ? <span className="um-self-chip">You</span> : null}
                       </div>
-                      <div className="um-email">{row.email}</div>
+                      <div className="um-email">{row.username || userContactLabel(row)}</div>
                     </div>
                     <div className={`um-role-pill um-role-${row.role}`} aria-hidden="true">
                       <RoleIcon size={13} />
@@ -629,7 +642,6 @@ export default function UserManagementSection({ canManage }) {
               row={panelRow}
               canManage={canManage}
               isBusy={pendingActionUserId === panelRow.userId}
-              onSendReset={handleSendReset}
               onToggleDisabled={handleToggleDisabled}
               onTogglePermission={handleTogglePermission}
             />
@@ -653,7 +665,7 @@ export default function UserManagementSection({ canManage }) {
   );
 }
 
-function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled, onTogglePermission }) {
+function UserDetailPanel({ row, canManage, isBusy, onToggleDisabled, onTogglePermission }) {
   const { state, dispatch, addToast } = useApp();
   const RoleIcon = ROLE_ICON[row.role] ?? ShieldCheck;
   const loginLocked = isLoginLockout(row);
@@ -669,6 +681,11 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
     phone: row.phone ?? '',
     joinedAt: row.joinedAt ? String(row.joinedAt).slice(0, 10) : '',
   });
+  const [showCredentialModal, setShowCredentialModal] = useState(false);
+  const [credential, setCredential] = useState(null);
+  const [savedCredentialMeta, setSavedCredentialMeta] = useState(null);
+  const [credentialVisible, setCredentialVisible] = useState(false);
+  const [credentialLoading, setCredentialLoading] = useState(false);
 
   async function handleSaveProfile() {
     const name = draft.name.trim();
@@ -693,6 +710,23 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
     }
   }
 
+  async function handleTogglePassword() {
+    if (credentialVisible) {
+      setCredentialVisible(false);
+      return;
+    }
+    if (credential?.password) {
+      setCredentialVisible(true);
+      return;
+    }
+    setCredentialLoading(true);
+    const { ok, data } = await callSettingsApi(addToast, '/api/get-user-credential', { userId: row.userId });
+    setCredentialLoading(false);
+    if (!ok) return;
+    setCredential(data);
+    setCredentialVisible(true);
+  }
+
   const grantedCount = hasPerms ? PERM_FIELDS.filter((p) => row.permissions[p.key]).length : 0;
   const restrictedCount = hasPerms ? PERM_FIELDS.length - grantedCount : 0;
 
@@ -713,6 +747,9 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
 
   const statusLabel = loginLocked ? 'Locked' : row.disabled ? 'Disabled' : 'Active';
   const statusTone = loginLocked ? 'locked' : row.disabled ? 'disabled' : 'active';
+  const displayUsername = savedCredentialMeta?.username ?? row.username;
+  const displayContactEmail = savedCredentialMeta?.contactEmail ?? row.contactEmail;
+  const hasStoredCredential = Boolean(displayUsername || credential?.password);
 
   return (
     <div className="um-detail">
@@ -726,7 +763,7 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
             <span className={`um-detail-statusbadge is-${statusTone}`}>{statusLabel}</span>
             {row.isSelf ? <span className="um-self-chip">You</span> : null}
           </div>
-          <div className="um-detail-email">{row.email}</div>
+          <div className="um-detail-email">{displayUsername || userContactLabel(row)}</div>
           <div className="um-detail-subline">
             <span className={`um-role-pill um-role-${row.role}`}>
               <RoleIcon size={13} />
@@ -739,7 +776,7 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
 
       {loginLocked ? (
         <div className="um-detail-locknote">
-          Locked after repeated failed sign-ins. Send an unlock &amp; reset link before this user can sign in again.
+          Locked after repeated failed sign-ins. Re-enable the user and set a new password before they sign in again.
         </div>
       ) : null}
 
@@ -766,8 +803,8 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
                 />
               </label>
               <div className="um-edit-field">
-                <span className="um-field-label"><Mail size={13} /> Email Address</span>
-                <div className="um-field-value um-field-readonly">{row.email}</div>
+                <span className="um-field-label"><Mail size={13} /> Contact Email</span>
+                <div className="um-field-value um-field-readonly">{displayContactEmail || 'Not set'}</div>
               </div>
               <label className="um-edit-field">
                 <span className="um-field-label"><Phone size={13} /> Phone Number</span>
@@ -813,7 +850,15 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
         ) : (
           <div className="um-profile-grid">
             <Field icon={UserRound} label="Full Name" value={row.name} />
-            <Field icon={Mail} label="Email Address" value={row.email} />
+            <Field icon={UserRound} label="Username" value={displayUsername} />
+            <Field icon={Mail} label="Contact Email" value={displayContactEmail} />
+            <PasswordField
+              hasCredential={hasStoredCredential}
+              password={credential?.password}
+              visible={credentialVisible}
+              loading={credentialLoading}
+              onToggle={handleTogglePassword}
+            />
             <Field icon={Phone} label="Phone Number" value={row.phone} />
             <Field icon={Calendar} label="Joined" value={formatDateOnly(row.joinedAt)} />
           </div>
@@ -931,9 +976,9 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
             type="button"
             className="btn btn-ghost um-qa-btn"
             disabled={!canManage || isBusy}
-            onClick={() => onSendReset(row)}
+            onClick={() => setShowCredentialModal(true)}
           >
-            <KeyRound size={15} /> {loginLocked ? 'Unlock & Reset' : 'Reset Password'}
+            <KeyRound size={15} /> {displayUsername ? 'Set Password' : 'Set Username / Password'}
           </button>
           {row.role === 'customer' ? (
             <Link to="/customers" className="btn btn-ghost um-qa-btn">
@@ -960,6 +1005,23 @@ function UserDetailPanel({ row, canManage, isBusy, onSendReset, onToggleDisabled
           </button>
         </div>
       </div>
+
+      {showCredentialModal ? (
+        <SetCredentialModal
+          row={row}
+          onClose={() => setShowCredentialModal(false)}
+          onSaved={(data) => {
+            setCredential(data?.password ? data : null);
+            setSavedCredentialMeta({
+              username: data?.username ?? displayUsername,
+              contactEmail: data?.contactEmail ?? null,
+            });
+            setCredentialVisible(false);
+            setShowCredentialModal(false);
+            addToast(data?.emailSent ? 'Credentials saved and emailed.' : 'Credentials saved.');
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -970,6 +1032,34 @@ function Field({ icon, label, value }) {
     <div className="um-field">
       <div className="um-field-label"><Icon size={13} /> {label}</div>
       <div className={`um-field-value ${value ? '' : 'is-empty'}`}>{value || 'Not set'}</div>
+    </div>
+  );
+}
+
+function PasswordField({ hasCredential, password, visible, loading, onToggle }) {
+  const displayValue = !hasCredential
+    ? 'Not set yet'
+    : visible && password
+      ? password
+      : '********';
+  return (
+    <div className="um-field">
+      <div className="um-field-label"><KeyRound size={13} /> Password</div>
+      <div className={`um-field-value um-password-value ${hasCredential ? '' : 'is-empty'}`}>
+        <span>{displayValue}</span>
+        {hasCredential ? (
+          <button
+            type="button"
+            className="um-password-eye"
+            onClick={onToggle}
+            disabled={loading}
+            title={visible ? 'Hide password' : 'Show password'}
+            aria-label={visible ? 'Hide password' : 'Show password'}
+          >
+            {visible ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1141,11 +1231,103 @@ function PermissionToggle({ label, on, onClick, disabledReason }) {
   );
 }
 
+function SetCredentialModal({ row, onClose, onSaved }) {
+  const { addToast } = useApp();
+  const [username, setUsername] = useState(row.username || suggestUsername(row.name));
+  const [password, setPassword] = useState('');
+  const [contactEmail, setContactEmail] = useState(row.contactEmail || '');
+  const [submitting, setSubmitting] = useState(false);
+  useModalBehavior(onClose, { enabled: !submitting });
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const nextUsername = username.trim().toLowerCase();
+    const nextPassword = password.trim();
+    const nextContactEmail = contactEmail.trim().toLowerCase();
+    if (!nextUsername || !nextPassword) {
+      addToast('Username and password are required.', 'warning');
+      return;
+    }
+    if (nextPassword.length < 6) {
+      addToast('Password must be at least 6 characters.', 'warning');
+      return;
+    }
+
+    setSubmitting(true);
+    const { ok, data } = await callSettingsApi(addToast, '/api/set-user-credential', {
+      userId: row.userId,
+      username: nextUsername,
+      password: nextPassword,
+      contactEmail: nextContactEmail || null,
+    });
+    setSubmitting(false);
+    if (!ok) return;
+    onSaved({ ...data, password: nextPassword });
+  }
+
+  return (
+    <div className="modal-overlay" onClick={submitting ? undefined : handleOverlayClick(onClose)}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">Set Login Credentials</h3>
+          <button className="btn btn-ghost" type="button" onClick={onClose} disabled={submitting} aria-label="Close">x</button>
+        </div>
+        <form className="modal-body" onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Username</label>
+            <input
+              className="form-input"
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              placeholder="e.g. manoj"
+              autoFocus
+              required
+            />
+            <p className="form-hint">This is what the user types on the login screen.</p>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input
+              className="form-input"
+              type="text"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Minimum 6 characters"
+              required
+            />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Contact Email Optional</label>
+            <input
+              className="form-input"
+              type="email"
+              value={contactEmail}
+              onChange={(event) => setContactEmail(event.target.value)}
+              placeholder="name@company.com"
+            />
+            <p className="form-hint">If provided, the username and password will be emailed. Otherwise share them manually.</p>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-ghost" type="button" onClick={onClose} disabled={submitting}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="submit" disabled={submitting}>
+              {submitting ? 'Saving...' : 'Save Credentials'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function AddUserModal({ onClose, onSuccess }) {
   const { addToast } = useApp();
   const [role, setRole] = useState('staff');
-  const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
   const [permissions, setPermissions] = useState({
     fulfilOrders: true,
     overridePrices: false,
@@ -1157,10 +1339,16 @@ function AddUserModal({ onClose, onSuccess }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const trimmedEmail = email.trim().toLowerCase();
     const trimmedName = fullName.trim();
-    if (!trimmedEmail || !trimmedName) {
-      addToast('Email and full name are required.', 'warning');
+    const trimmedUsername = username.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+    const trimmedContactEmail = contactEmail.trim().toLowerCase();
+    if (!trimmedName || !trimmedUsername || !trimmedPassword) {
+      addToast('Full name, username, and password are required.', 'warning');
+      return;
+    }
+    if (trimmedPassword.length < 6) {
+      addToast('Password must be at least 6 characters.', 'warning');
       return;
     }
 
@@ -1172,32 +1360,33 @@ function AddUserModal({ onClose, onSuccess }) {
       return;
     }
 
-    const isCustomer = role === 'customer';
-    const endpoint = isCustomer ? '/api/invite-customer' : '/api/invite-staff';
-    const body = isCustomer
-      ? { email: trimmedEmail, fullName: trimmedName }
-      : { email: trimmedEmail, fullName: trimmedName, role, permissions };
-
-    const response = await fetch(endpoint, {
+    const response = await fetch('/api/create-user', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${sessionData.session.access_token}`,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        role,
+        fullName: trimmedName,
+        username: trimmedUsername,
+        password: trimmedPassword,
+        contactEmail: trimmedContactEmail || null,
+        permissions,
+      }),
     });
-    const data = await response.json().catch(() => ({}));
+    const data = await readApiResponse(response);
     setSubmitting(false);
 
     if (!response.ok && !data.warning) {
-      addToast(data.error || 'Failed to send invite.', 'warning');
+      addToast(apiErrorMessage(data, response, 'Failed to create user.'), 'warning');
       return;
     }
     if (data.warning) addToast(data.warning, 'warning');
 
-    const successMessage = isCustomer
-      ? `Customer ${trimmedEmail} invited. Configure their company & location assignments from the Customers page.`
-      : `${role === 'driver' ? 'Driver' : 'Staff'} ${trimmedEmail} invited. They'll receive an email to set their password.`;
+    const successMessage = data.emailSent
+      ? `${roleLabel(role)} ${trimmedUsername} created and emailed.`
+      : `${roleLabel(role)} ${trimmedUsername} created. Share the username and password manually.`;
 
     onSuccess(successMessage);
   }
@@ -1206,7 +1395,7 @@ function AddUserModal({ onClose, onSuccess }) {
     <div className="modal-overlay" onClick={submitting ? undefined : handleOverlayClick(onClose)}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
         <div className="modal-header">
-          <h3 className="modal-title">Invite User</h3>
+          <h3 className="modal-title">Add User</h3>
           <button className="btn btn-ghost" type="button" onClick={onClose} disabled={submitting} aria-label="Close">x</button>
         </div>
         <form className="modal-body" onSubmit={handleSubmit}>
@@ -1221,7 +1410,7 @@ function AddUserModal({ onClose, onSuccess }) {
                 <label key={r.value} className={`role-radio ${role === r.value ? 'active' : ''}`}>
                   <input
                     type="radio"
-                    name="invite-role"
+                    name="user-role"
                     value={r.value}
                     checked={role === r.value}
                     onChange={() => setRole(r.value)}
@@ -1233,16 +1422,16 @@ function AddUserModal({ onClose, onSuccess }) {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Email</label>
+            <label className="form-label">Username</label>
             <input
               className="form-input"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="name@company.com"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="e.g. manoj"
               required
               autoFocus
             />
+            <p className="form-hint">This is what the user types on the login screen.</p>
           </div>
 
           <div className="form-group">
@@ -1254,6 +1443,30 @@ function AddUserModal({ onClose, onSuccess }) {
               onChange={(e) => setFullName(e.target.value)}
               required
             />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input
+              className="form-input"
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Contact Email Optional</label>
+            <input
+              className="form-input"
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="name@company.com"
+            />
+            <p className="form-hint">If provided, credentials are emailed. Otherwise share them manually.</p>
           </div>
 
           {role === 'staff' ? (
@@ -1287,7 +1500,7 @@ function AddUserModal({ onClose, onSuccess }) {
               <div className="alert-content">
                 <div className="alert-title">Next step</div>
                 <div className="alert-description">
-                  After invite, configure company and location assignments from the Customers page.
+                  After creation, configure company and location assignments from the Customers page.
                 </div>
               </div>
             </div>
@@ -1298,7 +1511,7 @@ function AddUserModal({ onClose, onSuccess }) {
               Cancel
             </button>
             <button className="btn btn-primary" type="submit" disabled={submitting}>
-              {submitting ? 'Sending invite...' : 'Send Invite'}
+              {submitting ? 'Creating...' : 'Create User'}
             </button>
           </div>
         </form>

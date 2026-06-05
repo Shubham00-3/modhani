@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { findUserByIdentifier, publicContactEmail } from '../src/server/auth/userCredentials.js';
 
 const MAX_FAILED_ATTEMPTS = 3;
 
@@ -29,9 +30,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ ok: false, error: 'Method not allowed.' });
   }
 
-  const email = String(req.body?.email ?? '').trim().toLowerCase();
-  if (!email) {
-    return res.status(400).json({ ok: false, error: 'Email is required.' });
+  const identifier = String(req.body?.identifier ?? req.body?.email ?? '').trim().toLowerCase();
+  if (!identifier) {
+    return res.status(400).json({ ok: false, error: 'Username is required.' });
   }
 
   let supabase;
@@ -41,21 +42,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ ok: false, error: error.message });
   }
 
-  const [{ data: profile }, { data: contact }] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('user_id, role, full_name, email, manage_settings, disabled_at, failed_login_attempts')
-      .eq('email', email)
-      .maybeSingle(),
-    supabase
-      .from('customer_contacts')
-      .select('user_id, full_name, email, status, failed_login_attempts')
-      .eq('email', email)
-      .maybeSingle(),
-  ]);
-
+  const targetInfo = await findUserByIdentifier(supabase, identifier);
+  const profile = targetInfo?.profile ?? null;
+  const contact = targetInfo?.contact ?? null;
   const target = profile ?? contact;
-  const role = profile?.role ?? (contact ? 'customer' : null);
+  const role = targetInfo?.role ?? (contact ? 'customer' : null);
+  const targetLabel = target?.username || publicContactEmail(target) || identifier;
 
   if (!target || !role) {
     return res.status(200).json({ ok: true, tracked: false });
@@ -68,7 +60,7 @@ export default async function handler(req, res) {
       tracked: true,
       locked: true,
       attemptsRemaining: 0,
-      error: 'This account is disabled. Ask an admin to re-enable it and send a password reset link.',
+      error: 'This account is disabled. Ask an admin to re-enable it or set a new password.',
     });
   }
 
@@ -130,7 +122,7 @@ export default async function handler(req, res) {
       await supabase.auth.admin.updateUserById(profile.user_id, {
         ban_duration: '876000h',
       }).then(() => null, () => null);
-      await writeAudit(supabase, `Auto-disabled ${role} ${profile.full_name} (${email}) after ${MAX_FAILED_ATTEMPTS} failed sign-in attempts.`);
+      await writeAudit(supabase, `Auto-disabled ${role} ${profile.full_name} (${targetLabel}) after ${MAX_FAILED_ATTEMPTS} failed sign-in attempts.`);
     }
 
     return res.status(200).json({
@@ -159,7 +151,7 @@ export default async function handler(req, res) {
     await supabase.auth.admin.updateUserById(contact.user_id, {
       ban_duration: '876000h',
     }).then(() => null, () => null);
-    await writeAudit(supabase, `Auto-disabled customer ${contact.full_name ?? email} (${email}) after ${MAX_FAILED_ATTEMPTS} failed sign-in attempts.`);
+    await writeAudit(supabase, `Auto-disabled customer ${contact.full_name ?? targetLabel} (${targetLabel}) after ${MAX_FAILED_ATTEMPTS} failed sign-in attempts.`);
   }
 
   return res.status(200).json({

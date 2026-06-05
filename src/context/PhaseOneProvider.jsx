@@ -1253,7 +1253,25 @@ export function AppProvider({ children }) {
       return { ok: false, error: getSupabaseConfigError() };
     }
 
-    const normalizedEmail = String(email ?? '').trim().toLowerCase();
+    const loginIdentifier = String(email ?? '').trim().toLowerCase();
+    if (!loginIdentifier) {
+      return { ok: false, error: 'Enter your username.' };
+    }
+
+    let normalizedEmail = loginIdentifier;
+    const resolveResponse = await fetch('/api/resolve-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ identifier: loginIdentifier }),
+    }).catch(() => null);
+    const resolveData = await resolveResponse?.json().catch(() => ({}));
+
+    if (resolveResponse?.ok && resolveData?.authEmail) {
+      normalizedEmail = resolveData.authEmail;
+    } else if (!loginIdentifier.includes('@')) {
+      return { ok: false, error: resolveData?.error ?? 'Invalid username or password.' };
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: normalizedEmail,
       password,
@@ -1263,14 +1281,14 @@ export function AppProvider({ children }) {
       const response = await fetch('/api/record-login-failure', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: normalizedEmail }),
+        body: JSON.stringify({ identifier: loginIdentifier, email: normalizedEmail }),
       }).catch(() => null);
       const failureData = await response?.json().catch(() => ({}));
 
       if (failureData?.locked) {
         return {
           ok: false,
-          error: failureData.error ?? 'Too many failed sign-in attempts. Ask an admin to re-enable your account and send a password reset link.',
+          error: failureData.error ?? 'Too many failed sign-in attempts. Ask an admin to re-enable your account or set a new password.',
         };
       }
       if (Number.isFinite(failureData?.attemptsRemaining)) {

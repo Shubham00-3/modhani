@@ -7,6 +7,7 @@ import {
   Package,
   Plus,
   Printer,
+  RotateCcw,
   Trash2,
   Truck,
   Users,
@@ -40,6 +41,47 @@ import {
   isValidCaseQuantityStep,
 } from '../data/phaseOneData';
 import { printInvoice, printPackingSlip, printProofOfDelivery } from '../utils/printDocuments';
+
+function buildAutoFifoAssignments(order, batches) {
+  const remainingByBatchId = new Map(
+    batches.map((batch) => [batch.id, Math.max(Number(batch.qtyRemaining) || 0, 0)])
+  );
+  const nextAssignments = {};
+
+  order.items.forEach((item) => {
+    let remainingNeeded = getItemOutstandingQty(item);
+    if (remainingNeeded <= 0) return;
+
+    const availableBatches = batches
+      .filter((batch) =>
+        batch.productId === item.productId
+        && batch.status === 'active'
+        && !batch.deletedAt
+        && (remainingByBatchId.get(batch.id) ?? 0) > 0
+      )
+      .sort((left, right) => {
+        const dateDiff = new Date(left.productionDate) - new Date(right.productionDate);
+        if (dateDiff !== 0) return dateDiff;
+        return String(left.batchNumber ?? '').localeCompare(String(right.batchNumber ?? ''));
+      });
+
+    availableBatches.forEach((batch) => {
+      if (remainingNeeded <= 0) return;
+      const batchRemaining = remainingByBatchId.get(batch.id) ?? 0;
+      const assignedQty = Number(Math.min(remainingNeeded, batchRemaining).toFixed(2));
+      if (assignedQty <= 0) return;
+
+      nextAssignments[item.id] = {
+        ...(nextAssignments[item.id] ?? {}),
+        [batch.id]: assignedQty,
+      };
+      remainingByBatchId.set(batch.id, Number((batchRemaining - assignedQty).toFixed(2)));
+      remainingNeeded = Number((remainingNeeded - assignedQty).toFixed(2));
+    });
+  });
+
+  return nextAssignments;
+}
 
 export default function PhaseOneOrdersInvoicing() {
   const { state, dispatch, addToast } = useApp();
@@ -989,7 +1031,7 @@ function OrderDetailPanel({
 
 function FulfilmentPanel({ order, onBack }) {
   const { state, dispatch, addToast } = useApp();
-  const [assignments, setAssignments] = useState({});
+  const [assignments, setAssignments] = useState(() => buildAutoFifoAssignments(order, state.batches));
   const [declineReason, setDeclineReason] = useState('');
 
   const totalOutstanding = getOrderOutstandingQty(order);
@@ -1123,22 +1165,35 @@ function FulfilmentPanel({ order, onBack }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div className="card-title" style={{ marginBottom: 2 }}>Manual FIFO Batch Assignment</div>
+          <div className="card-title" style={{ marginBottom: 2 }}>FIFO Lot Assignment</div>
           <div style={{ color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-            Oldest batches are shown first, but staff chooses the final allocation.
+            Auto-filled from oldest active lots. Staff can edit any quantity before saving.
           </div>
         </div>
-        <button className="btn btn-ghost btn-sm" type="button" onClick={onBack}>
-          Back
-        </button>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <button
+            className="btn btn-ghost btn-sm"
+            type="button"
+            onClick={() => setAssignments(buildAutoFifoAssignments(order, state.batches))}
+          >
+            <RotateCcw size={14} /> Re-run FIFO
+          </button>
+          <button className="btn btn-ghost btn-sm" type="button" onClick={onBack}>
+            Back
+          </button>
+        </div>
       </div>
 
       {order.items.map((item) => {
         const product = getProduct(state.products, item.productId);
         const outstanding = getItemOutstandingQty(item);
         const availableBatches = state.batches
-          .filter((batch) => batch.productId === item.productId && batch.qtyRemaining > 0)
-          .sort((left, right) => new Date(left.productionDate) - new Date(right.productionDate));
+          .filter((batch) => batch.productId === item.productId && batch.status === 'active' && !batch.deletedAt && batch.qtyRemaining > 0)
+          .sort((left, right) => {
+            const dateDiff = new Date(left.productionDate) - new Date(right.productionDate);
+            if (dateDiff !== 0) return dateDiff;
+            return String(left.batchNumber ?? '').localeCompare(String(right.batchNumber ?? ''));
+          });
 
         const itemAssignments = assignments[item.id] ?? {};
         const assignedQty = Object.values(itemAssignments).reduce((sum, qty) => sum + (Number(qty) || 0), 0);

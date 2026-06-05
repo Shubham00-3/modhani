@@ -131,7 +131,7 @@ export default function CustomerPortal() {
         <CheckCircle2 size={34} />
         <h1>Pending Staff Approval</h1>
         <p>
-          Your customer account is created. Modhani staff still needs to link {portal.contact.email} to a company
+          Your customer account is created. Modhani staff still needs to link {portal.contact.contactEmail || portal.contact.username || portal.contact.email || 'your account'} to a company
           before you can place orders.
         </p>
       </section>
