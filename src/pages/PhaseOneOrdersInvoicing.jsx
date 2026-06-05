@@ -23,6 +23,7 @@ import {
   getBatchLabel,
   getActiveCatalogProducts,
   getClientName,
+  getDriverName,
   getClientPricingForProduct,
   getInvoiceableTotal,
   getItemDiscountReason,
@@ -95,6 +96,7 @@ export default function PhaseOneOrdersInvoicing() {
     locationId: '',
     status: '',
     source: '',
+    driverUserId: '',
   });
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [showFulfilment, setShowFulfilment] = useState(false);
@@ -103,7 +105,7 @@ export default function PhaseOneOrdersInvoicing() {
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
   const [bulkSelectedIds, setBulkSelectedIds] = useState(() => new Set());
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
-  const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || dashboardView || dashboardSearch);
+  const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || filters.driverUserId || dashboardView || dashboardSearch);
 
   const selectedOrder = state.orders.find((order) => order.id === selectedOrderId) ?? null;
 
@@ -135,6 +137,11 @@ export default function PhaseOneOrdersInvoicing() {
       .filter((order) => (filters.status ? order.status === filters.status : true))
       .filter((order) => (filters.source ? order.source === filters.source : true))
       .filter((order) => {
+        if (!filters.driverUserId) return true;
+        if (filters.driverUserId === '__unassigned__') return !order.driverUserId;
+        return order.driverUserId === filters.driverUserId;
+      })
+      .filter((order) => {
         if (!dashboardSearch) return true;
         const itemText = order.items
           .map((item) => {
@@ -152,6 +159,7 @@ export default function PhaseOneOrdersInvoicing() {
           order.qbInvoiceNumber,
           getClientName(state.clients, order.clientId),
           getLocationName(state.locations, order.locationId),
+          getDriverName(state.users, order.driverUserId),
           itemText,
         ]
           .filter(Boolean)
@@ -160,7 +168,7 @@ export default function PhaseOneOrdersInvoicing() {
           .includes(dashboardSearch);
       })
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  }, [dashboardSearch, dashboardView, filters, state.clients, state.locations, state.orders, state.products]);
+  }, [dashboardSearch, dashboardView, filters, state.clients, state.locations, state.orders, state.products, state.users]);
 
   const dashboardViewLabel = {
     open: 'Open Orders',
@@ -172,6 +180,14 @@ export default function PhaseOneOrdersInvoicing() {
   const locationOptions = filters.clientId
     ? state.locations.filter((location) => location.clientId === filters.clientId)
     : state.locations;
+
+  const driverOptions = useMemo(
+    () =>
+      state.users
+        .filter((user) => user.role === 'driver' && !user.disabledAt)
+        .sort((left, right) => String(left.name ?? '').localeCompare(String(right.name ?? ''))),
+    [state.users]
+  );
 
   function openOrder(orderId) {
     setSelectedOrderId(orderId);
@@ -192,7 +208,7 @@ export default function PhaseOneOrdersInvoicing() {
     nextSearchParams.delete('view');
     nextSearchParams.delete('q');
     setSearchParams(nextSearchParams);
-    setFilters({ clientId: '', locationId: '', status: '', source: '' });
+    setFilters({ clientId: '', locationId: '', status: '', source: '', driverUserId: '' });
   }
 
   async function closePanel() {
@@ -407,6 +423,22 @@ export default function PhaseOneOrdersInvoicing() {
           <option value="edi">EDI</option>
           <option value="portal">Portal</option>
         </select>
+
+        <select
+          aria-label="Filter by driver"
+          title="Filter by driver"
+          className="form-select"
+          value={filters.driverUserId}
+          onChange={(event) => updateFilters((current) => ({ ...current, driverUserId: event.target.value }))}
+        >
+          <option value="">All Drivers</option>
+          <option value="__unassigned__">Unassigned</option>
+          {driverOptions.map((driver) => (
+            <option key={driver.id} value={driver.id}>
+              {driver.name}
+            </option>
+          ))}
+        </select>
         <button
           className="btn btn-secondary"
           type="button"
@@ -453,6 +485,7 @@ export default function PhaseOneOrdersInvoicing() {
                   <th>Status</th>
                   <th>Client</th>
                   <th>Location</th>
+                  <th>Driver</th>
                   <th>Source</th>
                   <th className="cell-align-right">Total Value</th>
                   <th>QB Invoice</th>
@@ -506,6 +539,11 @@ export default function PhaseOneOrdersInvoicing() {
                     </td>
                     <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
                     <td>{getLocationName(state.locations, order.locationId)}</td>
+                    <td>
+                      {getDriverName(state.users, order.driverUserId) ?? (
+                        <span style={{ color: 'var(--color-text-muted)' }}>Unassigned</span>
+                      )}
+                    </td>
                     <td>
                       <span className={`badge badge-${order.source}`}>{order.source.toUpperCase()}</span>
                     </td>
