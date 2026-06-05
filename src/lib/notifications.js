@@ -133,6 +133,22 @@ function buildLateOrderNotifications({ orders, clients, locations, now }) {
       }
     }
 
+    if (order.status === 'packed' && !order.driverUserId) {
+      const timestamp = order.packingSlipSentAt ?? order.invoicedAt ?? order.createdAt;
+      const ageHours = hoursBetween(now, timestamp);
+      if (ageHours >= LATE_NEXT_STEP_HOURS) {
+        return [{
+          key: `driver-pending:${order.id}:${timestamp}`,
+          type: 'late-order',
+          severity: ageHours >= 24 ? 'critical' : 'warning',
+          title: `Driver needed — ${locationLabel}`,
+          description: `Order #${order.orderNumber} has been packed for ${Math.floor(ageHours)} hours and still needs a driver to go out for delivery.`,
+          relatedLabel: `Order #${order.orderNumber}`,
+          timestamp,
+        }];
+      }
+    }
+
     return [];
   });
 }

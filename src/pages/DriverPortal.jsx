@@ -322,10 +322,20 @@ export default function DriverPortal() {
     ? selectedOrderId
     : fallbackSelectedOrderId;
 
-  // Driver portal only ever holds orders in "shipped" status assigned to
-  // this driver. Once POD is captured the order disappears on the next
-  // refresh, so there's no separate completed list to render.
-  const pendingOrders = state.orders;
+  // The driver portal holds (a) orders out for delivery (shipped, no POD yet)
+  // and (b) orders delivered in the last 24 hours (POD captured) which stay
+  // visible as recent history before dropping off the list.
+  const pendingOrders = useMemo(
+    () => state.orders.filter((order) => !order.podSignedAt),
+    [state.orders]
+  );
+  const recentOrders = useMemo(
+    () =>
+      state.orders
+        .filter((order) => order.podSignedAt)
+        .sort((a, b) => new Date(b.podSignedAt).getTime() - new Date(a.podSignedAt).getTime()),
+    [state.orders]
+  );
 
   const selectedOrder = useMemo(
     () => state.orders.find((order) => order.id === effectiveSelectedOrderId) ?? null,
@@ -449,6 +459,33 @@ export default function DriverPortal() {
               No deliveries assigned to you right now.
             </div>
           )}
+
+          {recentOrders.length ? (
+            <>
+              <div className="driver-list-heading" style={{ marginTop: 'var(--space-4)' }}>
+                <ClipboardSignature size={18} />
+                <span>Recent Orders (24h)</span>
+                <strong>{recentOrders.length}</strong>
+              </div>
+              {recentOrders.map((order) => {
+                const locationName = getLocationName(state.locations, order.locationId);
+                const clientName = getClientName(state.clients, order.clientId);
+                return (
+                  <button
+                    className={`driver-order-card driver-order-completed ${order.id === selectedOrder?.id ? 'active' : ''}`}
+                    key={order.id}
+                    type="button"
+                    onClick={() => handleSelectOrder(order.id)}
+                  >
+                    <span className="driver-order-number">Order #{order.orderNumber}</span>
+                    <span>{clientName}</span>
+                    <small>{locationName}</small>
+                    <small>Delivered {formatDateTime(order.podSignedAt)}</small>
+                  </button>
+                );
+              })}
+            </>
+          ) : null}
         </aside>
 
         <section className="driver-delivery-panel">
@@ -463,9 +500,9 @@ export default function DriverPortal() {
                   </p>
                 </div>
                 <div className="driver-status-card">
-                  <span>Shipped</span>
+                  <span>{selectedOrder.podSignedAt ? 'Delivered' : 'Shipped'}</span>
                   <strong>Order #{selectedOrder.orderNumber}</strong>
-                  <small>{formatDateTime(selectedOrder.shippedAt)}</small>
+                  <small>{formatDateTime(selectedOrder.podSignedAt ?? selectedOrder.shippedAt)}</small>
                 </div>
               </div>
 
@@ -518,6 +555,22 @@ export default function DriverPortal() {
                       <img src={selectedOrder.podSignatureDataUrl} alt="Saved proof of delivery signature" />
                     ) : null}
                   </div>
+                  <button
+                    className="btn btn-secondary"
+                    type="button"
+                    style={{ marginTop: 'var(--space-3)' }}
+                    onClick={() =>
+                      printProofOfDelivery({
+                        order: selectedOrder,
+                        clients: state.clients,
+                        locations: state.locations,
+                        products: state.products,
+                        batches: state.batches,
+                      })
+                    }
+                  >
+                    <Printer size={16} /> Print POD
+                  </button>
                   {Array.isArray(selectedOrder.podPhotoUrls) && selectedOrder.podPhotoUrls.length > 0 ? (
                     <div style={{ marginTop: 'var(--space-3)' }}>
                       <div className="driver-section-title">Delivery Photos</div>

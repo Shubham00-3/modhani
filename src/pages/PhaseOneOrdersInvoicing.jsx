@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   FileText,
   Lock,
+  Mail,
   Package,
   Plus,
   Printer,
@@ -37,9 +38,12 @@ import {
   getProductDisplayName,
   getProductImageUrl,
   formatCaseQuantityBreakdown,
+  formatOrderStatus,
   hasProductImage,
   isLocationShipToReady,
+  isProductHstApplicable,
   isValidCaseQuantityStep,
+  HST_RATE,
 } from '../data/phaseOneData';
 import { printInvoice, printPackingSlip, printProofOfDelivery } from '../utils/printDocuments';
 
@@ -286,15 +290,13 @@ export default function PhaseOneOrdersInvoicing() {
   }
 
   async function handleConfirmShipment(order) {
-    if (!order.driverUserId) {
-      addToast('Assign a driver before confirming shipment.', 'warning');
-      return;
-    }
-
     const client = state.clients.find((entry) => entry.id === order.clientId);
     const timestamp = new Date().toISOString();
     const packingSlipNumber = order.packingSlipNumber ?? `PS-${order.orderNumber}`;
     const emailedPackingSlip = Boolean(client?.emailPackingSlip);
+    // No driver required: with a driver the order goes out for delivery
+    // (shipped); without one it waits as "packed" until a driver is assigned.
+    const nextStatus = order.driverUserId ? 'shipped' : 'packed';
 
     const result = await dispatch({
       type: 'CONFIRM_SHIPMENT',
@@ -309,8 +311,8 @@ export default function PhaseOneOrdersInvoicing() {
 
     const updatedOrder = {
       ...order,
-      status: 'shipped',
-      shippedAt: new Date().toISOString(),
+      status: nextStatus,
+      shippedAt: nextStatus === 'shipped' ? new Date().toISOString() : order.shippedAt,
       packingSlipNumber,
       packingSlipSentAt: emailedPackingSlip ? new Date().toISOString() : null,
     };
@@ -323,7 +325,31 @@ export default function PhaseOneOrdersInvoicing() {
       batches: state.batches,
     });
 
-    addToast(`Shipment confirmed for Order #${order.orderNumber}.`);
+    addToast(
+      order.driverUserId
+        ? `Shipment confirmed for Order #${order.orderNumber}.`
+        : `Order #${order.orderNumber} packed. Assign a driver to send it out for delivery.`
+    );
+  }
+
+  async function handleSendInvoice(order) {
+    if (!order.invoiceNumber) {
+      addToast('Create the invoice before sending it.', 'warning');
+      return;
+    }
+    if (order.invoiceEmailSentAt) {
+      addToast(`Invoice for Order #${order.orderNumber} was already sent.`, 'warning');
+      return;
+    }
+
+    const result = await dispatch({
+      type: 'SEND_INVOICE_EMAIL',
+      payload: { orderId: order.id, timestamp: new Date().toISOString() },
+    });
+
+    if (!result?.ok) return;
+
+    addToast(`Invoice for Order #${order.orderNumber} sent.`);
   }
 
   return (
@@ -407,6 +433,7 @@ export default function PhaseOneOrdersInvoicing() {
           <option value="partial">Partial</option>
           <option value="fulfilled">Fulfilled</option>
           <option value="invoiced">Invoiced</option>
+          <option value="packed">Packed</option>
           <option value="shipped">Shipped</option>
           <option value="delivered">Delivered</option>
           <option value="declined">Declined</option>
@@ -475,7 +502,7 @@ export default function PhaseOneOrdersInvoicing() {
                   <th style={{ width: 36, textAlign: 'center' }}>
                     <BulkSelectAllCheckbox
                       eligibleIds={filteredOrders
-                        .filter((order) => order.status === 'shipped' && !order.podSignedAt)
+                        .filter((order) => ['packed', 'shipped'].includes(order.status) && !order.podSignedAt)
                         .map((order) => order.id)}
                       selectedIds={bulkSelectedIds}
                       onChange={setBulkSelectedIds}
@@ -495,7 +522,7 @@ export default function PhaseOneOrdersInvoicing() {
               </thead>
               <tbody>
                 {filteredOrders.map((order) => {
-                  const canBulkSelect = order.status === 'shipped' && !order.podSignedAt;
+                  const canBulkSelect = ['packed', 'shipped'].includes(order.status) && !order.podSignedAt;
                   const isSelected = bulkSelectedIds.has(order.id);
                   return (
                   <tr
@@ -516,7 +543,7 @@ export default function PhaseOneOrdersInvoicing() {
                         type="checkbox"
                         aria-label={`Select order ${order.orderNumber} for bulk driver assignment`}
                         disabled={!canBulkSelect}
-                        title={canBulkSelect ? undefined : 'Bulk assignment is only available for shipped orders that have not been delivered yet.'}
+                        title={canBulkSelect ? undefined : 'Bulk assignment is only available for packed or shipped orders that have not been delivered yet.'}
                         checked={isSelected}
                         onChange={(event) => {
                           setBulkSelectedIds((current) => {
@@ -530,7 +557,7 @@ export default function PhaseOneOrdersInvoicing() {
                     </td>
                     <td className="cell-monospace cell-align-left">#{order.orderNumber}</td>
                     <td>
-                      <span className={`badge badge-${order.status}`}>{order.status}</span>
+                      <span className={`badge badge-${order.status}`}>{formatOrderStatus(order.status)}</span>
                       {order.lockedBy && order.lockedBy !== state.currentUser.id ? (
                         <span style={{ marginLeft: 8, color: 'var(--color-warning)' }}>
                           <Lock size={14} style={{ verticalAlign: 'middle' }} />
@@ -622,6 +649,7 @@ export default function PhaseOneOrdersInvoicing() {
                   onEditInvoice={() => setShowEditInvoiceModal(true)}
                   onPushToQuickBooks={handleQueueQuickBooks}
                   onConfirmShipment={handleConfirmShipment}
+                  onSendInvoice={handleSendInvoice}
                   onPrintPackingSlip={(currentOrder) =>
                     printPackingSlip({
                       order: currentOrder,
@@ -676,9 +704,9 @@ function InfoCard({ label, value }) {
 
 /**
  * Driver assignment row for the order detail panel. Lets admin pick which
- * registered driver should deliver this order. Only after a driver is assigned
- * AND the order is in "shipped" status will the order show up in that driver's
- * queue.
+ * registered driver should deliver this order. Assigning a driver to a "packed"
+ * order advances it to "shipped" (out for delivery) and surfaces it in that
+ * driver's queue; clearing the driver returns it to "packed".
  */
 function DriverAssignmentRow({ order }) {
   const { state, dispatch, addToast } = useApp();
@@ -786,6 +814,7 @@ function OrderDetailPanel({
   onEditInvoice,
   onPushToQuickBooks,
   onConfirmShipment,
+  onSendInvoice,
   onPrintPackingSlip,
   onPrintProofOfDelivery,
   onPrintInvoice,
@@ -801,18 +830,20 @@ function OrderDetailPanel({
   const canEditInvoice =
     order.invoiceNumber &&
     state.currentUser.permissions.editInvoices &&
-    ['invoiced', 'shipped', 'delivered'].includes(order.status) &&
+    ['invoiced', 'packed', 'shipped', 'delivered'].includes(order.status) &&
     order.qbSyncStatus !== 'pending' &&
     order.qbSyncStatus !== 'syncing' &&
     !quickBooksJob;
   const canQueueQuickBooks =
     order.invoiceNumber &&
-    ['invoiced', 'shipped', 'delivered'].includes(order.status) &&
+    ['invoiced', 'packed', 'shipped', 'delivered'].includes(order.status) &&
     order.qbSyncStatus !== 'pushed' &&
     order.qbSyncStatus !== 'syncing' &&
     order.qbSyncStatus !== 'failed' &&
     !quickBooksJob;
-  const needsDriverBeforeShipment = order.status === 'invoiced' && !order.driverUserId;
+  // A driver is no longer required to confirm a shipment. When an invoiced
+  // order has no driver it simply becomes "packed" and waits for one.
+  const isPackedAwaitingDriver = order.status === 'packed' && !order.driverUserId;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -829,7 +860,7 @@ function OrderDetailPanel({
       ) : null}
 
       <div className="grid-2">
-        <InfoCard label="Status" value={<span className={`badge badge-${order.status}`}>{order.status}</span>} />
+        <InfoCard label="Status" value={<span className={`badge badge-${order.status}`}>{formatOrderStatus(order.status)}</span>} />
         <InfoCard label="Source" value={<span className={`badge badge-${order.source}`}>{order.source.toUpperCase()}</span>} />
         <InfoCard label="Created" value={formatDateTime(order.createdAt)} />
         <InfoCard label="Outstanding" value={`${getOrderOutstandingQty(order).toLocaleString()} units`} />
@@ -946,7 +977,7 @@ function OrderDetailPanel({
           </button>
         ) : null}
 
-        {['invoiced', 'shipped', 'delivered'].includes(order.status) && order.qbSyncStatus === 'failed' ? (
+        {['invoiced', 'packed', 'shipped', 'delivered'].includes(order.status) && order.qbSyncStatus === 'failed' ? (
           <button className="btn btn-secondary" type="button" onClick={() => onPushToQuickBooks(order)}>
             <FileText size={16} /> Retry QuickBooks Sync
           </button>
@@ -956,8 +987,6 @@ function OrderDetailPanel({
           <button
             className="btn btn-primary"
             type="button"
-            disabled={needsDriverBeforeShipment}
-            title={needsDriverBeforeShipment ? 'Assign a driver before confirming shipment' : undefined}
             onClick={() => onConfirmShipment(order)}
           >
             <Truck size={16} /> Confirm Shipment
@@ -967,6 +996,12 @@ function OrderDetailPanel({
         {order.invoiceNumber ? (
           <button className="btn btn-ghost" type="button" onClick={() => onPrintInvoice(order)}>
             <Printer size={16} /> Print Invoice
+          </button>
+        ) : null}
+
+        {order.invoiceNumber && !order.invoiceEmailSentAt ? (
+          <button className="btn btn-secondary" type="button" onClick={() => onSendInvoice(order)}>
+            <Mail size={16} /> Send Invoice
           </button>
         ) : null}
 
@@ -983,12 +1018,20 @@ function OrderDetailPanel({
         ) : null}
       </div>
 
-      {needsDriverBeforeShipment ? (
-        <div className="alert alert-warning" style={{ marginTop: 'var(--space-4)' }}>
+      {order.invoiceNumber ? (
+        <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>
+          {order.invoiceEmailSentAt
+            ? `Invoice sent ${formatDateTime(order.invoiceEmailSentAt)}`
+            : 'Invoice not yet sent — review for transit damage, then use Send Invoice.'}
+        </div>
+      ) : null}
+
+      {isPackedAwaitingDriver ? (
+        <div className="alert alert-info" style={{ marginTop: 'var(--space-4)' }}>
           <AlertTriangle size={18} />
           <div className="alert-content">
-            <div className="alert-title">Driver required before shipment</div>
-            <div className="alert-description">Assign a driver to this order before confirming shipment.</div>
+            <div className="alert-title">Packed — awaiting driver</div>
+            <div className="alert-description">Assign a driver to send this order out for delivery (it will move to Shipped).</div>
           </div>
         </div>
       ) : null}
@@ -1357,7 +1400,6 @@ function FulfilmentPanel({ order, onBack }) {
 function InvoiceModal({ order, onClose }) {
   useModalBehavior(onClose);
   const { state, dispatch, addToast } = useApp();
-  const client = state.clients.find((entry) => entry.id === order.clientId);
   const location = state.locations.find((entry) => entry.id === order.locationId);
   const invoiceLines = order.items.filter((item) => item.fulfilledQty > 0);
   const [lineOverrides, setLineOverrides] = useState(() =>
@@ -1413,7 +1455,6 @@ function InvoiceModal({ order, onClose }) {
 
       const timestamp = new Date().toISOString();
       const invoiceNumber = `DRAFT-${order.orderNumber}`;
-      const emailSentAt = client?.emailInvoice ? timestamp : null;
       const shipTo = getOrderShipToSnapshot(order, location);
 
       const result = await dispatch({
@@ -1424,13 +1465,15 @@ function InvoiceModal({ order, onClose }) {
           timestamp,
           overrides,
           shipTo,
-          invoiceEmailSentAt: emailSentAt,
+          // Invoices are no longer emailed automatically — admins review and
+          // dispatch them manually with the "Send Invoice" action.
+          invoiceEmailSentAt: null,
         },
       });
 
       if (!result?.ok) return;
 
-      addToast(`Invoice ${invoiceNumber} created.`);
+      addToast(`Invoice ${invoiceNumber} created. Review, then use Send Invoice to email it.`);
       onClose();
     } catch (error) {
       addToast(error.message, 'warning');
@@ -1562,6 +1605,39 @@ function InvoiceModal({ order, onClose }) {
               </div>
             );
           })}
+          {(() => {
+            const summary = invoiceLines.reduce(
+              (acc, item) => {
+                const product = getProduct(state.products, item.productId);
+                const lineValue = lineOverrides[item.id];
+                const defaultPrice = item.clientPrice ?? item.basePrice;
+                const effectivePrice = Number(lineValue.price) || defaultPrice;
+                const discountValue = Number(lineValue.discount);
+                const lineDiscount = Number.isFinite(discountValue) && discountValue > 0 ? discountValue : 0;
+                const lineTotal = Math.max(item.fulfilledQty * effectivePrice - lineDiscount, 0);
+                acc.subtotal += lineTotal;
+                acc.hst += isProductHstApplicable(product) ? lineTotal * HST_RATE : 0;
+                return acc;
+              },
+              { subtotal: 0, hst: 0 }
+            );
+            return (
+              <div className="card" style={{ padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>Subtotal</span>
+                  <span className="cell-monospace">{formatCurrency(summary.subtotal)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--color-text-secondary)' }}>
+                  <span>HST (13%)</span>
+                  <span className="cell-monospace">{formatCurrency(summary.hst)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-2)' }}>
+                  <span>Total</span>
+                  <span className="cell-monospace">{formatCurrency(summary.subtotal + summary.hst)}</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         <div className="modal-footer">
           <button className="btn btn-ghost" type="button" onClick={onClose}>

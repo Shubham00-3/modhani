@@ -29,6 +29,7 @@ export function ProductModal({ product, onClose }) {
           leadTimeDays: '',
           orderUnitLabel: '',
           qbItemName: '',
+          hstApplicable: false,
           imageUrl: '',
           imagePath: '',
         }
@@ -125,6 +126,7 @@ export function ProductModal({ product, onClose }) {
             orderUnitLabel: String(form.orderUnitLabel ?? '').trim(),
             qbItemName,
             qbMappingStatus: qbItemName ? 'ready' : 'needs_mapping',
+            hstApplicable: Boolean(form.hstApplicable),
             imageUrl,
             imagePath,
           },
@@ -158,6 +160,12 @@ export function ProductModal({ product, onClose }) {
         onChange={(value) => setForm((current) => ({ ...current, baseCataloguePrice: value }))}
       />
       <FormInput label="QuickBooks Item Name" value={form.qbItemName ?? ''} onChange={(value) => setForm((current) => ({ ...current, qbItemName: value }))} />
+      <FormCheckbox
+        label="HST applicable (13%)"
+        hint="When checked, 13% HST is added to this product's line total on invoices."
+        checked={Boolean(form.hstApplicable)}
+        onChange={(checked) => setForm((current) => ({ ...current, hstApplicable: checked }))}
+      />
       <div className="form-group">
         <label className="form-label">Product Image</label>
         <div className="product-image-editor">
@@ -475,6 +483,26 @@ function FormInput({ label, value, onChange, type = 'text', placeholder }) {
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
+    </div>
+  );
+}
+
+function FormCheckbox({ label, hint, checked, onChange }) {
+  return (
+    <div className="form-group">
+      <label className="form-checkbox" style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', cursor: 'pointer' }}>
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(event) => onChange(event.target.checked)}
+        />
+        <span className="form-label" style={{ margin: 0 }}>{label}</span>
+      </label>
+      {hint ? (
+        <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', marginTop: 'var(--space-1)' }}>
+          {hint}
+        </div>
+      ) : null}
     </div>
   );
 }

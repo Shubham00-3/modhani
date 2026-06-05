@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   BarChart3,
   Building2,
+  FileCheck,
   FlaskConical,
   Layers,
   LayoutDashboard,
@@ -17,6 +18,7 @@ import { useApp } from '../../context/useApp';
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
   { to: '/orders', label: 'Orders & Invoicing', icon: ShoppingCart },
+  { to: '/pod', label: 'Proof of Delivery', icon: FileCheck },
   { to: '/production', label: 'Production & Lots', icon: FlaskConical },
   { to: '/inventory', label: 'Inventory', icon: Package },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
