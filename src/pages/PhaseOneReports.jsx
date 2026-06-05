@@ -288,6 +288,7 @@ export default function PhaseOneReports() {
           <option value="partial">Partial</option>
           <option value="fulfilled">Fulfilled</option>
           <option value="invoiced">Invoiced</option>
+          <option value="packed">Packed</option>
           <option value="shipped">Shipped</option>
           <option value="delivered">Delivered</option>
           <option value="declined">Declined</option>

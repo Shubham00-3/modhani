@@ -9,6 +9,7 @@ import {
   getItemDiscountAmount,
   getItemDiscountReason,
   getLocationName,
+  getOrderHstTotal,
   getOrderShipToSnapshot,
   getOrderValue,
   getProduct,
@@ -237,7 +238,12 @@ export function printInvoice({ order, clients, locations, products, batches = []
     .join('');
   const invoiceTo = formatAddressBlock(clientName, location);
   const shipTo = formatAddressBlock(shipToSnapshot.name, shipToSnapshot);
-  const totalLabel = Number(invoiceTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const hstTotal = getOrderHstTotal(order, products);
+  const grandTotal = Number(invoiceTotal) + hstTotal;
+  const formatAmount = (value) => Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const subtotalLabel = formatAmount(invoiceTotal);
+  const hstLabel = formatAmount(hstTotal);
+  const totalLabel = formatAmount(grandTotal);
 
   openPrintableWindow(
     `Invoice ${invoiceHeaderNumber}`,
@@ -356,6 +362,8 @@ export function printInvoice({ order, clients, locations, products, batches = []
         <section class="bottom-grid">
           <div class="signature-space"></div>
           <table class="totals-table">
+            <tr><td class="label" style="font-weight:400;">Subtotal</td><td class="amount">CAD ${subtotalLabel}</td></tr>
+            <tr><td class="label" style="font-weight:400;">HST (13%)</td><td class="amount">CAD ${hstLabel}</td></tr>
             <tr><td class="label">Total</td><td class="amount">CAD ${totalLabel}</td></tr>
             <tr><td class="label" style="font-weight:400;">Payments/Credits</td><td class="amount">CAD 0.00</td></tr>
             <tr><td class="label">Balance Due</td><td class="amount">CAD ${totalLabel}</td></tr>
@@ -366,7 +374,29 @@ export function printInvoice({ order, clients, locations, products, batches = []
   );
 }
 
-export function printProofOfDelivery({ order, clients, locations, products, batches = [] }) {
+const POD_PRINT_STYLE = `
+  <style>
+    @page { size: letter; margin: 0.35in; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #fff !important; }
+    .pod-sheet {
+      font-family: Segoe UI, Arial, sans-serif;
+      padding: 18px;
+      color: #111827;
+      background: #fff;
+    }
+    /* Page break before every sheet after the first — one POD per page. */
+    .pod-sheet + .pod-sheet { page-break-before: always; break-before: page; }
+    .pod-section { break-inside: avoid; page-break-inside: avoid; }
+    @media print {
+      .pod-sheet { padding: 0; }
+    }
+  </style>
+`;
+
+// Builds the printable <main class="pod-sheet"> block for a single order.
+// Shared by the single-POD print and the bulk POD download.
+function buildPodSheetMarkup(order, { clients, locations, products, batches = [] }) {
   const clientName = getClientName(clients, order.clientId);
   const location = locations.find((entry) => entry.id === order.locationId);
   const shipTo = getOrderShipToSnapshot(order, location);
@@ -419,26 +449,7 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
   const signedLocal = order.podSignedAtLocal ?? formatTorontoDateTime(signedAt);
   const signedTimezone = order.podSignedTimezone ?? 'America/Toronto';
 
-  openPrintableWindow(
-    `POD ${order.orderNumber}`,
-    `
-      <style>
-        @page { size: letter; margin: 0.35in; }
-        * { box-sizing: border-box; }
-        body { margin: 0; background: #fff !important; }
-        .pod-sheet {
-          font-family: Segoe UI, Arial, sans-serif;
-          padding: 18px;
-          color: #111827;
-          background: #fff;
-          page-break-after: avoid;
-          break-after: avoid;
-        }
-        .pod-section { break-inside: avoid; page-break-inside: avoid; }
-        @media print {
-          .pod-sheet { padding: 0; }
-        }
-      </style>
+  return `
       <main class="pod-sheet">
         <header class="pod-section" style="display:flex;justify-content:space-between;align-items:flex-start;gap:20px;margin-bottom:18px;">
           <div style="display:flex;align-items:center;gap:18px;">
@@ -492,8 +503,31 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
 
         ${photosSection}
       </main>
-    `
+    `;
+}
+
+export function printProofOfDelivery({ order, clients, locations, products, batches = [] }) {
+  openPrintableWindow(
+    `POD ${order.orderNumber}`,
+    POD_PRINT_STYLE + buildPodSheetMarkup(order, { clients, locations, products, batches })
   );
+}
+
+/**
+ * Bulk POD download. Renders one POD sheet per order (one per page) into a
+ * single printable window so the user can "Save as PDF" — matching the
+ * invoice/packing-slip export convention.
+ */
+export function printProofOfDeliveryBatch({ orders, clients, locations, products, batches = [] }) {
+  const podOrders = (orders ?? []).filter((order) => order && order.podSignedAt);
+  if (!podOrders.length) return false;
+
+  const sheets = podOrders
+    .map((order) => buildPodSheetMarkup(order, { clients, locations, products, batches }))
+    .join('');
+
+  const title = podOrders.length === 1 ? `POD ${podOrders[0].orderNumber}` : `PODs (${podOrders.length})`;
+  return openPrintableWindow(title, POD_PRINT_STYLE + sheets);
 }
 
 function reportMetricCards(summary) {

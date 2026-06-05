@@ -467,6 +467,51 @@ export function getInvoiceableTotal(order) {
   }, 0);
 }
 
+// Harmonized Sales Tax. Applied per-line only to products flagged as
+// HST-applicable, at 13% of the (post-discount) line total.
+export const HST_RATE = 0.13;
+
+export function isProductHstApplicable(product) {
+  return product?.hstApplicable === true;
+}
+
+export function roundCurrency(amount) {
+  return Math.round((Number(amount) || 0) * 100) / 100;
+}
+
+/**
+ * HST for a single invoice line. Prefers the amount snapshotted at invoice
+ * time (item.hstAmount); otherwise computes it live from the product flag so
+ * previews and demo mode stay accurate before an invoice is created.
+ */
+export function getItemHstAmount(item, product) {
+  if (item?.hstAmount != null) return Number(item.hstAmount) || 0;
+  const applicable = item?.hstApplicable ?? isProductHstApplicable(product);
+  if (!applicable) return 0;
+  return roundCurrency(getInvoiceLineTotal(item) * HST_RATE);
+}
+
+export function getOrderHstTotal(order, products = []) {
+  if (order?.invoiceHstTotal != null) return Number(order.invoiceHstTotal) || 0;
+  return (order?.items ?? []).reduce(
+    (sum, item) => sum + getItemHstAmount(item, getProduct(products, item.productId)),
+    0
+  );
+}
+
+export function getOrderGrandTotal(order, products = []) {
+  return getOrderValue(order) + getOrderHstTotal(order, products);
+}
+
+/**
+ * Capitalize an order status label for display (e.g. "pending" -> "Pending").
+ */
+export function formatOrderStatus(status) {
+  const value = String(status ?? '').trim();
+  if (!value) return '-';
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 export function getBatchLabel(batches, batchId) {
   return normalizeLotCode(batches.find((batch) => batch.id === batchId)?.batchNumber ?? batchId);
 }

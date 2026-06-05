@@ -2104,6 +2104,7 @@ img {
   white-space: nowrap;
 }
 
+.badge-packed { background: #E0E7FF; color: #4338CA; }
 .badge-shipped { background: var(--color-success-bg); color: var(--color-success); }
 .badge-delivered { background: #DBEAFE; color: #1D4ED8; }
 .badge-invoiced { background: #FEF3C7; color: #D97706; }

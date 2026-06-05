@@ -15,6 +15,10 @@ import {
   buildReportRowsFromOrders,
   getEffectiveItemPrice,
   getItemDiscountAmount,
+  getInvoiceLineTotal,
+  isProductHstApplicable,
+  roundCurrency,
+  HST_RATE,
 } from '../data/phaseOneData';
 import { buildOperationalNotifications } from '../lib/notifications';
 import {
@@ -597,21 +601,27 @@ function reducer(state, action) {
 
           const nextItems = order.items.map((item) => {
             const override = action.payload.overrides.find((entry) => entry.orderItemId === item.id);
-            if (!override) {
-              return {
-                ...item,
-                invoiceQty: item.fulfilledQty,
-                discountAmount: item.discountAmount ?? 0,
-                discountReason: item.discountReason ?? '',
-              };
-            }
+            const product = state.products.find((entry) => entry.id === item.productId);
+            const hstApplicable = isProductHstApplicable(product);
+            const withInvoice = !override
+              ? {
+                  ...item,
+                  invoiceQty: item.fulfilledQty,
+                  discountAmount: item.discountAmount ?? 0,
+                  discountReason: item.discountReason ?? '',
+                }
+              : {
+                  ...item,
+                  invoiceQty: item.fulfilledQty,
+                  overridePrice: override.overridePrice,
+                  overrideReason: override.overrideReason,
+                  discountAmount: Number(override.discount ?? 0) || 0,
+                  discountReason: override.discountReason ?? '',
+                };
             return {
-              ...item,
-              invoiceQty: item.fulfilledQty,
-              overridePrice: override.overridePrice,
-              overrideReason: override.overrideReason,
-              discountAmount: Number(override.discount ?? 0) || 0,
-              discountReason: override.discountReason ?? '',
+              ...withInvoice,
+              hstApplicable,
+              hstAmount: hstApplicable ? roundCurrency(getInvoiceLineTotal(withInvoice) * HST_RATE) : 0,
             };
           });
 
@@ -619,6 +629,7 @@ function reducer(state, action) {
             (sum, item) => sum + Math.max((item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item) - getItemDiscountAmount(item), 0),
             0
           );
+          const invoiceHstTotal = nextItems.reduce((sum, item) => sum + (Number(item.hstAmount) || 0), 0);
 
           return {
             ...order,
@@ -626,6 +637,7 @@ function reducer(state, action) {
             status: 'invoiced',
             invoiceNumber: action.payload.invoiceNumber,
             invoiceTotal,
+            invoiceHstTotal,
             invoicedAt: action.payload.timestamp,
             invoiceEmailSentAt: action.payload.invoiceEmailSentAt,
             invoiceShipToName: action.payload.shipTo?.name ?? null,
@@ -648,16 +660,26 @@ function reducer(state, action) {
 
             const result = trimFulfilmentToInvoiceLines(order, state.batches, action.payload.lines);
             nextBatches = result.batches;
-            const nextItems = result.items;
+            const nextItems = result.items.map((item) => {
+              const product = state.products.find((entry) => entry.id === item.productId);
+              const hstApplicable = item.hstApplicable ?? isProductHstApplicable(product);
+              return {
+                ...item,
+                hstApplicable,
+                hstAmount: hstApplicable ? roundCurrency(getInvoiceLineTotal(item) * HST_RATE) : 0,
+              };
+            });
             const invoiceTotal = nextItems.reduce(
               (sum, item) => sum + Math.max((item.invoiceQty ?? item.fulfilledQty) * getEffectiveItemPrice(item) - getItemDiscountAmount(item), 0),
               0
             );
+            const invoiceHstTotal = nextItems.reduce((sum, item) => sum + (Number(item.hstAmount) || 0), 0);
 
             return {
               ...order,
               items: nextItems,
               invoiceTotal,
+              invoiceHstTotal,
               invoiceShipToName: action.payload.shipTo?.name ?? order.invoiceShipToName ?? null,
               invoiceAddressLine1: action.payload.shipTo?.addressLine1 ?? order.invoiceAddressLine1 ?? null,
               invoiceAddressLine2: action.payload.shipTo?.addressLine2 ?? order.invoiceAddressLine2 ?? null,
@@ -736,18 +758,52 @@ function reducer(state, action) {
     case 'CONFIRM_SHIPMENT':
       return {
         ...state,
-        orders: state.orders.map((order) =>
-          order.id === action.payload.orderId
-            ? {
-                ...order,
-                status: 'shipped',
-                shippedAt: action.payload.timestamp,
-                packingSlipNumber: action.payload.packingSlipNumber,
-                packingSlipSentAt: action.payload.packingSlipSentAt,
-              }
-            : order
-        ),
+        orders: state.orders.map((order) => {
+          if (order.id !== action.payload.orderId) return order;
+          // No driver -> "packed"; driver already assigned -> "shipped".
+          const nextStatus = order.driverUserId ? 'shipped' : 'packed';
+          return {
+            ...order,
+            status: nextStatus,
+            shippedAt: nextStatus === 'shipped' ? action.payload.timestamp : order.shippedAt,
+            packingSlipNumber: action.payload.packingSlipNumber,
+            packingSlipSentAt: action.payload.packingSlipSentAt,
+          };
+        }),
       };
+    case 'ASSIGN_DRIVER':
+    case 'BULK_ASSIGN_DRIVER': {
+      const orderIds = new Set(
+        action.type === 'BULK_ASSIGN_DRIVER' ? action.payload.orderIds : [action.payload.orderId]
+      );
+      const nextDriverId = action.payload.driverUserId ?? null;
+      const timestamp = action.payload.timestamp ?? new Date().toISOString();
+      return {
+        ...state,
+        orders: state.orders.map((order) => {
+          if (!orderIds.has(order.id) || order.status === 'delivered') return order;
+          // Assigning a driver to a packed order dispatches it (shipped);
+          // clearing the driver on an un-delivered shipped order reverts it.
+          let status = order.status;
+          let shippedAt = order.shippedAt;
+          if (nextDriverId && order.status === 'packed') {
+            status = 'shipped';
+            shippedAt = timestamp;
+          } else if (!nextDriverId && order.status === 'shipped' && !order.podSignedAt) {
+            status = 'packed';
+            shippedAt = null;
+          }
+          return {
+            ...order,
+            driverUserId: nextDriverId,
+            driverAssignedAt: nextDriverId ? timestamp : null,
+            driverAssignedBy: nextDriverId ? state.currentUserId : null,
+            status,
+            shippedAt,
+          };
+        }),
+      };
+    }
     case 'COMPLETE_DELIVERY_POD':
       return {
         ...state,
@@ -815,6 +871,15 @@ function reducer(state, action) {
             : user
         ),
       };
+    case 'SEND_INVOICE_EMAIL':
+      return {
+        ...state,
+        orders: state.orders.map((order) =>
+          order.id === action.payload.orderId
+            ? { ...order, invoiceEmailSentAt: action.payload.timestamp ?? new Date().toISOString() }
+            : order
+        ),
+      };
     case 'UPDATE_QB_SETTINGS':
       return { ...state, quickBooks: { ...state.quickBooks, ...action.payload } };
     case 'ADD_AUDIT':
@@ -847,6 +912,7 @@ const serverWorkflowActions = new Set([
   'RESTORE_BATCH',
   'ASSIGN_DRIVER',
   'BULK_ASSIGN_DRIVER',
+  'SEND_INVOICE_EMAIL',
 ]);
 const serverAdminActions = new Set([
   'ADD_PRODUCT',
@@ -873,7 +939,10 @@ const serverAdminActions = new Set([
 const orderEmailEventsByAction = {
   DECLINE_ORDER: 'order_updated',
   APPLY_FULFILMENT_AND_DECLINE_REMAINING: 'order_updated',
-  CREATE_INVOICE: 'invoice_ready',
+  // Invoice emails are no longer sent automatically on creation. Admins review
+  // each invoice (accounting for transit damage) and dispatch it manually with
+  // SEND_INVOICE_EMAIL.
+  SEND_INVOICE_EMAIL: 'invoice_ready',
   CONFIRM_SHIPMENT: 'order_shipped',
   COMPLETE_DELIVERY_POD: 'order_delivered',
 };

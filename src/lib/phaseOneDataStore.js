@@ -86,6 +86,7 @@ function productToUi(product) {
     orderUnitLabel: product.order_unit_label ?? '',
     qbItemName: product.qb_item_name ?? `${product.name} ${product.unit_size}`.trim(),
     qbMappingStatus: product.qb_mapping_status ?? 'ready',
+    hstApplicable: product.hst_applicable === true,
     isCatalogActive: product.is_catalog_active !== false,
     imageUrl: product.image_url ?? '',
     imagePath: product.image_path ?? '',
@@ -602,6 +603,8 @@ export async function fetchRemoteState(supabase, userId) {
       overrideReason: item.override_reason,
       discountAmount: Number(item.discount_amount ?? 0),
       discountReason: item.discount_reason ?? '',
+      hstApplicable: item.hst_applicable === true,
+      hstAmount: item.hst_amount == null ? null : Number(item.hst_amount),
       qbTxnLineId: item.qb_txn_line_id ?? null,
       assignedBatches: assignmentsByItemId.get(item.id) ?? [],
     });
@@ -619,6 +622,7 @@ export async function fetchRemoteState(supabase, userId) {
     lockedAt: order.locked_at,
     invoiceNumber: order.invoice_number,
     invoiceTotal: order.invoice_total == null ? null : Number(order.invoice_total),
+    invoiceHstTotal: order.invoice_hst_total == null ? 0 : Number(order.invoice_hst_total),
     qbInvoiceNumber: order.qb_invoice_number,
     qbTxnId: order.qb_txn_id ?? null,
     qbEditSequence: order.qb_edit_sequence ?? null,
@@ -727,14 +731,24 @@ export async function fetchAuthIdentity(supabase, userId) {
   return 'customer';
 }
 
+export const DRIVER_RECENT_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+export function isRecentlyDeliveredOrder(order, nowMs = Date.now()) {
+  if (order.status !== 'delivered' || !order.podSignedAt) return false;
+  const signedMs = new Date(order.podSignedAt).getTime();
+  return Number.isFinite(signedMs) && nowMs - signedMs < DRIVER_RECENT_WINDOW_MS;
+}
+
 export async function fetchDriverPortalState(supabase, userId) {
   const data = await fetchRemoteState(supabase, userId);
-  // Drivers only see orders that are (a) still in shipped status — meaning
-  // POD hasn't been captured yet — AND (b) explicitly assigned to them.
-  // Once POD is captured the order flips to "delivered" and disappears from
-  // the queue immediately.
+  // Drivers see orders assigned to them that are either (a) still in "shipped"
+  // status — out for delivery, POD not yet captured — or (b) delivered within
+  // the last 24 hours, so a completed POD stays visible as recent history
+  // before dropping off the queue.
+  const nowMs = Date.now();
   const isDriverVisible = (order) =>
-    order.status === 'shipped' && order.driverUserId === userId;
+    order.driverUserId === userId
+    && (order.status === 'shipped' || isRecentlyDeliveredOrder(order, nowMs));
 
   const driverOrders = data.orders.filter(isDriverVisible);
   const visibleOrderIds = new Set(driverOrders.map((order) => order.id));
@@ -1064,6 +1078,11 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_batch_id: action.payload.id,
         p_user_id: currentUser.id,
       });
+    case 'SEND_INVOICE_EMAIL':
+      return callRpc(supabase, 'modhanios_send_invoice_email', {
+        p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+      });
     case 'ASSIGN_DRIVER':
       return callRpc(supabase, 'modhanios_assign_driver', {
         p_order_id: action.payload.orderId,
@@ -1101,6 +1120,7 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_lead_time_days: product.leadTimeDays == null || product.leadTimeDays === '' ? null : Number(product.leadTimeDays),
         p_order_unit_label: product.orderUnitLabel ?? null,
         p_qb_item_name: product.qbItemName ?? `${product.name} ${product.unitSize}`.trim(),
+        p_hst_applicable: Boolean(product.hstApplicable),
         p_image_url: product.imageUrl ?? null,
         p_image_path: product.imagePath ?? null,
       });
