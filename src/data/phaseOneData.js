@@ -290,6 +290,15 @@ export function getLocationName(locations, locationId) {
   return locations.find((location) => location.id === locationId)?.name ?? 'Unknown location';
 }
 
+/**
+ * Resolve the assigned driver's display name for an order. Returns null when no
+ * driver is assigned so callers can render their own "Unassigned" placeholder.
+ */
+export function getDriverName(users, driverUserId) {
+  if (!driverUserId) return null;
+  return users.find((user) => user.id === driverUserId)?.name ?? 'Unknown driver';
+}
+
 export function getQuickBooksSyncLabel(order) {
   if (order.qbSyncStatus === 'pushed') return order.qbInvoiceNumber ?? 'Pushed';
   if (order.qbSyncStatus === 'syncing') return 'Syncing';
