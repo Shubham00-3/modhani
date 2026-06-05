@@ -4531,16 +4531,57 @@ input[type='checkbox']:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
+.um-field {
+  display: block;
+  min-width: 0;
+}
 .um-field-label {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
   font-size: 12px;
   color: var(--color-text-muted);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
-.um-field-value { font-size: 14px; font-weight: 600; color: var(--color-text); }
+.um-field-value {
+  display: block;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
 .um-field-value.is-empty { color: var(--color-text-muted); font-weight: 400; font-style: italic; }
+.um-password-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+.um-password-value span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.um-password-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg, #fff);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.um-password-eye:hover:not(:disabled) {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.um-password-eye:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
 
 .um-detail-cards {
   display: grid;

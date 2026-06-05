@@ -22,7 +22,7 @@ import CustomerPortalShell from './pages/CustomerPortalShell';
 import CartProvider from './context/CartProvider';
 import DriverPortal from './pages/DriverPortal';
 
-// Detect Supabase invite / recovery callbacks before rendering the login form,
+// Detect Supabase account callbacks before rendering the login form,
 // so the JS client has time to turn the URL token or code into a session.
 function hasAuthHashInUrl() {
   if (typeof window === 'undefined') return false;
@@ -49,7 +49,7 @@ export default function App() {
 
   if (!state.initialized || state.authLoading || processingAuthHash) {
     const message = processingAuthHash
-      ? 'Processing your invite link...'
+      ? 'Processing your account link...'
       : `Preparing ${state.authConfigured ? 'Supabase-backed workspace' : 'demo workspace'}...`;
     return (
       <div
@@ -74,8 +74,7 @@ export default function App() {
     return <AuthScreen />;
   }
 
-  // Any newly invited user (staff, driver, or customer) lands here once on
-  // first sign-in to choose a password before reaching their portal.
+  // Legacy invited/recovery users can still finish password setup here.
   if (state.needsPasswordSetup && ['customer', 'staff', 'driver'].includes(state.authRole)) {
     return (
       <SetPasswordScreen

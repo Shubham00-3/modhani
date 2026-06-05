@@ -34,7 +34,7 @@ export default function CustomerPortalShell({ children }) {
   } = useCart();
 
   const contact = state.customerPortal?.contact ?? null;
-  const firstName = firstNameOf(contact?.fullName, contact?.email);
+  const firstName = firstNameOf(contact?.fullName, contact?.contactEmail || contact?.username || contact?.email);
 
   const activeCompany = portalClients.find((c) => c.id === activeClientId);
   const companyLabel = activeCompany

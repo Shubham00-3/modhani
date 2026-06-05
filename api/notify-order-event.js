@@ -1,6 +1,7 @@
 import { getAdminClient, getCallerFromBearer } from '../src/server/email/supabaseAdmin.js';
 import { sendTransactionalEmail } from '../src/server/email/resendClient.js';
 import { buildOrderEmail } from '../src/server/email/orderEmailTemplates.js';
+import { publicContactEmail } from '../src/server/auth/userCredentials.js';
 
 const ALLOWED_EVENTS = new Set([
   'order_received',
@@ -199,14 +200,14 @@ async function resolveRecipients(supabase, eventType, order, client) {
   const contactResult = matchingUserIds.length
     ? await supabase
         .from('customer_contacts')
-        .select('email')
+        .select('email, contact_email')
         .in('user_id', matchingUserIds)
         .eq('status', 'active')
     : { data: [], error: null };
 
   if (contactResult.error) return [];
 
-  const matchingContacts = (contactResult.data ?? []).map((contact) => contact.email);
+  const matchingContacts = (contactResult.data ?? []).map((contact) => publicContactEmail(contact));
 
   const fallbackEmails = [
     client?.email_packing_slip ? client?.packing_slip_email : null,

@@ -19,6 +19,10 @@ import { useApp } from '../context/useApp';
 import { supabase } from '../lib/supabaseClient';
 import { useModalBehavior } from '../hooks/useModalBehavior';
 
+function getCustomerContactLabel(contact) {
+  return contact?.contactEmail || contact?.email || contact?.username || contact?.authEmail || 'Not set';
+}
+
 export default function PhaseOneCustomers() {
   const { state, dispatch, addToast } = useApp();
   const canManage = state.currentUser?.permissions?.manageSettings;
@@ -40,7 +44,7 @@ export default function PhaseOneCustomers() {
         .map((a) => state.clients.find((c) => c.id === a.clientId)?.name ?? '')
         .join(' ');
 
-      const searchable = [contact.fullName, contact.email, assignedClientNames]
+      const searchable = [contact.fullName, contact.username, contact.contactEmail, contact.email, assignedClientNames]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
@@ -105,7 +109,7 @@ export default function PhaseOneCustomers() {
               type="search"
               value={customerSearch}
               onChange={(event) => setCustomerSearch(event.target.value)}
-              placeholder="Search customers by name, email, or company..."
+              placeholder="Search customers by name, username, email, or company..."
             />
           </label>
         </div>
@@ -132,8 +136,8 @@ export default function PhaseOneCustomers() {
                     }}
                   >
                     <div className="customer-contact-info">
-                      <strong>{contact.fullName || contact.email}</strong>
-                      <p>{contact.email}</p>
+                      <strong>{contact.fullName || contact.username || contact.email}</strong>
+                      <p>{getCustomerContactLabel(contact)}</p>
                     </div>
                     <div className="customer-contact-summary">
                       <span className="customer-chip-count">
@@ -174,8 +178,8 @@ export default function PhaseOneCustomers() {
             </div>
             <div className="empty-state-description">
               {customers.length
-                ? 'Try searching by name, email, or company.'
-                : 'Add your first customer using the button above. They will receive an invitation email to set their password.'}
+                ? 'Try searching by name, username, email, or company.'
+                : 'Add your first customer using the button above. Credentials can be emailed or shared manually.'}
             </div>
           </div>
         )}
@@ -188,7 +192,8 @@ export default function PhaseOneCustomers() {
         <div className="customer-tips-body">
           <div className="customer-tips-title">How customer accounts work</div>
           <ul className="customer-tips-list">
-            <li>Invited customers receive a password setup link by email.</li>
+            <li>Settings admins create customer usernames and passwords.</li>
+            <li>Contact email is optional; when present, credentials are emailed automatically.</li>
             <li>They can sign in to the customer portal to place orders and view recent invoices.</li>
             <li>Assign a customer to one or more companies/locations to control what they can order.</li>
           </ul>
@@ -200,7 +205,12 @@ export default function PhaseOneCustomers() {
           clients={state.clients}
           locations={state.locations}
           onClose={() => setShowAddModal(false)}
-          onSuccess={() => addToast('Customer invited successfully. They will receive an email link to set their password.')}
+          onSuccess={(data) => {
+            addToast(data?.emailSent
+              ? 'Customer created and credentials emailed.'
+              : 'Customer created. Share the username and password manually.');
+            setShowAddModal(false);
+          }}
         />
       ) : null}
     </div>
@@ -408,7 +418,7 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
       if (data.warning) {
         addToast(data.warning, 'warning');
       } else {
-        addToast(`Customer ${contact.email} has been permanently removed.`);
+        addToast(`Customer ${getCustomerContactLabel(contact)} has been permanently removed.`);
       }
 
       // Realtime subscription on customer_contacts will refresh the list
@@ -510,19 +520,19 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
             <strong>Permanently Remove Customer</strong>
           </div>
           <p>
-            This will permanently delete <strong>{contact.fullName || contact.email}</strong>'s account,
+            This will permanently delete <strong>{contact.fullName || getCustomerContactLabel(contact)}</strong>'s account,
             all company and location assignments, and their Supabase auth user.
             This action cannot be undone.
           </p>
           <div className="form-group">
             <label className="form-label">
-              Type <strong>{contact.email}</strong> to confirm:
+              Type <strong>{getCustomerContactLabel(contact)}</strong> to confirm:
             </label>
             <input
               className="form-input"
               value={deleteConfirmEmail}
               onChange={(e) => setDeleteConfirmEmail(e.target.value)}
-              placeholder={contact.email}
+              placeholder={getCustomerContactLabel(contact)}
               autoFocus
             />
           </div>
@@ -538,7 +548,7 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
             <button
               className="btn btn-danger btn-sm"
               type="button"
-              disabled={deleteConfirmEmail.trim().toLowerCase() !== contact.email.toLowerCase() || deleting}
+              disabled={deleteConfirmEmail.trim().toLowerCase() !== getCustomerContactLabel(contact).toLowerCase() || deleting}
               onClick={handleDelete}
             >
               <Trash2 size={14} /> {deleting ? 'Removing...' : 'Remove Permanently'}
@@ -556,7 +566,9 @@ function CustomerDetailPanel({ contact, clients, locations, initialClientIds, in
 
 function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
   const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
   const [selectedClientIds, setSelectedClientIds] = useState([]);
   const [selectedLocationIds, setSelectedLocationIds] = useState([]);
   const [submitting, setSubmitting] = useState(false);
@@ -606,33 +618,49 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
     setSubmitting(true);
     setError('');
 
+    const normalizedUsername = username.trim().toLowerCase();
+    const trimmedPassword = password.trim();
+    if (!fullName.trim() || !normalizedUsername || !trimmedPassword) {
+      setError('Full name, username, and password are required.');
+      setSubmitting(false);
+      return;
+    }
+    if (trimmedPassword.length < 6) {
+      setError('Password must be at least 6 characters.');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       // Get the current user's session token for authentication.
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
       if (sessionError || !sessionData.session) {
-        setError('You must be signed in to invite customers.');
+        setError('You must be signed in to create customers.');
         setSubmitting(false);
         return;
       }
 
-      const response = await fetch('/api/invite-customer', {
+      const response = await fetch('/api/create-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${sessionData.session.access_token}`,
         },
         body: JSON.stringify({
-          email: email.trim(),
+          role: 'customer',
           fullName: fullName.trim(),
+          username: normalizedUsername,
+          password: trimmedPassword,
+          contactEmail: contactEmail.trim() || null,
           clientIds: selectedClientIds,
           locationIds: selectedLocationIds,
         }),
       });
 
-      const data = await response.json();
+      const data = await readApiResponse(response);
 
-      if (!data.ok && !data.warning) {
-        setError(data.error || 'Failed to invite customer.');
+      if (!response.ok && !data.warning) {
+        setError(apiErrorMessage(data, response, 'Failed to create customer.'));
         setSubmitting(false);
         return;
       }
@@ -641,7 +669,7 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
         setError(data.warning);
       }
 
-      onSuccess();
+      onSuccess(data);
 
       // Realtime subscription on customer_contacts will pick up the new
       // contact automatically. No need for a hard page reload.
@@ -667,7 +695,7 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
             <p className="modal-description">
-              Enter the customer's details below. They will receive an email link to set their password and sign in to the Customer Portal.
+              Enter the customer's login details below. Contact email is optional; if it is blank, share the username and password manually.
             </p>
 
             <div className="form-group">
@@ -683,16 +711,47 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Email *</label>
+              <label className="form-label">Username *</label>
+              <div className="auth-input-wrap" style={{ background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
+                <UserPlus size={16} />
+                <input
+                  className="form-input"
+                  type="text"
+                  placeholder="customer.username"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  autoComplete="username"
+                  required
+                />
+              </div>
+              <div className="form-hint">
+                Use 3-32 lowercase letters, numbers, dots, underscores, or hyphens.
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Password *</label>
+              <input
+                className="form-input"
+                type="text"
+                placeholder="Minimum 6 characters"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="new-password"
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Contact Email (optional)</label>
               <div className="auth-input-wrap" style={{ background: 'var(--color-bg-secondary)', borderRadius: 'var(--radius-md)' }}>
                 <Mail size={16} />
                 <input
                   className="form-input"
                   type="email"
                   placeholder="customer@example.com"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
+                  value={contactEmail}
+                  onChange={(event) => setContactEmail(event.target.value)}
                 />
               </div>
             </div>
@@ -746,7 +805,7 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
             {error ? (
               <div className="alert alert-warning">
                 <div className="alert-content">
-                  <div className="alert-title">Could not invite</div>
+                  <div className="alert-title">Could not create customer</div>
                   <div className="alert-description">{error}</div>
                 </div>
               </div>
@@ -758,8 +817,8 @@ function AddCustomerModal({ clients, locations, onClose, onSuccess }) {
               Cancel
             </button>
             <button className={`btn btn-primary${submitting ? ' btn-loading' : ''}`} type="submit" disabled={submitting}>
-              <Mail size={16} />
-              {submitting ? 'Sending Invite...' : 'Send Invitation'}
+              <UserPlus size={16} />
+              {submitting ? 'Creating...' : 'Create Customer'}
             </button>
           </div>
         </form>
@@ -778,4 +837,22 @@ function arraysEqual(a, b) {
     if (a[i] !== b[i]) return false;
   }
   return true;
+}
+
+async function readApiResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text.trim().slice(0, 300) };
+  }
+}
+
+function apiErrorMessage(data, response, fallback) {
+  if (data?.error) return data.error;
+  if (response.status === 404) {
+    return 'Local API route was not found. Restart npm run dev so Vite loads the API middleware.';
+  }
+  return `${fallback} (${response.status})`;
 }

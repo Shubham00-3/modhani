@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { publicContactEmail } from '../src/server/auth/userCredentials.js';
 
 function getAdminClient() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -72,14 +73,14 @@ export default async function handler(req, res) {
   // Resolve target - could be a staff/driver profile or a customer contact.
   const { data: targetProfile } = await supabase
     .from('profiles')
-    .select('user_id, role, full_name, email, manage_settings, disabled_at')
+    .select('user_id, role, full_name, email, username, contact_email, manage_settings, disabled_at')
     .eq('user_id', userId)
     .maybeSingle();
 
   const { data: targetContact } = !targetProfile
     ? await supabase
         .from('customer_contacts')
-        .select('user_id, email, full_name, status, failed_login_attempts, failed_login_last_at')
+        .select('user_id, email, username, contact_email, full_name, status, failed_login_attempts, failed_login_last_at')
         .eq('user_id', userId)
         .maybeSingle()
     : { data: null };
@@ -151,7 +152,7 @@ export default async function handler(req, res) {
     ban_duration: disabled ? '876000h' : 'none',
   });
 
-  const targetEmail = targetProfile?.email ?? targetContact?.email ?? '';
+  const targetEmail = targetProfile?.username || targetContact?.username || publicContactEmail(targetProfile ?? targetContact) || targetProfile?.email || targetContact?.email || '';
   const targetName = targetProfile?.full_name ?? targetContact?.full_name ?? targetEmail;
   const role = targetProfile?.role ?? 'customer';
   const auditReason = reason?.trim();

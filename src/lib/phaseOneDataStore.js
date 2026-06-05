@@ -5,9 +5,14 @@ import {
 } from '../data/phaseOneData';
 
 function profileToUi(profile) {
+  const contactEmail = profile.contact_email ?? null;
+  const authEmail = profile.email ?? null;
   return {
     id: profile.user_id,
-    email: profile.email,
+    email: contactEmail || (isInternalAuthEmail(authEmail) ? '' : authEmail),
+    authEmail,
+    username: profile.username ?? '',
+    contactEmail,
     name: profile.full_name,
     initials: profile.initials,
     role: profile.role,
@@ -247,7 +252,9 @@ function reportLineToUi(row) {
 function profileToDb(user) {
   return {
     user_id: user.id,
-    email: user.email ?? null,
+    email: user.authEmail ?? user.email ?? null,
+    username: user.username || null,
+    contact_email: user.contactEmail || user.email || null,
     full_name: user.name,
     initials: user.initials,
     role: user.role,
@@ -330,9 +337,14 @@ function pricingToDb(pricing) {
 }
 
 function customerContactToUi(contact) {
+  const contactEmail = contact.contact_email ?? null;
+  const authEmail = contact.email ?? null;
   return {
     userId: contact.user_id,
-    email: contact.email,
+    email: contactEmail || (isInternalAuthEmail(authEmail) ? '' : authEmail),
+    authEmail,
+    username: contact.username ?? '',
+    contactEmail,
     fullName: contact.full_name,
     clientId: contact.client_id,
     status: contact.status,
@@ -341,6 +353,10 @@ function customerContactToUi(contact) {
     createdAt: contact.created_at,
     updatedAt: contact.updated_at,
   };
+}
+
+function isInternalAuthEmail(value) {
+  return String(value ?? '').trim().toLowerCase().endsWith('@auth.modhanios.local');
 }
 
 function customerClientAssignmentToUi(row) {

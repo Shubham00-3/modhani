@@ -34,7 +34,7 @@ export default function SetPasswordScreen({ authRole, onComplete }) {
 
     if (userError || !user || !isValidSetupSession) {
       await supabase.auth.signOut();
-      setError('Password setup is only available from an invite or password-reset email link. Open that email and try again.');
+      setError('Password setup is only available from an account setup email link. Open that email and try again.');
       setSubmitting(false);
       return;
     }

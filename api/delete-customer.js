@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { publicContactEmail } from '../src/server/auth/userCredentials.js';
 
 function getAdminClient() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -65,7 +66,7 @@ export default async function handler(req, res) {
   // Verify the target is actually a customer_contact (not a staff user).
   const { data: contact, error: contactError } = await supabase
     .from('customer_contacts')
-    .select('user_id, email, full_name')
+    .select('user_id, email, username, contact_email, full_name')
     .eq('user_id', customerUserId)
     .maybeSingle();
 
@@ -108,9 +109,10 @@ export default async function handler(req, res) {
   if (deleteAuthError) {
     await writeCustomerDeleteAudit(supabase, caller, staffProfile, contact, 'Customer record deleted, auth cleanup failed');
     // The contact record is already gone, warn about the auth orphan.
+    const contactLabel = getContactLabel(contact);
     return res.status(207).json({
       ok: true,
-      warning: `Customer record deleted, but the auth account could not be removed: ${deleteAuthError.message}. The email ${contact.email} may need manual cleanup in the Supabase dashboard.`,
+      warning: `Customer record deleted, but the auth account could not be removed: ${deleteAuthError.message}. The account ${contactLabel} may need manual cleanup in the Supabase dashboard.`,
     });
   }
 
@@ -119,19 +121,24 @@ export default async function handler(req, res) {
   return res.status(200).json({
     ok: true,
     deletedUserId: customerUserId,
-    deletedEmail: contact.email,
+    deletedContact: getContactLabel(contact),
   });
 }
 
 async function writeCustomerDeleteAudit(supabase, caller, staffProfile, contact, outcome) {
+  const contactLabel = getContactLabel(contact);
   await supabase.rpc('modhanios_insert_audit', {
     p_action: 'customer_removed',
     p_order_id: null,
     p_client_id: null,
     p_user_id: caller.id,
     p_user_name: staffProfile.full_name ?? caller.email ?? 'Unknown user',
-    p_details: `${outcome}: ${contact.full_name} (${contact.email})`,
-    p_previous_value: contact.email,
+    p_details: `${outcome}: ${contact.full_name} (${contactLabel})`,
+    p_previous_value: contactLabel,
     p_new_value: null,
   }).then(() => null, () => null);
+}
+
+function getContactLabel(contact) {
+  return contact?.username || publicContactEmail(contact) || contact?.email || contact?.user_id || 'unknown customer';
 }
