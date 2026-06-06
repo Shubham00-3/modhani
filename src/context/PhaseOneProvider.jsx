@@ -880,6 +880,18 @@ function reducer(state, action) {
             : order
         ),
       };
+    case 'BULK_SEND_INVOICE_EMAIL': {
+      const orderIds = new Set(action.payload.orderIds ?? []);
+      const timestamp = action.payload.timestamp ?? new Date().toISOString();
+      return {
+        ...state,
+        orders: state.orders.map((order) =>
+          orderIds.has(order.id) && order.invoiceNumber && !order.invoiceEmailSentAt
+            ? { ...order, invoiceEmailSentAt: timestamp }
+            : order
+        ),
+      };
+    }
     case 'UPDATE_QB_SETTINGS':
       return { ...state, quickBooks: { ...state.quickBooks, ...action.payload } };
     case 'ADD_AUDIT':
@@ -913,6 +925,7 @@ const serverWorkflowActions = new Set([
   'ASSIGN_DRIVER',
   'BULK_ASSIGN_DRIVER',
   'SEND_INVOICE_EMAIL',
+  'BULK_SEND_INVOICE_EMAIL',
 ]);
 const serverAdminActions = new Set([
   'ADD_PRODUCT',

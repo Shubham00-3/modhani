@@ -66,8 +66,16 @@ function openPrintableWindow(title, markup) {
   return true;
 }
 
+function getAppOrigin() {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin;
+  }
+  return '';
+}
+
 function getLogoSrc() {
-  return `${window.location.origin}/modhani-logo.png`;
+  const origin = getAppOrigin();
+  return `${origin}/modhani-logo.png`;
 }
 
 function escapeHtml(value) {
@@ -507,10 +515,28 @@ function buildPodSheetMarkup(order, { clients, locations, products, batches = []
 }
 
 export function printProofOfDelivery({ order, clients, locations, products, batches = [] }) {
-  openPrintableWindow(
+  return openPrintableWindow(
     `POD ${order.orderNumber}`,
     POD_PRINT_STYLE + buildPodSheetMarkup(order, { clients, locations, products, batches })
   );
+}
+
+export function buildProofOfDeliveryHtml({ order, clients, locations, products, batches = [] }) {
+  const title = `POD ${order.orderNumber}`;
+  return `
+    <!doctype html>
+    <html lang="en">
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>${escapeHtml(title)}</title>
+        ${POD_PRINT_STYLE}
+      </head>
+      <body style="margin:0;background:#fff;">
+        ${buildPodSheetMarkup(order, { clients, locations, products, batches })}
+      </body>
+    </html>
+  `;
 }
 
 /**
@@ -518,16 +544,243 @@ export function printProofOfDelivery({ order, clients, locations, products, batc
  * single printable window so the user can "Save as PDF" — matching the
  * invoice/packing-slip export convention.
  */
+function sanitizeDownloadName(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/[<>:"/\\|?*]/g, '-')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'file';
+}
+
+function triggerDownload(blob, fileName) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function imageFormatFromDataUrl(dataUrl) {
+  return String(dataUrl).includes('image/jpeg') || String(dataUrl).includes('image/jpg') ? 'JPEG' : 'PNG';
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read image.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+let podLogoDataUrlPromise = null;
+
+async function getPodLogoDataUrl() {
+  if (!podLogoDataUrlPromise) {
+    podLogoDataUrlPromise = fetch(getLogoSrc())
+      .then((response) => (response.ok ? response.blob() : null))
+      .then((blob) => (blob ? blobToDataUrl(blob) : null))
+      .catch(() => null);
+  }
+  return podLogoDataUrlPromise;
+}
+
+async function imageUrlToDataUrl(url) {
+  if (!url) return null;
+  if (String(url).startsWith('data:image/')) return url;
+  const response = await fetch(url).catch(() => null);
+  if (!response?.ok) return null;
+  return blobToDataUrl(await response.blob()).catch(() => null);
+}
+
+function drawTextLines(doc, text, x, y, maxWidth, options = {}) {
+  const lineHeight = options.lineHeight ?? 11;
+  const lines = doc.splitTextToSize(String(text ?? '-'), maxWidth);
+  doc.text(lines, x, y);
+  return y + lines.length * lineHeight;
+}
+
+function addImageIfAvailable(doc, dataUrl, x, y, width, height) {
+  if (!dataUrl) return false;
+  try {
+    doc.addImage(dataUrl, imageFormatFromDataUrl(dataUrl), x, y, width, height);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function buildProofOfDeliveryPdfBlob({ jsPDF, order, clients, locations, products, batches = [] }) {
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 36;
+  const bottom = pageHeight - margin;
+  let y = margin;
+
+  const ensureSpace = (height) => {
+    if (y + height <= bottom) return;
+    doc.addPage();
+    y = margin;
+  };
+
+  const clientName = getClientName(clients, order.clientId);
+  const location = locations.find((entry) => entry.id === order.locationId);
+  const shipTo = getOrderShipToSnapshot(order, location);
+  const signedAt = order.podSignedAt ?? new Date().toISOString();
+  const signedLocal = order.podSignedAtLocal ?? formatTorontoDateTime(signedAt);
+  const signedTimezone = order.podSignedTimezone ?? 'America/Toronto';
+  const logoDataUrl = await getPodLogoDataUrl();
+
+  addImageIfAvailable(doc, logoDataUrl, margin, y - 4, 90, 34);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('Proof of Delivery', margin + 110, y + 12);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text('Signed delivery record', margin + 110, y + 28);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text(`Order #: ${order.orderNumber}`, pageWidth - margin - 130, y + 4);
+  doc.text(`Invoice #: ${order.invoiceNumber ?? '-'}`, pageWidth - margin - 130, y + 18);
+  doc.text(`Signed: ${formatDate(signedAt)}`, pageWidth - margin - 130, y + 32);
+  y += 58;
+
+  doc.setDrawColor(229, 231, 235);
+  doc.roundedRect(margin, y, 250, 74, 6, 6);
+  doc.roundedRect(margin + 266, y, pageWidth - margin * 2 - 266, 74, 6, 6);
+  doc.setFontSize(8);
+  doc.setTextColor(107, 114, 128);
+  doc.text('CLIENT', margin + 10, y + 16);
+  doc.text('SHIP TO', margin + 276, y + 16);
+  doc.setTextColor(17, 24, 39);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(11);
+  drawTextLines(doc, clientName, margin + 10, y + 34, 225);
+  doc.setFont('helvetica', 'normal');
+  drawTextLines(
+    doc,
+    [
+      shipTo.name,
+      shipTo.addressLine1,
+      shipTo.addressLine2,
+      [shipTo.city, shipTo.province, shipTo.postalCode].filter(Boolean).join(' '),
+      shipTo.country,
+    ].filter(Boolean).join('\n'),
+    margin + 276,
+    y + 34,
+    pageWidth - margin * 2 - 286,
+    { lineHeight: 10 }
+  );
+  y += 96;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(10);
+  doc.text('Product', margin, y);
+  doc.text('Lot Codes', margin + 310, y);
+  doc.text('Qty', pageWidth - margin - 25, y);
+  y += 10;
+  doc.line(margin, y, pageWidth - margin, y);
+  y += 18;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  order.items
+    .filter((item) => (item.invoiceQty ?? item.fulfilledQty) > 0)
+    .forEach((item) => {
+      ensureSpace(44);
+      const product = getProduct(products, item.productId);
+      const qty = item.invoiceQty ?? item.fulfilledQty;
+      const lotCodes = [
+        ...new Set(
+          item.assignedBatches?.map((assigned) => {
+            const batch = batches.find((entry) => entry.id === assigned.batchId);
+            return normalizeLotCode(batch?.batchNumber ?? assigned.batchId);
+          }) ?? []
+        ),
+      ].filter(Boolean).join(', ') || 'No lot assignment';
+
+      const rowStart = y;
+      const nextProductY = drawTextLines(doc, getProductDisplayName(product), margin, y, 290, { lineHeight: 11 });
+      drawTextLines(doc, lotCodes, margin + 310, y, 130, { lineHeight: 11 });
+      doc.text(String(qty.toLocaleString()), pageWidth - margin - 25, y, { align: 'right' });
+      y = Math.max(nextProductY, rowStart + 22);
+      doc.setDrawColor(229, 231, 235);
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 16;
+    });
+
+  ensureSpace(132);
+  const signatureY = y;
+  doc.roundedRect(margin, signatureY, 250, 100, 6, 6);
+  doc.roundedRect(margin + 266, signatureY, pageWidth - margin * 2 - 266, 100, 6, 6);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(107, 114, 128);
+  doc.text('RECEIVER SIGNATURE', margin + 10, signatureY + 16);
+  doc.setTextColor(17, 24, 39);
+  addImageIfAvailable(doc, order.podSignatureDataUrl, margin + 22, signatureY + 30, 120, 44);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(`Received By: ${order.podSignedBy ?? '-'}`, margin + 276, signatureY + 24);
+  doc.text(`Local Timestamp: ${signedLocal}`, margin + 276, signatureY + 40);
+  doc.text(`Timezone: ${signedTimezone}`, margin + 276, signatureY + 56);
+  drawTextLines(doc, `Delivery Notes: ${order.podNotes ?? '-'}`, margin + 276, signatureY + 72, pageWidth - margin * 2 - 286);
+
+  const photoUrls = Array.isArray(order.podPhotoUrls) ? order.podPhotoUrls : [];
+  if (photoUrls.length) {
+    doc.addPage();
+    y = margin;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text(`Delivery Photos - Order #${order.orderNumber}`, margin, y);
+    y += 24;
+    const photoDataUrls = await Promise.all(photoUrls.slice(0, 4).map(imageUrlToDataUrl));
+    photoDataUrls.filter(Boolean).forEach((photoDataUrl, index) => {
+      const col = index % 2;
+      const row = Math.floor(index / 2);
+      addImageIfAvailable(doc, photoDataUrl, margin + col * 270, y + row * 220, 220, 180);
+    });
+  }
+
+  return doc.output('blob');
+}
+
+export async function downloadProofOfDeliveryZip({ orders, clients, locations, products, batches = [] }) {
+  const podOrders = (orders ?? []).filter((order) => order && order.podSignedAt);
+  if (!podOrders.length) return false;
+
+  const [{ jsPDF }, { default: JSZip }] = await Promise.all([
+    import('jspdf'),
+    import('jszip'),
+  ]);
+  const zip = new JSZip();
+  for (const order of podOrders) {
+    const pdfBlob = await buildProofOfDeliveryPdfBlob({ jsPDF, order, clients, locations, products, batches });
+    const signedDate = String(order.podSignedAt ?? new Date().toISOString()).slice(0, 10);
+    const fileName = `${sanitizeDownloadName(`POD-${order.orderNumber}-${signedDate}`)}.pdf`;
+    zip.file(fileName, pdfBlob);
+  }
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const dateLabel = new Date().toISOString().slice(0, 10);
+  triggerDownload(zipBlob, `PODs-${dateLabel}.zip`);
+  return true;
+}
+
 export function printProofOfDeliveryBatch({ orders, clients, locations, products, batches = [] }) {
   const podOrders = (orders ?? []).filter((order) => order && order.podSignedAt);
   if (!podOrders.length) return false;
 
-  const sheets = podOrders
-    .map((order) => buildPodSheetMarkup(order, { clients, locations, products, batches }))
-    .join('');
-
-  const title = podOrders.length === 1 ? `POD ${podOrders[0].orderNumber}` : `PODs (${podOrders.length})`;
-  return openPrintableWindow(title, POD_PRINT_STYLE + sheets);
+  return podOrders.every((order) =>
+    printProofOfDelivery({ order, clients, locations, products, batches })
+  );
 }
 
 function reportMetricCards(summary) {

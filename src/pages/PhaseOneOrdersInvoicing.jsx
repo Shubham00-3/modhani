@@ -107,6 +107,7 @@ export default function PhaseOneOrdersInvoicing() {
   const [showInvoiceModal, setShowInvoiceModal] = useState(false);
   const [showEditInvoiceModal, setShowEditInvoiceModal] = useState(false);
   const [showAddOrderModal, setShowAddOrderModal] = useState(false);
+  const [showBulkInvoiceModal, setShowBulkInvoiceModal] = useState(false);
   const [bulkSelectedIds, setBulkSelectedIds] = useState(() => new Set());
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
   const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || filters.driverUserId || dashboardView || dashboardSearch);
@@ -361,9 +362,14 @@ export default function PhaseOneOrdersInvoicing() {
             Manual fulfilment, invoicing, QuickBooks sync, and packing slip control.
           </p>
         </div>
-        <button className="btn btn-primary" type="button" disabled={!canCreateOrders} onClick={() => setShowAddOrderModal(true)}>
-          <Plus size={16} /> Add Incoming Order
-        </button>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', flexWrap: 'wrap' }}>
+          <button className="btn btn-secondary" type="button" onClick={() => setShowBulkInvoiceModal(true)}>
+            <Mail size={16} /> Send Invoices
+          </button>
+          <button className="btn btn-primary" type="button" disabled={!canCreateOrders} onClick={() => setShowAddOrderModal(true)}>
+            <Plus size={16} /> Add Incoming Order
+          </button>
+        </div>
       </div>
 
       {!canCreateOrders ? (
@@ -687,6 +693,260 @@ export default function PhaseOneOrdersInvoicing() {
       {showInvoiceModal && selectedOrder ? <InvoiceModal order={selectedOrder} onClose={() => setShowInvoiceModal(false)} /> : null}
       {showEditInvoiceModal && selectedOrder ? <EditInvoiceModal order={selectedOrder} onClose={() => setShowEditInvoiceModal(false)} /> : null}
       {showAddOrderModal ? <AddOrderModal onClose={() => setShowAddOrderModal(false)} /> : null}
+      {showBulkInvoiceModal ? (
+        <BulkInvoiceModal
+          onClose={() => setShowBulkInvoiceModal(false)}
+          onReviewOrder={(order) => {
+            setSelectedOrderId(order.id);
+            setShowBulkInvoiceModal(false);
+            setShowEditInvoiceModal(true);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+// Yesterday's local-day window [start, end) for the "Previous day" quick filter.
+function getPreviousDayRange(now = new Date()) {
+  const start = new Date(now);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - 1);
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+  return { start: start.getTime(), end: end.getTime() };
+}
+
+function isInvoiceBlockedByQuickBooks(order) {
+  return ['pending', 'syncing', 'failed'].includes(order.qbSyncStatus);
+}
+
+function BulkInvoiceModal({ onClose, onReviewOrder }) {
+  const { state, dispatch, addToast, notifyOrderEvent } = useApp();
+  useModalBehavior(onClose);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [onlyPreviousDay, setOnlyPreviousDay] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  // Every order with an invoice that has not been emailed yet, newest first.
+  const unsentInvoices = useMemo(
+    () =>
+      state.orders
+        .filter((order) => order.invoiceNumber && !order.invoiceEmailSentAt)
+        .sort((a, b) => new Date(b.invoicedAt ?? 0).getTime() - new Date(a.invoicedAt ?? 0).getTime()),
+    [state.orders]
+  );
+
+  const visibleInvoices = useMemo(() => {
+    if (!onlyPreviousDay) return unsentInvoices;
+    const { start, end } = getPreviousDayRange();
+    return unsentInvoices.filter((order) => {
+      const invoicedMs = new Date(order.invoicedAt ?? 0).getTime();
+      return invoicedMs >= start && invoicedMs < end;
+    });
+  }, [unsentInvoices, onlyPreviousDay]);
+
+  const visibleIds = visibleInvoices.map((order) => order.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const selectedOrders = visibleInvoices.filter((order) => selectedIds.has(order.id));
+
+  function toggleOne(orderId, checked) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(orderId);
+      else next.delete(orderId);
+      return next;
+    });
+  }
+
+  function toggleAllVisible(checked) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      visibleIds.forEach((id) => (checked ? next.add(id) : next.delete(id)));
+      return next;
+    });
+  }
+
+  function selectPreviousDayInvoices() {
+    const { start, end } = getPreviousDayRange();
+    const previousDayIds = unsentInvoices
+      .filter((order) => {
+        const invoicedMs = new Date(order.invoicedAt ?? 0).getTime();
+        return invoicedMs >= start && invoicedMs < end;
+      })
+      .map((order) => order.id);
+
+    setOnlyPreviousDay(true);
+    setSelectedIds(new Set(previousDayIds));
+  }
+
+  async function handleSend() {
+    const orderIds = selectedOrders.map((order) => order.id);
+    if (!orderIds.length) {
+      addToast('Select at least one invoice to send.', 'warning');
+      return;
+    }
+
+    const blockedByQuickBooks = selectedOrders.filter(isInvoiceBlockedByQuickBooks);
+    if (blockedByQuickBooks.length) {
+      const orderList = blockedByQuickBooks.map((order) => `#${order.orderNumber}`).join(', ');
+      addToast(`Resolve QuickBooks sync before sending: ${orderList}`, 'warning');
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await dispatch({
+        type: 'BULK_SEND_INVOICE_EMAIL',
+        payload: { orderIds, timestamp: new Date().toISOString() },
+      });
+
+      if (result?.ok) {
+        // Fire the customer email per invoice (the bulk RPC only stamps them sent).
+        const emailResults = await Promise.all(
+          orderIds.map((orderId) =>
+            notifyOrderEvent(orderId, 'invoice_ready').catch((error) => ({ ok: false, error }))
+          )
+        );
+        const failedEmails = emailResults.filter((entry) => entry?.ok === false).length;
+        addToast(
+          failedEmails
+            ? `Marked ${orderIds.length} invoice${orderIds.length === 1 ? '' : 's'} sent; ${failedEmails} email notification${failedEmails === 1 ? '' : 's'} failed.`
+            : `Sent ${orderIds.length} invoice${orderIds.length === 1 ? '' : 's'}.`
+        );
+        setSelectedIds(new Set());
+        onClose();
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleQueueQuickBooks() {
+    const queueable = selectedOrders.filter((order) => {
+      const location = state.locations.find((entry) => entry.id === order.locationId);
+      return isLocationShipToReady(location) && order.qbSyncStatus !== 'syncing';
+    });
+    if (!queueable.length) {
+      addToast('No selected invoices are ready for QuickBooks sync.', 'warning');
+      return;
+    }
+
+    setBusy(true);
+    let queued = 0;
+    for (const order of queueable) {
+      const result = await dispatch({
+        type: 'QUEUE_QB_INVOICE',
+        payload: {
+          orderId: order.id,
+          jobType: order.qbTxnId ? 'invoice_update' : 'invoice',
+          timestamp: new Date().toISOString(),
+        },
+      });
+      if (result?.ok) queued += 1;
+    }
+    setBusy(false);
+    addToast(`Queued ${queued} invoice${queued === 1 ? '' : 's'} for QuickBooks.`);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="bulk-invoice-title" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 760 }}>
+        <div className="modal-header">
+          <h3 id="bulk-invoice-title" className="modal-title">Send Invoices</h3>
+          <button className="btn btn-ghost" type="button" onClick={onClose} aria-label="Close bulk invoice">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-3)', flexWrap: 'wrap', marginBottom: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <button
+                className={`btn btn-sm ${onlyPreviousDay ? 'btn-ghost' : 'btn-secondary'}`}
+                type="button"
+                onClick={() => setOnlyPreviousDay(false)}
+              >
+                All unsent ({unsentInvoices.length})
+              </button>
+              <button
+                className="btn btn-sm btn-secondary"
+                type="button"
+                onClick={selectPreviousDayInvoices}
+              >
+                Previous day
+              </button>
+            </div>
+            <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
+              {selectedOrders.length} selected
+            </div>
+          </div>
+
+          {visibleInvoices.length ? (
+            <div className="table-scroll-wrapper">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th style={{ width: 36, textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        aria-label="Select all visible invoices"
+                        checked={allVisibleSelected}
+                        onChange={(event) => toggleAllVisible(event.target.checked)}
+                      />
+                    </th>
+                    <th>Order</th>
+                    <th>Client</th>
+                    <th>Invoiced</th>
+                    <th>QuickBooks</th>
+                    <th className="cell-align-right">Total</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleInvoices.map((order) => (
+                    <tr key={order.id}>
+                      <td style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          aria-label={`Select invoice for order ${order.orderNumber}`}
+                          checked={selectedIds.has(order.id)}
+                          onChange={(event) => toggleOne(order.id, event.target.checked)}
+                        />
+                      </td>
+                      <td className="cell-monospace cell-align-left">#{order.orderNumber}</td>
+                      <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
+                      <td>{order.invoicedAt ? formatDate(order.invoicedAt) : '-'}</td>
+                      <td className="cell-align-left">{getQuickBooksSyncLabel(order)}</td>
+                      <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
+                      <td>
+                        <button className="btn btn-ghost btn-sm" type="button" onClick={() => onReviewOrder(order)}>
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
+              <div className="empty-state-title">No unsent invoices</div>
+              <div className="empty-state-description">
+                {onlyPreviousDay ? 'No invoices were created yesterday.' : 'Every invoice has already been sent.'}
+              </div>
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-ghost" type="button" onClick={onClose} disabled={busy}>Cancel</button>
+          <button className="btn btn-secondary" type="button" onClick={handleQueueQuickBooks} disabled={busy || selectedOrders.length === 0}>
+            <FileText size={16} /> Queue for QuickBooks
+          </button>
+          <button className="btn btn-primary" type="button" onClick={handleSend} disabled={busy || selectedOrders.length === 0}>
+            <Mail size={16} /> Send Selected ({selectedOrders.length})
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

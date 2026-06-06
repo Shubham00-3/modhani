@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, ClipboardSignature, LogOut, MapPin, Printer, RotateCcw, Trash2, Truck } from 'lucide-react';
+import { Camera, ClipboardSignature, LogOut, MapPin, Navigation, Printer, RotateCcw, Trash2, Truck } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { supabase } from '../lib/supabaseClient';
+import { syncPodToGoogleDrive } from '../lib/googleDriveSync';
 import {
   formatDateTime,
   formatTorontoDateTime,
@@ -13,6 +14,7 @@ import {
   normalizeLotCode,
 } from '../data/phaseOneData';
 import { printProofOfDelivery } from '../utils/printDocuments';
+import { buildOptimizedRoute, buildGoogleMapsRouteUrl } from '../utils/driverRoute';
 
 function formatAddress(shipTo) {
   // Clean each part: trim, strip trailing commas/whitespace.
@@ -337,6 +339,13 @@ export default function DriverPortal() {
     [state.orders]
   );
 
+  // Basic, address-only delivery route for the pending stops (no API/geolocation).
+  const routeStops = useMemo(
+    () => buildOptimizedRoute(pendingOrders, state.locations),
+    [pendingOrders, state.locations]
+  );
+  const routeMapUrl = useMemo(() => buildGoogleMapsRouteUrl(routeStops), [routeStops]);
+
   const selectedOrder = useMemo(
     () => state.orders.find((order) => order.id === effectiveSelectedOrderId) ?? null,
     [effectiveSelectedOrderId, state.orders]
@@ -377,9 +386,10 @@ export default function DriverPortal() {
 
     setSaving(true);
     const justPoddedOrderId = selectedOrder.id;
+    let signedTimestamp = null;
     let result;
     try {
-      const signedTimestamp = buildPodTimestampSnapshot();
+      signedTimestamp = buildPodTimestampSnapshot();
       result = await dispatch({
         type: 'COMPLETE_DELIVERY_POD',
         payload: {
@@ -404,6 +414,35 @@ export default function DriverPortal() {
 
     if (result?.ok) {
       addToast(`POD saved for order #${selectedOrder.orderNumber}.`);
+      const savedPodOrder = {
+        ...selectedOrder,
+        status: 'delivered',
+        podSignatureDataUrl: signatureDataUrl,
+        podSignedBy: signedBy.trim(),
+        podSignedAt: signedTimestamp?.iso ?? new Date().toISOString(),
+        podSignedAtLocal: signedTimestamp?.local ?? null,
+        podSignedTimezone: signedTimestamp?.timeZone ?? POD_TIME_ZONE,
+        podNotes: notes.trim(),
+        podCapturedBy: state.currentUserId,
+        podPhotoUrls: completedPhotos.map((photo) => photo.url),
+        podPhotoPaths: completedPhotos.map((photo) => photo.path),
+      };
+      syncPodToGoogleDrive({
+        supabase,
+        order: savedPodOrder,
+        clients: state.clients,
+        locations: state.locations,
+        products: state.products,
+        batches: state.batches,
+      }).then((syncResult) => {
+        if (syncResult?.ok && !syncResult.skipped) {
+          addToast('POD synced to Google Drive.');
+        } else if (syncResult?.ok === false) {
+          addToast(`POD saved, but Google Drive sync failed: ${syncResult.error}`, 'warning');
+        }
+      }).catch((syncError) => {
+        addToast(`POD saved, but Google Drive sync failed: ${syncError.message}`, 'warning');
+      });
       setSelectedOrderId(justPoddedOrderId);
       setSignedBy('');
       setSignatureDataUrl('');
@@ -429,6 +468,38 @@ export default function DriverPortal() {
           <LogOut size={16} /> Sign Out
         </button>
       </header>
+
+      {routeStops.length ? (
+        <section className="driver-route-card">
+          <div className="driver-route-head">
+            <div className="driver-section-title">
+              <Navigation size={18} /> Today&apos;s Route
+              <span className="driver-route-count">{routeStops.length} stop{routeStops.length === 1 ? '' : 's'}</span>
+            </div>
+            <button
+              className="btn btn-primary"
+              type="button"
+              disabled={!routeMapUrl}
+              onClick={() => routeMapUrl && window.open(routeMapUrl, '_blank', 'noopener')}
+            >
+              <MapPin size={16} /> Open in Google Maps
+            </button>
+          </div>
+          <ol className="driver-route-list">
+            {routeStops.map((stop) => (
+              <li key={stop.order.id}>
+                <span className="driver-route-stop-client">
+                  #{stop.order.orderNumber} · {getClientName(state.clients, stop.order.clientId)}
+                </span>
+                <span className="driver-route-stop-address">{stop.address || 'No address on file'}</span>
+              </li>
+            ))}
+          </ol>
+          <p className="driver-route-note">
+            A basic suggested order by address — follow it or not, it&apos;s up to you. Google Maps may re-optimize when opened.
+          </p>
+        </section>
+      ) : null}
 
       <main className="driver-portal-layout">
         <aside className="driver-order-list" aria-label="Delivery orders">
@@ -555,22 +626,6 @@ export default function DriverPortal() {
                       <img src={selectedOrder.podSignatureDataUrl} alt="Saved proof of delivery signature" />
                     ) : null}
                   </div>
-                  <button
-                    className="btn btn-secondary"
-                    type="button"
-                    style={{ marginTop: 'var(--space-3)' }}
-                    onClick={() =>
-                      printProofOfDelivery({
-                        order: selectedOrder,
-                        clients: state.clients,
-                        locations: state.locations,
-                        products: state.products,
-                        batches: state.batches,
-                      })
-                    }
-                  >
-                    <Printer size={16} /> Print POD
-                  </button>
                   {Array.isArray(selectedOrder.podPhotoUrls) && selectedOrder.podPhotoUrls.length > 0 ? (
                     <div style={{ marginTop: 'var(--space-3)' }}>
                       <div className="driver-section-title">Delivery Photos</div>
