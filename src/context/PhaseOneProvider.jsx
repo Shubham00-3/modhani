@@ -952,10 +952,6 @@ const serverAdminActions = new Set([
 const orderEmailEventsByAction = {
   DECLINE_ORDER: 'order_updated',
   APPLY_FULFILMENT_AND_DECLINE_REMAINING: 'order_updated',
-  // Invoice emails are no longer sent automatically on creation. Admins review
-  // each invoice (accounting for transit damage) and dispatch it manually with
-  // SEND_INVOICE_EMAIL.
-  SEND_INVOICE_EMAIL: 'invoice_ready',
   CONFIRM_SHIPMENT: 'order_shipped',
   COMPLETE_DELIVERY_POD: 'order_delivered',
 };
@@ -1395,8 +1391,10 @@ export function AppProvider({ children }) {
     return { ok: true };
   }, []);
 
-  const notifyOrderEvent = useCallback(async (orderId, eventType) => {
+  const notifyOrderEvent = useCallback(async (orderId, eventType, options = {}) => {
     if (!supabase || !orderId || !eventType) return { ok: true };
+    const showSuccessToast = options.showSuccessToast !== false;
+    const showErrorToast = options.showErrorToast !== false;
 
     const { data: sessionResult, error: sessionError } = await supabase.auth.getSession();
     if (sessionError || !sessionResult.session) {
@@ -1415,11 +1413,13 @@ export function AppProvider({ children }) {
 
     if (!response.ok || data.ok === false) {
       const message = data.error || `Email notification failed (${response.status}).`;
-      addToast(message, 'warning');
+      if (showErrorToast) {
+        addToast(message, 'warning');
+      }
       return { ok: false, error: message };
     }
 
-    if (!data.skipped) {
+    if (!data.skipped && showSuccessToast) {
       addToast('Customer email notification sent.');
     }
 

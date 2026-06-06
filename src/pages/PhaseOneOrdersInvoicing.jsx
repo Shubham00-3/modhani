@@ -89,7 +89,7 @@ function buildAutoFifoAssignments(order, batches) {
 }
 
 export default function PhaseOneOrdersInvoicing() {
-  const { state, dispatch, addToast } = useApp();
+  const { state, dispatch, addToast, notifyOrderEvent } = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const dashboardView = searchParams.get('view') ?? '';
   const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
@@ -340,6 +340,19 @@ export default function PhaseOneOrdersInvoicing() {
     }
     if (order.invoiceEmailSentAt) {
       addToast(`Invoice for Order #${order.orderNumber} was already sent.`, 'warning');
+      return;
+    }
+
+    const emailResult = await notifyOrderEvent(order.id, 'invoice_ready', {
+      showSuccessToast: false,
+      showErrorToast: false,
+    }).catch((error) => ({
+      ok: false,
+      error: error?.message ?? 'Invoice email failed.',
+    }));
+
+    if (!emailResult?.ok) {
+      addToast(`Invoice email failed for Order #${order.orderNumber}. It was not marked as sent.`, 'warning');
       return;
     }
 
@@ -727,6 +740,7 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [onlyPreviousDay, setOnlyPreviousDay] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [failedInvoiceIds, setFailedInvoiceIds] = useState(() => new Set());
 
   // Every order with an invoice that has not been emailed yet, newest first.
   const unsentInvoices = useMemo(
@@ -748,7 +762,7 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
 
   const visibleIds = visibleInvoices.map((order) => order.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
-  const selectedOrders = visibleInvoices.filter((order) => selectedIds.has(order.id));
+  const selectedOrders = unsentInvoices.filter((order) => selectedIds.has(order.id));
 
   function toggleOne(orderId, checked) {
     setSelectedIds((current) => {
@@ -767,6 +781,11 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
     });
   }
 
+  function selectAllUnsentInvoices() {
+    setOnlyPreviousDay(false);
+    setSelectedIds(new Set(unsentInvoices.map((order) => order.id)));
+  }
+
   function selectPreviousDayInvoices() {
     const { start, end } = getPreviousDayRange();
     const previousDayIds = unsentInvoices
@@ -781,8 +800,7 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
   }
 
   async function handleSend() {
-    const orderIds = selectedOrders.map((order) => order.id);
-    if (!orderIds.length) {
+    if (!selectedOrders.length) {
       addToast('Select at least one invoice to send.', 'warning');
       return;
     }
@@ -796,27 +814,55 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
 
     setBusy(true);
     try {
+      const emailResults = await Promise.all(
+        selectedOrders.map(async (order) => {
+          const result = await notifyOrderEvent(order.id, 'invoice_ready', {
+            showSuccessToast: false,
+            showErrorToast: false,
+          }).catch((error) => ({
+            ok: false,
+            error: error?.message ?? 'Invoice email failed.',
+          }));
+          return { order, result };
+        })
+      );
+
+      const successfulOrders = emailResults.filter((entry) => entry.result?.ok).map((entry) => entry.order);
+      const failedOrders = emailResults.filter((entry) => !entry.result?.ok).map((entry) => entry.order);
+      const successfulIds = successfulOrders.map((order) => order.id);
+      const failedIds = failedOrders.map((order) => order.id);
+
+      if (!successfulIds.length) {
+        setFailedInvoiceIds(new Set(failedIds));
+        setSelectedIds(new Set(failedIds));
+        addToast(`Failed to send ${failedIds.length} invoice${failedIds.length === 1 ? '' : 's'}. Fix the issue and retry.`, 'warning');
+        return;
+      }
+
       const result = await dispatch({
         type: 'BULK_SEND_INVOICE_EMAIL',
-        payload: { orderIds, timestamp: new Date().toISOString() },
+        payload: { orderIds: successfulIds, timestamp: new Date().toISOString() },
       });
-
       if (result?.ok) {
-        // Fire the customer email per invoice (the bulk RPC only stamps them sent).
-        const emailResults = await Promise.all(
-          orderIds.map((orderId) =>
-            notifyOrderEvent(orderId, 'invoice_ready').catch((error) => ({ ok: false, error }))
-          )
-        );
-        const failedEmails = emailResults.filter((entry) => entry?.ok === false).length;
+        setFailedInvoiceIds(new Set(failedIds));
+        if (failedIds.length) {
+          setSelectedIds(new Set(failedIds));
+          addToast(
+            `Sent ${successfulIds.length} invoice${successfulIds.length === 1 ? '' : 's'}. ${failedIds.length} failed and remain selected for retry.`,
+            'warning'
+          );
+          return;
+        }
+
         addToast(
-          failedEmails
-            ? `Marked ${orderIds.length} invoice${orderIds.length === 1 ? '' : 's'} sent; ${failedEmails} email notification${failedEmails === 1 ? '' : 's'} failed.`
-            : `Sent ${orderIds.length} invoice${orderIds.length === 1 ? '' : 's'}.`
+          `Sent ${successfulIds.length} invoice${successfulIds.length === 1 ? '' : 's'}.`
         );
         setSelectedIds(new Set());
         onClose();
+        return;
       }
+
+      addToast('Email was sent, but marking invoices as sent failed. Refresh before retrying to avoid duplicates.', 'warning');
     } finally {
       setBusy(false);
     }
@@ -866,20 +912,40 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
                 type="button"
                 onClick={() => setOnlyPreviousDay(false)}
               >
-                All unsent ({unsentInvoices.length})
+                Show all ({unsentInvoices.length})
+              </button>
+              <button
+                className="btn btn-sm btn-secondary"
+                type="button"
+                onClick={selectAllUnsentInvoices}
+                disabled={unsentInvoices.length === 0}
+              >
+                Select all unsent
               </button>
               <button
                 className="btn btn-sm btn-secondary"
                 type="button"
                 onClick={selectPreviousDayInvoices}
               >
-                Previous day
+                Select previous day
               </button>
             </div>
             <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)' }}>
               {selectedOrders.length} selected
             </div>
           </div>
+
+          {failedInvoiceIds.size ? (
+            <div className="alert alert-warning" style={{ marginBottom: 'var(--space-4)' }}>
+              <AlertTriangle size={18} />
+              <div className="alert-content">
+                <div className="alert-title">Some invoices failed to send</div>
+                <div className="alert-description">
+                  Failed invoices are still unsent and selected. Fix the issue, then click Send Selected again.
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {visibleInvoices.length ? (
             <div className="table-scroll-wrapper">
@@ -897,6 +963,7 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
                     <th>Order</th>
                     <th>Client</th>
                     <th>Invoiced</th>
+                    <th>Email</th>
                     <th>QuickBooks</th>
                     <th className="cell-align-right">Total</th>
                     <th />
@@ -916,6 +983,13 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
                       <td className="cell-monospace cell-align-left">#{order.orderNumber}</td>
                       <td style={{ fontWeight: 600 }}>{getClientName(state.clients, order.clientId)}</td>
                       <td>{order.invoicedAt ? formatDate(order.invoicedAt) : '-'}</td>
+                      <td>
+                        {failedInvoiceIds.has(order.id) ? (
+                          <span style={{ color: 'var(--color-danger, #b91c1c)', fontWeight: 700 }}>Failed - retry</span>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)' }}>Ready</span>
+                        )}
+                      </td>
                       <td className="cell-align-left">{getQuickBooksSyncLabel(order)}</td>
                       <td className="cell-monospace">{formatCurrency(getOrderValue(order))}</td>
                       <td>
