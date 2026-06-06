@@ -645,6 +645,9 @@ export async function fetchRemoteState(supabase, userId) {
     podCapturedBy: order.pod_captured_by ?? null,
     podPhotoUrls: Array.isArray(order.pod_photo_urls) ? order.pod_photo_urls : [],
     podPhotoPaths: Array.isArray(order.pod_photo_paths) ? order.pod_photo_paths : [],
+    podDriveFileId: order.pod_drive_file_id ?? null,
+    podDriveWebViewLink: order.pod_drive_web_view_link ?? null,
+    podDriveSyncedAt: order.pod_drive_synced_at ?? null,
     driverUserId: order.driver_user_id ?? null,
     driverAssignedAt: order.driver_assigned_at ?? null,
     driverAssignedBy: order.driver_assigned_by ?? null,
@@ -1081,6 +1084,11 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
     case 'SEND_INVOICE_EMAIL':
       return callRpc(supabase, 'modhanios_send_invoice_email', {
         p_order_id: action.payload.orderId,
+        p_user_id: currentUser.id,
+      });
+    case 'BULK_SEND_INVOICE_EMAIL':
+      return callRpc(supabase, 'modhanios_bulk_send_invoice_email', {
+        p_order_ids: action.payload.orderIds,
         p_user_id: currentUser.id,
       });
     case 'ASSIGN_DRIVER':

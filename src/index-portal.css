@@ -1650,6 +1650,57 @@
   border-color: var(--color-success);
 }
 
+.driver-route-card {
+  margin: 0 clamp(12px, 3vw, 28px) var(--space-4);
+  padding: clamp(14px, 2.5vw, 20px);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg, 14px);
+  background: var(--color-surface, #fff);
+}
+
+.driver-route-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.driver-route-count {
+  margin-left: 8px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.driver-route-list {
+  margin: var(--space-3) 0 0;
+  padding-left: 1.4em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.driver-route-list li {
+  line-height: 1.4;
+}
+
+.driver-route-stop-client {
+  font-weight: 600;
+  display: block;
+}
+
+.driver-route-stop-address {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.driver-route-note {
+  margin: var(--space-3) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
 .driver-delivery-panel {
   padding: clamp(18px, 3vw, 28px);
 }

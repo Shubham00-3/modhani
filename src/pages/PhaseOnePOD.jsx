@@ -1,17 +1,18 @@
 import { useMemo, useState } from 'react';
-import { Download, FileCheck, Printer, Search } from 'lucide-react';
+import { Download, ExternalLink, FileCheck, Printer, Search } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatDateTime,
   getClientName,
   getLocationName,
 } from '../data/phaseOneData';
-import { printProofOfDelivery, printProofOfDeliveryBatch } from '../utils/printDocuments';
+import { downloadProofOfDeliveryZip, printProofOfDelivery } from '../utils/printDocuments';
 
 export default function PhaseOnePOD() {
   const { state, addToast } = useApp();
   const [search, setSearch] = useState('');
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [downloading, setDownloading] = useState(false);
 
   // Every delivered order with a captured POD, newest first.
   const podOrders = useMemo(
@@ -66,20 +67,30 @@ export default function PhaseOnePOD() {
     });
   }
 
-  function downloadOrders(orders) {
+  async function downloadOrders(orders) {
     if (!orders.length) {
       addToast('Select at least one POD to download.', 'warning');
       return;
     }
-    const opened = printProofOfDeliveryBatch({
-      orders,
-      clients: state.clients,
-      locations: state.locations,
-      products: state.products,
-      batches: state.batches,
-    });
-    if (opened === false) {
-      addToast('Could not open the print window. Check your pop-up blocker.', 'warning');
+
+    setDownloading(true);
+    try {
+      const downloaded = await downloadProofOfDeliveryZip({
+        orders,
+        clients: state.clients,
+        locations: state.locations,
+        products: state.products,
+        batches: state.batches,
+      });
+      if (downloaded === false) {
+        addToast('Could not prepare POD PDFs.', 'warning');
+        return;
+      }
+      addToast(`Downloaded ${orders.length} POD PDF${orders.length === 1 ? '' : 's'} as a ZIP.`);
+    } catch (error) {
+      addToast(`Could not download POD PDFs: ${error.message}`, 'warning');
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -95,10 +106,10 @@ export default function PhaseOnePOD() {
         <button
           className="btn btn-primary"
           type="button"
-          disabled={selectedOrders.length === 0}
+          disabled={selectedOrders.length === 0 || downloading}
           onClick={() => downloadOrders(selectedOrders)}
         >
-          <Download size={16} /> Download Selected ({selectedOrders.length})
+          <Download size={16} /> {downloading ? 'Preparing PDFs...' : `Download ZIP (${selectedOrders.length} PDFs)`}
         </button>
       </div>
 
@@ -142,6 +153,7 @@ export default function PhaseOnePOD() {
                   <th>Location</th>
                   <th>Received By</th>
                   <th>Delivered</th>
+                  <th>Drive</th>
                   <th />
                 </tr>
               </thead>
@@ -164,6 +176,15 @@ export default function PhaseOnePOD() {
                       <td>{order.podSignedBy ?? '-'}</td>
                       <td>{formatDateTime(order.podSignedAt)}</td>
                       <td>
+                        {order.podDriveWebViewLink ? (
+                          <a className="btn btn-ghost btn-sm" href={order.podDriveWebViewLink} target="_blank" rel="noreferrer">
+                            <ExternalLink size={14} /> Open
+                          </a>
+                        ) : (
+                          <span style={{ color: 'var(--color-text-muted)' }}>Pending</span>
+                        )}
+                      </td>
+                      <td>
                         <button
                           className="btn btn-ghost btn-sm"
                           type="button"
@@ -184,7 +205,7 @@ export default function PhaseOnePOD() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="8" style={{ padding: 0 }}>
+                    <td colSpan="9" style={{ padding: 0 }}>
                       <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
                         <div className="empty-state-title">No matching PODs</div>
                         <div className="empty-state-description">
