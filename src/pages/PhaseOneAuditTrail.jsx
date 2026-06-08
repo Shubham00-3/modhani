@@ -23,6 +23,7 @@ const ACTION_LABELS = {
   invoice_created: 'Invoice Created',
   invoice_updated: 'Invoice Updated',
   invoice_sent: 'Invoice Sent',
+  invoice_sent_qb_bypass: 'Draft Invoice Sent (QB Sync Bypassed)',
   qb_sync: 'QB Sync',
   packing_slip_created: 'Packing Slip Created',
   packing_slip_sent: 'Packing Slip Sent',
