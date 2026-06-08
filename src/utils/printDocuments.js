@@ -14,6 +14,7 @@ import {
   getOrderValue,
   getProduct,
   getProductDisplayName,
+  getProductOrderUnitLabel,
   normalizeLotCode,
 } from '../data/phaseOneData';
 
@@ -116,10 +117,11 @@ export function printPackingSlip({ order, clients, locations, products, batches 
     .filter((item) => item.fulfilledQty > 0)
     .map((item) => {
       const product = getProduct(products, item.productId);
+      const unitLabel = getProductOrderUnitLabel(product);
       const batchLines = item.assignedBatches
         .map((assigned) => {
           const batch = batches.find((entry) => entry.id === assigned.batchId);
-          return `<li>Lot Code ${normalizeLotCode(batch?.batchNumber ?? assigned.batchId)}: ${assigned.qty.toLocaleString()} units</li>`;
+          return `<li>Lot Code ${normalizeLotCode(batch?.batchNumber ?? assigned.batchId)}: ${assigned.qty.toLocaleString()} ${escapeHtml(unitLabel)}</li>`;
         })
         .join('');
 
@@ -127,7 +129,7 @@ export function printPackingSlip({ order, clients, locations, products, batches 
         <section style="margin-bottom:18px;padding:16px;border:1px solid #e5e7eb;border-radius:10px;">
           <div style="display:flex;justify-content:space-between;gap:12px;font-weight:600;">
             <span>${getProductDisplayName(product)}</span>
-            <span>${item.fulfilledQty.toLocaleString()} units</span>
+            <span>${item.fulfilledQty.toLocaleString()} ${escapeHtml(unitLabel)}</span>
           </div>
           <ul style="margin:10px 0 0 18px;padding:0;color:#4b5563;">
             ${batchLines || '<li>No lot assignment</li>'}
@@ -146,7 +148,6 @@ export function printPackingSlip({ order, clients, locations, products, batches 
               <img src="${logoSrc}" alt="Modhani" style="width:168px;height:auto;object-fit:contain;" />
               <div>
               <div style="font-size:28px;font-weight:700;">Packing Slip</div>
-              <div style="margin-top:6px;color:#6b7280;">ModhaniOS Shipment Document</div>
               </div>
             </div>
             <div style="text-align:right;">
@@ -970,7 +971,6 @@ export function printReport({
             <img src="${logoSrc}" alt="Modhani" />
             <div>
               <div class="report-title">Operations Report</div>
-              <div class="report-subtitle">ModhaniOS Reporting Export</div>
             </div>
           </div>
           <div class="report-meta">
