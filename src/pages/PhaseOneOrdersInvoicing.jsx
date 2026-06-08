@@ -838,9 +838,95 @@ function SendInvoiceWarningModal({ order, onCancel, onConfirm }) {
   );
 }
 
+// Bulk equivalent of SendInvoiceWarningModal: shown when a bulk send includes one
+// or more invoices that have not synced with QuickBooks, listing each draft so the
+// user can see exactly which temporary numbers will go out before bypassing.
+function BulkSendDraftWarningModal({ orders, clients, onCancel, onConfirm }) {
+  useModalBehavior(onCancel);
+  const [busy, setBusy] = useState(false);
+  const plural = orders.length === 1 ? '' : 's';
+
+  async function handleConfirm() {
+    setBusy(true);
+    try {
+      await onConfirm();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={busy ? undefined : handleOverlayClick(onCancel)}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bulk-draft-warning-title"
+        onClick={(event) => event.stopPropagation()}
+        style={{ maxWidth: 560 }}
+      >
+        <div className="modal-header">
+          <h3 id="bulk-draft-warning-title" className="modal-title">
+            Send {orders.length} unsynced draft invoice{plural}?
+          </h3>
+          <button className="btn btn-ghost" type="button" onClick={onCancel} disabled={busy} aria-label="Cancel send">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="alert alert-warning" style={{ marginBottom: 'var(--space-4)' }}>
+            <AlertTriangle size={18} />
+            <div className="alert-content">
+              <div className="alert-title">
+                {orders.length === 1 ? 'This invoice has' : 'These invoices have'} not synced with QuickBooks.
+              </div>
+              <div className="alert-description">
+                {orders.length === 1 ? 'It still carries a temporary draft number' : 'They still carry temporary draft numbers'} — the
+                final QuickBooks invoice number{plural} {orders.length === 1 ? 'is' : 'are'} assigned only after syncing. Sending now
+                emails the draft number{plural} to the client{plural}.
+              </div>
+            </div>
+          </div>
+          <div className="table-scroll-wrapper" style={{ maxHeight: 240, overflowY: 'auto' }}>
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Client</th>
+                  <th>Draft #</th>
+                </tr>
+              </thead>
+              <tbody>
+                {orders.map((order) => (
+                  <tr key={order.id}>
+                    <td className="cell-monospace cell-align-left">#{order.orderNumber}</td>
+                    <td style={{ fontWeight: 600 }}>{getClientName(clients, order.clientId)}</td>
+                    <td className="cell-monospace cell-align-left">{order.invoiceNumber}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" type="button" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" type="button" onClick={handleConfirm} disabled={busy}>
+            <Mail size={16} /> {busy ? 'Sending…' : `Bypass sync & send ${orders.length} draft${plural}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BulkInvoiceModal({ onClose, onReviewOrder }) {
   const { state, dispatch, addToast, notifyOrderEvent } = useApp();
-  useModalBehavior(onClose);
+  // When set, a warning is shown before emailing invoices that have not synced
+  // with QuickBooks (they still carry temporary draft numbers).
+  const [draftWarningOrders, setDraftWarningOrders] = useState(null);
+  useModalBehavior(onClose, { enabled: !draftWarningOrders });
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [onlyPreviousDay, setOnlyPreviousDay] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -903,7 +989,7 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
     setSelectedIds(new Set(previousDayIds));
   }
 
-  async function handleSend() {
+  async function handleSend(allowUnsynced = false) {
     if (!selectedOrders.length) {
       addToast('Select at least one invoice to send.', 'warning');
       return;
@@ -913,6 +999,15 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
     if (blockedByQuickBooks.length) {
       const orderList = blockedByQuickBooks.map((order) => `#${order.orderNumber}`).join(', ');
       addToast(`Resolve QuickBooks sync before sending: ${orderList}`, 'warning');
+      return;
+    }
+
+    // Invoices that never synced still carry a temporary DRAFT number. Warn and
+    // require an explicit, audited bypass before emailing them to clients — the
+    // same safeguard as the single Send Invoice button.
+    const unsyncedDrafts = selectedOrders.filter((order) => order.qbSyncStatus !== 'pushed');
+    if (unsyncedDrafts.length && !allowUnsynced) {
+      setDraftWarningOrders(unsyncedDrafts);
       return;
     }
 
@@ -1000,6 +1095,7 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
   }
 
   return (
+    <>
     <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="bulk-invoice-title" onClick={(event) => event.stopPropagation()} style={{ maxWidth: 760 }}>
         <div className="modal-header">
@@ -1120,12 +1216,24 @@ function BulkInvoiceModal({ onClose, onReviewOrder }) {
           <button className="btn btn-secondary" type="button" onClick={handleQueueQuickBooks} disabled={busy || selectedOrders.length === 0}>
             <FileText size={16} /> Queue for QuickBooks
           </button>
-          <button className="btn btn-primary" type="button" onClick={handleSend} disabled={busy || selectedOrders.length === 0}>
+          <button className="btn btn-primary" type="button" onClick={() => handleSend()} disabled={busy || selectedOrders.length === 0}>
             <Mail size={16} /> Send Selected ({selectedOrders.length})
           </button>
         </div>
       </div>
     </div>
+    {draftWarningOrders ? (
+      <BulkSendDraftWarningModal
+        orders={draftWarningOrders}
+        clients={state.clients}
+        onCancel={() => setDraftWarningOrders(null)}
+        onConfirm={async () => {
+          await handleSend(true);
+          setDraftWarningOrders(null);
+        }}
+      />
+    ) : null}
+    </>
   );
 }
 

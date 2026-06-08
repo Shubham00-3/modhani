@@ -903,6 +903,26 @@ function reducer(state, action) {
     case 'BULK_SEND_INVOICE_EMAIL': {
       const orderIds = new Set(action.payload.orderIds ?? []);
       const timestamp = action.payload.timestamp ?? new Date().toISOString();
+      const senderName = state.users.find((user) => user.id === state.currentUserId)?.name ?? 'Staff user';
+      const sentNow = state.orders.filter(
+        (order) => orderIds.has(order.id) && order.invoiceNumber && !order.invoiceEmailSentAt
+      );
+      // Mirror the server: each unsynced (draft) invoice sent in the batch gets
+      // its own QuickBooks-sync bypass audit row.
+      const bypassEntries = sentNow
+        .filter((order) => order.qbSyncStatus !== 'pushed')
+        .map((order, index) => ({
+          id: `audit-${Date.now()}-${index}`,
+          timestamp,
+          action: 'invoice_sent_qb_bypass',
+          orderId: order.id,
+          clientId: order.clientId ?? null,
+          userId: state.currentUserId,
+          userName: senderName,
+          details: `${senderName} bypassed the QuickBooks sync requirement and sent draft invoice ${order.invoiceNumber} for Order #${order.orderNumber} directly to the client`,
+          previousValue: order.qbSyncStatus ?? 'not synced',
+          newValue: order.invoiceNumber,
+        }));
       return {
         ...state,
         orders: state.orders.map((order) =>
@@ -910,6 +930,7 @@ function reducer(state, action) {
             ? { ...order, invoiceEmailSentAt: timestamp }
             : order
         ),
+        auditLog: bypassEntries.length ? [...bypassEntries, ...state.auditLog] : state.auditLog,
       };
     }
     case 'UPDATE_QB_SETTINGS':
