@@ -110,6 +110,9 @@ export default function PhaseOneOrdersInvoicing() {
   const [showBulkInvoiceModal, setShowBulkInvoiceModal] = useState(false);
   const [bulkSelectedIds, setBulkSelectedIds] = useState(() => new Set());
   const [showBulkAssignModal, setShowBulkAssignModal] = useState(false);
+  // When set, the QuickBooks-sync warning dialog is shown for this order before
+  // its draft invoice can be emailed to the client.
+  const [sendWarningOrder, setSendWarningOrder] = useState(null);
   const hasActiveFilters = Boolean(filters.clientId || filters.locationId || filters.status || filters.source || filters.driverUserId || dashboardView || dashboardSearch);
 
   const selectedOrder = state.orders.find((order) => order.id === selectedOrderId) ?? null;
@@ -343,6 +346,18 @@ export default function PhaseOneOrdersInvoicing() {
       return;
     }
 
+    // The real QuickBooks invoice number is only assigned once the invoice syncs;
+    // until then it carries a temporary DRAFT number. Warn before emailing an
+    // unsynced draft and require an explicit, audited bypass to continue.
+    if (order.qbSyncStatus !== 'pushed') {
+      setSendWarningOrder(order);
+      return;
+    }
+
+    await performSendInvoice(order, false);
+  }
+
+  async function performSendInvoice(order, allowUnsynced) {
     const emailResult = await notifyOrderEvent(order.id, 'invoice_ready', {
       showSuccessToast: false,
       showErrorToast: false,
@@ -353,17 +368,22 @@ export default function PhaseOneOrdersInvoicing() {
 
     if (!emailResult?.ok) {
       addToast(`Invoice email failed for Order #${order.orderNumber}. It was not marked as sent.`, 'warning');
-      return;
+      return false;
     }
 
     const result = await dispatch({
       type: 'SEND_INVOICE_EMAIL',
-      payload: { orderId: order.id, timestamp: new Date().toISOString() },
+      payload: { orderId: order.id, timestamp: new Date().toISOString(), allowUnsynced },
     });
 
-    if (!result?.ok) return;
+    if (!result?.ok) return false;
 
-    addToast(`Invoice for Order #${order.orderNumber} sent.`);
+    addToast(
+      allowUnsynced
+        ? `Draft invoice ${order.invoiceNumber} sent for Order #${order.orderNumber} (QuickBooks sync bypassed).`
+        : `Invoice for Order #${order.orderNumber} sent.`
+    );
+    return true;
   }
 
   return (
@@ -716,6 +736,18 @@ export default function PhaseOneOrdersInvoicing() {
           }}
         />
       ) : null}
+      {sendWarningOrder ? (
+        <SendInvoiceWarningModal
+          order={sendWarningOrder}
+          onCancel={() => setSendWarningOrder(null)}
+          onConfirm={async () => {
+            const order = sendWarningOrder;
+            const sent = await performSendInvoice(order, true);
+            setSendWarningOrder(null);
+            return sent;
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -732,6 +764,78 @@ function getPreviousDayRange(now = new Date()) {
 
 function isInvoiceBlockedByQuickBooks(order) {
   return ['pending', 'syncing', 'failed'].includes(order.qbSyncStatus);
+}
+
+// Shown before a not-yet-synced invoice is emailed. It still has a temporary
+// draft number, so the user must explicitly bypass the QuickBooks sync (an
+// action the server records in the audit log) to send it to the client.
+function SendInvoiceWarningModal({ order, onCancel, onConfirm }) {
+  useModalBehavior(onCancel);
+  const [busy, setBusy] = useState(false);
+
+  async function handleConfirm() {
+    setBusy(true);
+    try {
+      await onConfirm();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={busy ? undefined : handleOverlayClick(onCancel)}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="send-draft-warning-title"
+        onClick={(event) => event.stopPropagation()}
+        style={{ maxWidth: 520 }}
+      >
+        <div className="modal-header">
+          <h3 id="send-draft-warning-title" className="modal-title">Send unsynced draft invoice?</h3>
+          <button className="btn btn-ghost" type="button" onClick={onCancel} disabled={busy} aria-label="Cancel send">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">
+          <div className="alert alert-warning" style={{ marginBottom: 'var(--space-4)' }}>
+            <AlertTriangle size={18} />
+            <div className="alert-content">
+              <div className="alert-title">This will send the draft invoice to the client.</div>
+              <div className="alert-description">
+                Order #{order.orderNumber} has not synced with QuickBooks yet, so it still carries the
+                temporary draft number <strong>{order.invoiceNumber}</strong>. The final QuickBooks invoice
+                number is assigned only after syncing — sending now emails the draft number to the client.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-6)', flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 2 }}>
+                Draft number
+              </div>
+              <div style={{ fontWeight: 600 }}>{order.invoiceNumber ?? '-'}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 2 }}>
+                QuickBooks
+              </div>
+              <div style={{ fontWeight: 600 }}>{getQuickBooksSyncLabel(order)}</div>
+            </div>
+          </div>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" type="button" onClick={onCancel} disabled={busy}>
+            Cancel
+          </button>
+          <button className="btn btn-primary" type="button" onClick={handleConfirm} disabled={busy}>
+            <Mail size={16} /> {busy ? 'Sending…' : 'Bypass sync & send draft'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BulkInvoiceModal({ onClose, onReviewOrder }) {

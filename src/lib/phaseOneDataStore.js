@@ -1085,6 +1085,7 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
       return callRpc(supabase, 'modhanios_send_invoice_email', {
         p_order_id: action.payload.orderId,
         p_user_id: currentUser.id,
+        p_allow_unsynced: action.payload.allowUnsynced ?? false,
       });
     case 'BULK_SEND_INVOICE_EMAIL':
       return callRpc(supabase, 'modhanios_bulk_send_invoice_email', {

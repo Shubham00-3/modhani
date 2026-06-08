@@ -871,15 +871,35 @@ function reducer(state, action) {
             : user
         ),
       };
-    case 'SEND_INVOICE_EMAIL':
+    case 'SEND_INVOICE_EMAIL': {
+      const sentOrder = state.orders.find((order) => order.id === action.payload.orderId);
+      const sentAt = action.payload.timestamp ?? new Date().toISOString();
+      const bypassedSync = Boolean(action.payload.allowUnsynced) && sentOrder && sentOrder.qbSyncStatus !== 'pushed';
+      const senderName = state.users.find((user) => user.id === state.currentUserId)?.name ?? 'Staff user';
       return {
         ...state,
         orders: state.orders.map((order) =>
-          order.id === action.payload.orderId
-            ? { ...order, invoiceEmailSentAt: action.payload.timestamp ?? new Date().toISOString() }
-            : order
+          order.id === action.payload.orderId ? { ...order, invoiceEmailSentAt: sentAt } : order
         ),
+        auditLog: bypassedSync
+          ? [
+              {
+                id: `audit-${Date.now()}`,
+                timestamp: sentAt,
+                action: 'invoice_sent_qb_bypass',
+                orderId: sentOrder.id,
+                clientId: sentOrder.clientId ?? null,
+                userId: state.currentUserId,
+                userName: senderName,
+                details: `${senderName} bypassed the QuickBooks sync requirement and sent draft invoice ${sentOrder.invoiceNumber} for Order #${sentOrder.orderNumber} directly to the client`,
+                previousValue: sentOrder.qbSyncStatus ?? 'not synced',
+                newValue: sentOrder.invoiceNumber,
+              },
+              ...state.auditLog,
+            ]
+          : state.auditLog,
       };
+    }
     case 'BULK_SEND_INVOICE_EMAIL': {
       const orderIds = new Set(action.payload.orderIds ?? []);
       const timestamp = action.payload.timestamp ?? new Date().toISOString();
