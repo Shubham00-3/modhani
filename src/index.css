@@ -204,6 +204,9 @@ img {
   left: 0;
   width: var(--sidebar-width);
   height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
   background: var(--color-sidebar);
   border-right: 1px solid var(--color-border-light);
   display: flex;
@@ -211,6 +214,7 @@ img {
   z-index: 100;
   transition: width var(--transition-slow);
   overflow: hidden;
+  min-height: 0;
 }
 
 .sidebar.collapsed {
@@ -225,6 +229,7 @@ img {
   padding: var(--space-5) var(--space-3);
   border-bottom: 1px solid var(--color-border-light);
   min-width: 0;
+  flex-shrink: 0;
 }
 
 .sidebar-brand-icon {
@@ -271,10 +276,28 @@ img {
 
 .sidebar-nav {
   flex: 1;
+  min-height: 0;
   padding: var(--space-4) var(--space-3);
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(26, 48, 33, 0.18);
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(26, 48, 33, 0.34);
 }
 
 .sidebar-link {
@@ -289,6 +312,7 @@ img {
   transition: all var(--transition-fast);
   white-space: nowrap;
   text-decoration: none;
+  flex-shrink: 0;
 }
 
 .sidebar-link:hover {
@@ -317,6 +341,29 @@ img {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+@media (max-height: 820px) {
+  .sidebar-brand {
+    padding-block: var(--space-3);
+  }
+
+  .sidebar-brand-logo {
+    height: 64px;
+  }
+
+  .sidebar-nav {
+    padding-block: var(--space-3);
+  }
+
+  .sidebar-link {
+    padding-block: 10px;
+  }
+
+  .sidebar-footer {
+    padding-block: var(--space-3);
+  }
 }
 
 .sidebar-collapse-btn {
