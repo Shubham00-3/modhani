@@ -846,7 +846,10 @@ export async function fetchCustomerPortalState(supabase, user) {
   const productsById = new Map((productsResult.data ?? []).map((product) => [product.id, productToUi(product)]));
   const products = (pricingResult.data ?? [])
     .filter((pricing) => assignedClientIds.includes(pricing.client_id))
-    .filter((pricing) => pricing.is_active && Number(pricing.price) > 0)
+    .filter((pricing) => {
+      const price = Number(pricing.price);
+      return pricing.is_active && Number.isFinite(price) && price >= 0;
+    })
     .map((pricing) => {
       const productUi = productsById.get(pricing.product_id);
       if (!productUi || productUi.isCatalogActive === false) return null;
