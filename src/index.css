@@ -1868,6 +1868,42 @@ img {
   color: var(--color-primary);
 }
 
+.auth-password-toggle {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.auth-password-toggle svg {
+  position: static;
+  transform: none;
+  left: auto;
+  top: auto;
+  color: inherit;
+  pointer-events: none;
+}
+
+.auth-password-toggle:hover {
+  color: var(--color-primary);
+  background: rgba(26, 48, 33, 0.06);
+}
+
+.auth-input-wrap .form-input[type='text'],
+.auth-input-wrap .form-input[type='password'] {
+  padding-right: 44px;
+}
+
 .auth-input-wrap .form-input {
   width: 100%;
   padding: 13px 16px 13px 42px;
