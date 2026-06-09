@@ -12,8 +12,13 @@ import {
   getProduct,
   getProductDisplayName,
   isValidCaseQuantityStep,
+  isProductCatalogActive,
   normalizeLotCode,
 } from '../data/phaseOneData';
+
+function getProductionProductFilterKey(product) {
+  return getProductDisplayName(product).trim().toLowerCase();
+}
 
 export default function PhaseOneProductionBatches() {
   const { state, dispatch, addToast } = useApp();
@@ -32,10 +37,28 @@ export default function PhaseOneProductionBatches() {
   // sets deleted_at, so we split them by that flag.
   const activeBatches = state.batches.filter((b) => !b.deletedAt);
   const trashedBatches = state.batches.filter((b) => b.deletedAt);
+  const productFilterOptions = useMemo(() => {
+    const optionsByKey = new Map();
+    const productIdsWithLots = new Set(activeBatches.map((batch) => batch.productId));
+    state.products
+      .filter((product) => isProductCatalogActive(product) || productIdsWithLots.has(product.id))
+      .forEach((product) => {
+        const label = getProductDisplayName(product);
+        const key = getProductionProductFilterKey(product);
+        if (!optionsByKey.has(key)) {
+          optionsByKey.set(key, { key, label });
+        }
+      });
+
+    return [...optionsByKey.values()].sort((left, right) => left.label.localeCompare(right.label));
+  }, [activeBatches, state.products]);
 
   const filteredBatches = useMemo(() => {
     return activeBatches
-      .filter((batch) => (productFilter ? batch.productId === productFilter : true))
+      .filter((batch) => {
+        if (!productFilter) return true;
+        return getProductionProductFilterKey(getProduct(state.products, batch.productId)) === productFilter;
+      })
       .filter((batch) => (statusFilter ? batch.status === statusFilter : true))
       .filter((batch) => {
         if (!dashboardSearch) return true;
@@ -55,7 +78,11 @@ export default function PhaseOneProductionBatches() {
           .toLowerCase()
           .includes(dashboardSearch);
       })
-      .sort((a, b) => new Date(b.productionDate) - new Date(a.productionDate));
+      .sort((a, b) => {
+        const bTime = new Date(b.updatedAt ?? b.productionDate).getTime();
+        const aTime = new Date(a.updatedAt ?? a.productionDate).getTime();
+        return bTime - aTime || String(b.batchNumber ?? '').localeCompare(String(a.batchNumber ?? ''));
+      });
   }, [activeBatches, dashboardSearch, productFilter, state.products, statusFilter]);
   const hasActiveFilters = Boolean(productFilter || statusFilter || dashboardSearch);
 
@@ -145,9 +172,9 @@ export default function PhaseOneProductionBatches() {
         <div className="filter-bar">
           <select className="form-select" value={productFilter} onChange={(event) => setProductFilter(event.target.value)}>
             <option value="">All Products</option>
-            {activeProducts.map((product) => (
-              <option key={product.id} value={product.id}>
-                {getProductDisplayName(product)}
+            {productFilterOptions.map((product) => (
+              <option key={product.key} value={product.key}>
+                {product.label}
               </option>
             ))}
           </select>
