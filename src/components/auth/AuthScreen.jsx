@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Building2, LockKeyhole, ShoppingCart, Truck, UserRound } from 'lucide-react';
+import { ArrowRight, Building2, Eye, EyeOff, LockKeyhole, ShoppingCart, Truck, UserRound } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 
 export default function AuthScreen() {
@@ -7,6 +7,7 @@ export default function AuthScreen() {
   const [accountType, setAccountType] = useState('staff');
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -150,13 +151,22 @@ export default function AuthScreen() {
                     <LockKeyhole size={16} />
                     <input
                       className="form-input"
-                      type="password"
+                      type={showPassword ? 'text' : 'password'}
                       placeholder="Password"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       autoComplete="current-password"
                       required
                     />
+                    <button
+                      type="button"
+                      className="auth-password-toggle"
+                      onClick={() => setShowPassword((visible) => !visible)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      aria-pressed={showPassword}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
                 </div>
 
