@@ -416,23 +416,25 @@ function EditBatchModal({ batch, products, onClose, onSave }) {
   const [qty, setQty] = useState(String(batch.qtyProduced));
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
-  const alreadyUsed = batch.qtyProduced - batch.qtyRemaining;
   const product = getProduct(products, batch.productId);
   const quantityBreakdown = formatCaseQuantityBreakdown(product, qty);
+  const isZeroing = Number(qty) === 0;
 
   async function handleSubmit(event) {
     event.preventDefault();
     const numericQty = Number(qty);
-    if (!Number.isFinite(numericQty) || numericQty <= 0) {
-      window.alert('Enter a positive quantity.');
+    if (!Number.isFinite(numericQty) || numericQty < 0) {
+      window.alert('Enter a quantity of zero or more.');
       return;
     }
-    if (!isValidCaseQuantityStep(numericQty)) {
+    // Zero is valid (e.g. moved between locations / sold internally); the
+    // 2-decimal step rule only applies to positive quantities.
+    if (numericQty > 0 && !isValidCaseQuantityStep(numericQty)) {
       window.alert('Production quantity can use up to 2 decimal places.');
       return;
     }
-    if (numericQty < alreadyUsed) {
-      window.alert(`This lot already shipped ${alreadyUsed.toLocaleString()} cases. New produced quantity must be at least ${alreadyUsed.toLocaleString()}.`);
+    if (!reason.trim()) {
+      window.alert('Enter a reason for changing this production quantity.');
       return;
     }
     if (numericQty === batch.qtyProduced) {
@@ -440,7 +442,9 @@ function EditBatchModal({ batch, products, onClose, onSave }) {
       return;
     }
     const ok = window.confirm(
-      `Update lot ${batch.batchNumber} from ${batch.qtyProduced.toLocaleString()} to ${numericQty.toLocaleString()} cases?`
+      numericQty === 0
+        ? `Set lot ${batch.batchNumber} to zero units? The lot stays on record (cleared, not trashed) with your reason.`
+        : `Update lot ${batch.batchNumber} from ${batch.qtyProduced.toLocaleString()} to ${numericQty.toLocaleString()} cases?`
     );
     if (!ok) return;
     setSaving(true);
@@ -463,7 +467,7 @@ function EditBatchModal({ batch, products, onClose, onSave }) {
             <input
               className="form-input"
               type="number"
-              min="0.01"
+              min="0"
               step="0.01"
               value={qty}
               onChange={(e) => setQty(e.target.value)}
@@ -471,20 +475,34 @@ function EditBatchModal({ batch, products, onClose, onSave }) {
               autoFocus
             />
             <div className="form-hint">
-              Already shipped from this lot: {alreadyUsed.toLocaleString()} cases.
-              New quantity must be at least that.
+              Quantity can be zero or more. Negative quantities are not allowed.
             </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: 'var(--space-2)', alignSelf: 'flex-start' }}
+              onClick={() => setQty('0')}
+              disabled={isZeroing}
+            >
+              Set to zero (moved / internal use)
+            </button>
             {quantityBreakdown ? <div className="form-hint">{quantityBreakdown}</div> : null}
           </div>
           <div className="form-group">
-            <label className="form-label">Reason (optional)</label>
+            <label className="form-label">
+              Reason (required)
+            </label>
             <input
               className="form-input"
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Correcting initial mis-entry"
+              placeholder="e.g. Correcting initial mis-entry / moved to Brampton location / internal use"
+              required
             />
+            <div className="form-hint">
+              A reason is required for every production quantity change. Setting production to zero keeps the lot on record (cleared, not trashed).
+            </div>
           </div>
           <div className="modal-footer">
             <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving}>
