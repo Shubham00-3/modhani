@@ -26,7 +26,11 @@ import {
 
 export default function PhaseOneTiers() {
   const { state } = useApp();
-  const canManage = state.currentUser.role === 'admin';
+  // Tier management is an admin capability. "Admin" across this app (and the
+  // tier RPCs, which assert manage_settings) is the Manage Settings permission,
+  // not the role label — so gate on that flag to stay consistent and to let any
+  // manage-settings user (not only role==='admin') create/edit/assign tiers.
+  const canManage = Boolean(state.currentUser.permissions?.manageSettings);
   const tiers = useMemo(() => state.tiers ?? [], [state.tiers]);
 
   const [showCreateModal, setShowCreateModal] = useState(false);
