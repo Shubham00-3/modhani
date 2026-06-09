@@ -78,7 +78,11 @@ export default function PhaseOneProductionBatches() {
           .toLowerCase()
           .includes(dashboardSearch);
       })
-      .sort((a, b) => new Date(b.productionDate) - new Date(a.productionDate));
+      .sort((a, b) => {
+        const bTime = new Date(b.updatedAt ?? b.productionDate).getTime();
+        const aTime = new Date(a.updatedAt ?? a.productionDate).getTime();
+        return bTime - aTime || String(b.batchNumber ?? '').localeCompare(String(a.batchNumber ?? ''));
+      });
   }, [activeBatches, dashboardSearch, productFilter, state.products, statusFilter]);
   const hasActiveFilters = Boolean(productFilter || statusFilter || dashboardSearch);
 
