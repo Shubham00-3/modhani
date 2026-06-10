@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { History, ImageOff, PackageSearch, RotateCcw } from 'lucide-react';
+import { ArrowDownUp, History, ImageOff, PackageSearch, RotateCcw } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatCaseQuantityBreakdown,
@@ -22,6 +22,19 @@ function getStockStatusLabel(status) {
   return 'In stock';
 }
 
+// Numeric-aware comparison of item numbers so 5110 sorts before 5112 and 6000
+// before 5000 when reversed. Products without an item number always sort last,
+// regardless of direction.
+function compareItemNumbers(a, b, dir) {
+  const aValue = a == null ? '' : String(a).trim();
+  const bValue = b == null ? '' : String(b).trim();
+  if (!aValue && !bValue) return 0;
+  if (!aValue) return 1;
+  if (!bValue) return -1;
+  const result = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: 'base' });
+  return dir === 'desc' ? -result : result;
+}
+
 export default function PhaseOneInventory() {
   const { state } = useApp();
   const [search, setSearch] = useState('');
@@ -29,6 +42,7 @@ export default function PhaseOneInventory() {
   const [stockFilter, setStockFilter] = useState('');
   const [lotStatusFilter, setLotStatusFilter] = useState('');
   const [sortBy, setSortBy] = useState('product');
+  const [itemNumberDir, setItemNumberDir] = useState('asc');
   const [previewProduct, setPreviewProduct] = useState(null);
   const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
   const categories = useMemo(
@@ -83,6 +97,10 @@ export default function PhaseOneInventory() {
       .filter((row) => (lotStatusFilter ? row.batches.length > 0 : true))
       .filter((row) => (normalizedSearch ? row.searchText.includes(normalizedSearch) : true))
       .sort((a, b) => {
+        if (sortBy === 'item-number') {
+          return compareItemNumbers(a.product.itemNumber, b.product.itemNumber, itemNumberDir)
+            || getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
+        }
         if (sortBy === 'category') {
           return (a.product.category || '').localeCompare(b.product.category || '')
             || getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
@@ -102,7 +120,7 @@ export default function PhaseOneInventory() {
 
         return getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
       });
-  }, [activeProducts, categoryFilter, lotStatusFilter, search, sortBy, state.batches, stockFilter]);
+  }, [activeProducts, categoryFilter, itemNumberDir, lotStatusFilter, search, sortBy, state.batches, stockFilter]);
 
   const historyRows = useMemo(() => buildInventoryHistory(state), [state]);
   const hasActiveFilters = Boolean(search || categoryFilter || stockFilter || lotStatusFilter);
@@ -203,22 +221,35 @@ export default function PhaseOneInventory() {
           </select>
           <select aria-label="Sort by" title="Sort by" className="form-select" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
             <option value="product">Sort by Product</option>
+            <option value="item-number">Sort by Item Number</option>
             <option value="category">Sort by Category</option>
             <option value="status">Sort by Stock Status</option>
             <option value="remaining-asc">Sort by Low Remaining</option>
             <option value="remaining-desc">Sort by High Remaining</option>
             <option value="oldest-lot">Sort by Oldest Active Lot</option>
           </select>
+          {sortBy === 'item-number' ? (
+            <button
+              className="btn btn-secondary"
+              type="button"
+              title={itemNumberDir === 'asc' ? 'Item number: ascending (A-Z). Click for Z-A.' : 'Item number: descending (Z-A). Click for A-Z.'}
+              aria-label={`Toggle item number sort direction (currently ${itemNumberDir === 'asc' ? 'ascending' : 'descending'})`}
+              onClick={() => setItemNumberDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))}
+            >
+              <ArrowDownUp size={14} /> {itemNumberDir === 'asc' ? 'A-Z' : 'Z-A'}
+            </button>
+          ) : null}
           <button
             className="btn btn-secondary"
             type="button"
-            disabled={!hasActiveFilters && sortBy === 'product'}
+            disabled={!hasActiveFilters && sortBy === 'product' && itemNumberDir === 'asc'}
             onClick={() => {
               setSearch('');
               setCategoryFilter('');
               setStockFilter('');
               setLotStatusFilter('');
               setSortBy('product');
+              setItemNumberDir('asc');
             }}
           >
             <RotateCcw size={14} /> Reset
@@ -226,56 +257,64 @@ export default function PhaseOneInventory() {
         </div>
 
         {inventoryRows.length ? (
-          <div className="inventory-grid">
-            {inventoryRows.map(({ product, batches, activeBatches, totalProduced, totalRemaining, oldestLot, stockStatus }) => (
-              <div key={product.id} className={`inventory-card inventory-card-${stockStatus}`}>
-                <div className="inventory-card-main">
-                  <ProductImage product={product} onPreview={setPreviewProduct} />
-                  <div className="inventory-card-info">
-                    <div className="inventory-card-name">{getProductDisplayName(product)}</div>
-                    <div className="inventory-card-meta">
-                      {product.category || 'Uncategorized'} · {product.packagingDetails || product.unitSize || 'Not set'} · {getProductOrderUnitLabel(product)}
-                      {product.itemNumber ? ` · #${product.itemNumber}` : ''}
-                    </div>
-                  </div>
-                </div>
-                <div className="inventory-card-stats">
-                  <div className="inventory-stat-primary">
-                    <span className="inventory-stat-value">{totalRemaining.toLocaleString()}</span>
-                    <span className="inventory-stat-label">remaining</span>
-                  </div>
-                  <div className="inventory-stat-secondary">
-                    <span>{totalProduced.toLocaleString()} produced</span>
-                    <span>
+          <div className="table-scroll-wrapper">
+            <table className="data-table inventory-table">
+              <thead>
+                <tr>
+                  <th style={{ width: 48 }} aria-label="Product image" />
+                  <th style={{ width: 90 }}>Item #</th>
+                  <th>Product</th>
+                  <th>Remaining</th>
+                  <th>Produced</th>
+                  <th>Status</th>
+                  <th>Active Lots</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryRows.map(({ product, batches, activeBatches, totalProduced, totalRemaining, oldestLot, stockStatus }) => (
+                  <tr key={product.id} className={`inventory-row inventory-row-${stockStatus}`}>
+                    <td>
+                      <ProductImage product={product} onPreview={setPreviewProduct} small />
+                    </td>
+                    <td className="cell-monospace cell-align-left">{product.itemNumber || '-'}</td>
+                    <td className="cell-truncate">
+                      <div className="inventory-row-name" title={getProductDisplayName(product)}>
+                        {getProductDisplayName(product)}
+                      </div>
+                      <div className="inventory-row-meta">
+                        {product.category || 'Uncategorized'} · {product.packagingDetails || product.unitSize || 'Not set'} · {getProductOrderUnitLabel(product)}
+                      </div>
+                    </td>
+                    <td className="cell-monospace cell-align-left">
+                      <span className="inventory-row-remaining">{totalRemaining.toLocaleString()}</span>
+                    </td>
+                    <td className="cell-monospace cell-align-left">{totalProduced.toLocaleString()}</td>
+                    <td>
                       <span className={`badge badge-${stockStatus === 'low' ? 'partial' : stockStatus === 'out' ? 'declined' : 'fulfilled'}`}>
                         {getStockStatusLabel(stockStatus)}
                       </span>
-                    </span>
-                  </div>
-                </div>
-                <div className="inventory-card-lots">
-                  <div className="inventory-lots-header">
-                    <span>Active lots: {activeBatches.length || 0}</span>
-                    <span className="inventory-oldest">
-                      {oldestLot ? `FIFO: ${oldestLot.batchNumber} (${formatDate(oldestLot.productionDate)})` : ''}
-                    </span>
-                  </div>
-                  <div className="inventory-lots-body">
-                    {batches.length ? (
-                      <div className="inventory-lot-badges">
-                        {batches.map((batch) => (
-                          <span key={batch.id} className={`badge badge-${batch.status}`}>
-                            {batch.batchNumber}: {batch.qtyRemaining.toLocaleString()}
-                          </span>
-                        ))}
+                    </td>
+                    <td>
+                      {batches.length ? (
+                        <div className="inventory-lot-badges">
+                          {batches.map((batch) => (
+                            <span key={batch.id} className={`badge badge-${batch.status}`}>
+                              {batch.batchNumber}: {batch.qtyRemaining.toLocaleString()}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="inventory-no-lots">No lots logged</span>
+                      )}
+                      <div className="inventory-row-fifo">
+                        {activeBatches.length ? `${activeBatches.length} active` : '0 active'}
+                        {oldestLot ? ` · FIFO ${oldestLot.batchNumber} (${formatDate(oldestLot.productionDate)})` : ''}
                       </div>
-                    ) : (
-                      <div className="inventory-no-lots">No lots logged</div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
           <div className="empty-state" style={{ padding: 'var(--space-8)' }}>
@@ -391,7 +430,7 @@ export default function PhaseOneInventory() {
   );
 }
 
-function ProductImage({ product, onPreview }) {
+function ProductImage({ product, onPreview, small = false }) {
   const imageUrl = getProductImageUrl(product, { fallback: true });
   const usesFallback = !hasProductImage(product);
   const label = getProductDisplayName(product);
@@ -399,7 +438,7 @@ function ProductImage({ product, onPreview }) {
   return (
     <button
       type="button"
-      className={`product-thumb product-thumb-button ${usesFallback ? 'product-thumb-fallback' : ''}`}
+      className={`product-thumb product-thumb-button ${small ? 'product-thumb-sm' : ''} ${usesFallback ? 'product-thumb-fallback' : ''}`}
       onClick={() => onPreview?.(product)}
       aria-label={`Open ${usesFallback ? 'Modhani logo placeholder for ' : ''}${label} image`}
       title={usesFallback ? 'No product image yet. Click to view the placeholder.' : `Open ${label} image`}

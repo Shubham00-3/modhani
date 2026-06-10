@@ -5389,11 +5389,6 @@ input[type='checkbox']:disabled {
     border-radius: 10px !important;
   }
 
-  /* Inventory grid collapses to single column on phone */
-  .inventory-grid {
-    grid-template-columns: 1fr !important;
-  }
-
   /* Form rows stack their labels above inputs (already mostly do, just make
      sure side-by-side flex groups wrap) */
   .form-group {

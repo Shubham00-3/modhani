@@ -525,6 +525,10 @@ function TrashBatchModal({ batch, onClose, onConfirm }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (!reason.trim()) {
+      window.alert('Enter a reason for moving this lot to trash.');
+      return;
+    }
     setSaving(true);
     await onConfirm({ reason: reason.trim() });
     setSaving(false);
@@ -547,21 +551,25 @@ function TrashBatchModal({ batch, onClose, onConfirm }) {
             orders, this will be blocked.
           </p>
           <div className="form-group">
-            <label className="form-label">Reason (optional)</label>
+            <label className="form-label">Reason (required)</label>
             <input
               className="form-input"
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Spoiled, mis-entered, recalled"
+              required
               autoFocus
             />
+            <div className="form-hint">
+              A reason is required for every lot moved to trash. It is kept on the audit trail.
+            </div>
           </div>
           <div className="modal-footer">
             <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving}>
               Cancel
             </button>
-            <button className="btn btn-primary" type="submit" disabled={saving}>
+            <button className="btn btn-primary" type="submit" disabled={saving || !reason.trim()}>
               {saving ? 'Moving...' : 'Move to Trash'}
             </button>
           </div>
