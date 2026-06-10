@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, FlaskConical, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownUp, FlaskConical, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
+import { compareItemNumbers } from '../lib/productSort';
 import {
   formatCaseQuantityBreakdown,
   formatDate,
@@ -30,6 +31,8 @@ export default function PhaseOneProductionBatches() {
   const [trashingBatch, setTrashingBatch] = useState(null);
   const [productFilter, setProductFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [sortBy, setSortBy] = useState('recent');
+  const [sortDir, setSortDir] = useState('asc');
   const [showTrash, setShowTrash] = useState(false);
   const dashboardSearch = (searchParams.get('q') ?? '').trim().toLowerCase();
 
@@ -79,11 +82,20 @@ export default function PhaseOneProductionBatches() {
           .includes(dashboardSearch);
       })
       .sort((a, b) => {
+        if (sortBy === 'item-number') {
+          const aItem = getProduct(state.products, a.productId)?.itemNumber;
+          const bItem = getProduct(state.products, b.productId)?.itemNumber;
+          return compareItemNumbers(aItem, bItem, sortDir)
+            || String(a.batchNumber ?? '').localeCompare(String(b.batchNumber ?? ''), undefined, { numeric: true });
+        }
+        if (sortBy === 'lot-code') {
+          return compareItemNumbers(a.batchNumber, b.batchNumber, sortDir);
+        }
         const bTime = new Date(b.updatedAt ?? b.productionDate).getTime();
         const aTime = new Date(a.updatedAt ?? a.productionDate).getTime();
         return bTime - aTime || String(b.batchNumber ?? '').localeCompare(String(a.batchNumber ?? ''));
       });
-  }, [activeBatches, dashboardSearch, productFilter, state.products, statusFilter]);
+  }, [activeBatches, dashboardSearch, sortDir, productFilter, sortBy, state.products, statusFilter]);
   const hasActiveFilters = Boolean(productFilter || statusFilter || dashboardSearch);
 
   const oldestActive = activeBatches
@@ -184,13 +196,31 @@ export default function PhaseOneProductionBatches() {
             <option value="active">Active</option>
             <option value="cleared">Cleared</option>
           </select>
+          <select aria-label="Sort by" title="Sort by" className="form-select" value={sortBy} onChange={(event) => setSortBy(event.target.value)}>
+            <option value="recent">Most Recent</option>
+            <option value="item-number">Sort by Item Number</option>
+            <option value="lot-code">Sort by Lot Code</option>
+          </select>
+          {sortBy === 'item-number' || sortBy === 'lot-code' ? (
+            <button
+              className="btn btn-secondary"
+              type="button"
+              title={sortDir === 'asc' ? 'Ascending (A-Z / low to high). Click for Z-A.' : 'Descending (Z-A / high to low). Click for A-Z.'}
+              aria-label={`Toggle sort direction (currently ${sortDir === 'asc' ? 'ascending' : 'descending'})`}
+              onClick={() => setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))}
+            >
+              <ArrowDownUp size={14} /> {sortDir === 'asc' ? 'A-Z' : 'Z-A'}
+            </button>
+          ) : null}
           <button
             className="btn btn-secondary"
             type="button"
-            disabled={!hasActiveFilters}
+            disabled={!hasActiveFilters && sortBy === 'recent' && sortDir === 'asc'}
             onClick={() => {
               setProductFilter('');
               setStatusFilter('');
+              setSortBy('recent');
+              setSortDir('asc');
               const nextSearchParams = new URLSearchParams(searchParams);
               nextSearchParams.delete('q');
               setSearchParams(nextSearchParams);

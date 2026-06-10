@@ -14,25 +14,13 @@ import {
   hasProductImage,
 } from '../data/phaseOneData';
 import { LOW_STOCK_THRESHOLD, getStockStatus } from '../lib/inventoryThresholds';
+import { compareItemNumbers } from '../lib/productSort';
 import ProductImageLightbox from '../components/ProductImageLightbox';
 
 function getStockStatusLabel(status) {
   if (status === 'out') return 'Out of stock';
   if (status === 'low') return 'Running low';
   return 'In stock';
-}
-
-// Numeric-aware comparison of item numbers so 5110 sorts before 5112 and 6000
-// before 5000 when reversed. Products without an item number always sort last,
-// regardless of direction.
-function compareItemNumbers(a, b, dir) {
-  const aValue = a == null ? '' : String(a).trim();
-  const bValue = b == null ? '' : String(b).trim();
-  if (!aValue && !bValue) return 0;
-  if (!aValue) return 1;
-  if (!bValue) return -1;
-  const result = aValue.localeCompare(bValue, undefined, { numeric: true, sensitivity: 'base' });
-  return dir === 'desc' ? -result : result;
 }
 
 export default function PhaseOneInventory() {
