@@ -28,6 +28,8 @@ drop policy if exists "products_all_authenticated" on public.products;
 drop policy if exists "products_all_staff" on public.products;
 drop policy if exists "products_select_staff_or_customer_all" on public.products;
 drop policy if exists "products_select_staff_or_customer_catalogue" on public.products;
+drop policy if exists "products_staff_all" on public.products;
+drop policy if exists "products_select_staff_or_assigned_customer" on public.products;
 
 create policy "products_staff_all" on public.products
 for all to authenticated
