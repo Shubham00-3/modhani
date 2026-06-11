@@ -2308,6 +2308,15 @@
   margin-top: var(--space-1);
 }
 
+/* Search + sort controls grouped on the right of the catalogue header. */
+.catalogue-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .client-directory-search,
 .catalogue-search {
   min-width: min(360px, 100%);
@@ -2663,6 +2672,11 @@
   .client-directory-search,
   .catalogue-search {
     width: 100%;
+  }
+
+  .catalogue-controls {
+    width: 100%;
+    justify-content: stretch;
   }
 
   .grid-2, .grid-3, .grid-4 {

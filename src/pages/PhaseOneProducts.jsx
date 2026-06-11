@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Package, Plus, Search, Settings2 } from 'lucide-react';
+import { ArrowDownUp, Package, Plus, Search, Settings2 } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import {
   formatCurrency,
@@ -10,6 +10,7 @@ import {
   getActiveCatalogProducts,
   hasProductImage,
 } from '../data/phaseOneData';
+import { compareItemNumbers } from '../lib/productSort';
 import { ProductModal } from '../components/settings/ManagementModals';
 import ProductImageLightbox from '../components/ProductImageLightbox';
 
@@ -21,34 +22,43 @@ export default function PhaseOneProducts() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [previewProduct, setPreviewProduct] = useState(null);
   const [productSearch, setProductSearch] = useState('');
+  const [sortBy, setSortBy] = useState('default');
+  const [itemNumberDir, setItemNumberDir] = useState('asc');
   const dashboardSearch = searchParams.get('q') ?? '';
   const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
 
   const filteredProducts = useMemo(() => {
     const query = (productSearch || dashboardSearch).trim().toLowerCase();
 
-    if (!query) return activeProducts;
+    const matched = !query
+      ? activeProducts
+      : activeProducts.filter((product) =>
+          [
+            getProductDisplayName(product),
+            product.name,
+            product.unitSize,
+            product.category,
+            product.itemNumber,
+            product.packagingDetails,
+            product.unitsPerCase,
+            product.shelfLifeDays,
+            product.leadTimeDays,
+            product.orderUnitLabel,
+            product.baseCataloguePrice,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(query)
+        );
 
-    return activeProducts.filter((product) =>
-      [
-        getProductDisplayName(product),
-        product.name,
-        product.unitSize,
-        product.category,
-        product.itemNumber,
-        product.packagingDetails,
-        product.unitsPerCase,
-        product.shelfLifeDays,
-        product.leadTimeDays,
-        product.orderUnitLabel,
-        product.baseCataloguePrice,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-        .includes(query)
+    if (sortBy !== 'item-number') return matched;
+
+    return [...matched].sort((a, b) =>
+      compareItemNumbers(a.itemNumber, b.itemNumber, itemNumberDir)
+        || getProductDisplayName(a).localeCompare(getProductDisplayName(b))
     );
-  }, [activeProducts, dashboardSearch, productSearch]);
+  }, [activeProducts, dashboardSearch, itemNumberDir, productSearch, sortBy]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-6)' }}>
@@ -86,15 +96,38 @@ export default function PhaseOneProducts() {
               Showing {filteredProducts.length.toLocaleString()} of {activeProducts.length.toLocaleString()} products
             </div>
           </div>
-          <label className="catalogue-search">
-            <Search size={16} />
-            <input
-              type="search"
-              placeholder="Search products..."
-              value={productSearch}
-              onChange={(event) => setProductSearch(event.target.value)}
-            />
-          </label>
+          <div className="catalogue-controls">
+            <label className="catalogue-search">
+              <Search size={16} />
+              <input
+                type="search"
+                placeholder="Search products..."
+                value={productSearch}
+                onChange={(event) => setProductSearch(event.target.value)}
+              />
+            </label>
+            <select
+              aria-label="Sort by"
+              title="Sort by"
+              className="form-select"
+              value={sortBy}
+              onChange={(event) => setSortBy(event.target.value)}
+            >
+              <option value="default">Catalogue order</option>
+              <option value="item-number">Sort by Item Number</option>
+            </select>
+            {sortBy === 'item-number' ? (
+              <button
+                className="btn btn-secondary"
+                type="button"
+                title={itemNumberDir === 'asc' ? 'Item number: ascending (A-Z). Click for Z-A.' : 'Item number: descending (Z-A). Click for A-Z.'}
+                aria-label={`Toggle item number sort direction (currently ${itemNumberDir === 'asc' ? 'ascending' : 'descending'})`}
+                onClick={() => setItemNumberDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))}
+              >
+                <ArrowDownUp size={14} /> {itemNumberDir === 'asc' ? 'A-Z' : 'Z-A'}
+              </button>
+            ) : null}
+          </div>
         </div>
         {activeProducts.length ? (
           <div className="table-scroll-wrapper">
