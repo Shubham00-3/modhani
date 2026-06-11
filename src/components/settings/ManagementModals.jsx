@@ -4,6 +4,7 @@ import { useApp } from '../../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../../hooks/useModalBehavior';
 import { getProductImageUrl } from '../../data/phaseOneData';
 import { isSupabaseConfigured, supabase } from '../../lib/supabaseClient';
+import { GOODS_TYPES, DEFAULT_GOODS_TYPE, normalizeGoodsType } from '../../lib/goodsTypes';
 
 export function ProductModal({ product, onClose }) {
   const { state, dispatch, addToast } = useApp();
@@ -20,6 +21,7 @@ export function ProductModal({ product, onClose }) {
           name: '',
           unitSize: '',
           category: '',
+          goodsType: DEFAULT_GOODS_TYPE,
           baseCataloguePrice: '',
           itemNumber: '',
           upc: '',
@@ -117,6 +119,7 @@ export function ProductModal({ product, onClose }) {
             unitSize,
             id: productId,
             baseCataloguePrice,
+            goodsType: normalizeGoodsType(form.goodsType),
             itemNumber: String(form.itemNumber ?? '').trim(),
             upc: String(form.upc ?? '').trim(),
             packagingDetails: String(form.packagingDetails ?? '').trim(),
@@ -146,6 +149,12 @@ export function ProductModal({ product, onClose }) {
         onChange={(value) => setForm((current) => ({ ...current, unitSize: value }))}
       />
       <FormInput label="Category" value={form.category} onChange={(value) => setForm((current) => ({ ...current, category: value }))} />
+      <FormSelect
+        label="Goods Type"
+        value={normalizeGoodsType(form.goodsType)}
+        onChange={(value) => setForm((current) => ({ ...current, goodsType: value }))}
+        options={GOODS_TYPES}
+      />
       <FormInput label="Modhani Item #" value={form.itemNumber ?? ''} onChange={(value) => setForm((current) => ({ ...current, itemNumber: value }))} />
       <FormInput label="UPC" value={form.upc ?? ''} onChange={(value) => setForm((current) => ({ ...current, upc: value }))} />
       <FormInput label="Packaging Details" value={form.packagingDetails ?? ''} onChange={(value) => setForm((current) => ({ ...current, packagingDetails: value }))} />
@@ -483,6 +492,19 @@ function FormInput({ label, value, onChange, type = 'text', placeholder }) {
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
       />
+    </div>
+  );
+}
+
+function FormSelect({ label, value, onChange, options }) {
+  return (
+    <div className="form-group">
+      <label className="form-label">{label}</label>
+      <select className="form-select" value={value} onChange={(event) => onChange(event.target.value)}>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
     </div>
   );
 }

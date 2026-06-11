@@ -15,6 +15,7 @@ import {
 } from '../data/phaseOneData';
 import { LOW_STOCK_THRESHOLD, getStockStatus } from '../lib/inventoryThresholds';
 import { compareItemNumbers } from '../lib/productSort';
+import { GOODS_TYPES, getGoodsTypeLabel, normalizeGoodsType } from '../lib/goodsTypes';
 import ProductImageLightbox from '../components/ProductImageLightbox';
 
 function getStockStatusLabel(status) {
@@ -27,9 +28,10 @@ export default function PhaseOneInventory() {
   const { state } = useApp();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [goodsTypeFilter, setGoodsTypeFilter] = useState('');
   const [stockFilter, setStockFilter] = useState('');
   const [lotStatusFilter, setLotStatusFilter] = useState('');
-  const [sortBy, setSortBy] = useState('product');
+  const [sortBy, setSortBy] = useState('item-number');
   const [itemNumberDir, setItemNumberDir] = useState('asc');
   const [previewProduct, setPreviewProduct] = useState(null);
   const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
@@ -72,6 +74,7 @@ export default function PhaseOneInventory() {
             product.orderUnitLabel,
             product.qbItemName,
             getProductDisplayName(product),
+            getGoodsTypeLabel(product.goodsType),
             lotCodes,
             stockStatus,
           ]
@@ -81,6 +84,7 @@ export default function PhaseOneInventory() {
         };
       })
       .filter((row) => (categoryFilter ? row.product.category === categoryFilter : true))
+      .filter((row) => (goodsTypeFilter ? normalizeGoodsType(row.product.goodsType) === goodsTypeFilter : true))
       .filter((row) => (stockFilter ? row.stockStatus === stockFilter : true))
       .filter((row) => (lotStatusFilter ? row.batches.length > 0 : true))
       .filter((row) => (normalizedSearch ? row.searchText.includes(normalizedSearch) : true))
@@ -108,10 +112,10 @@ export default function PhaseOneInventory() {
 
         return getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
       });
-  }, [activeProducts, categoryFilter, itemNumberDir, lotStatusFilter, search, sortBy, state.batches, stockFilter]);
+  }, [activeProducts, categoryFilter, goodsTypeFilter, itemNumberDir, lotStatusFilter, search, sortBy, state.batches, stockFilter]);
 
   const historyRows = useMemo(() => buildInventoryHistory(state), [state]);
-  const hasActiveFilters = Boolean(search || categoryFilter || stockFilter || lotStatusFilter);
+  const hasActiveFilters = Boolean(search || categoryFilter || goodsTypeFilter || stockFilter || lotStatusFilter);
 
   const [historySearch, setHistorySearch] = useState('');
   const [historyTypeFilter, setHistoryTypeFilter] = useState('');
@@ -196,6 +200,12 @@ export default function PhaseOneInventory() {
               <option key={category} value={category}>{category}</option>
             ))}
           </select>
+          <select aria-label="Filter by goods type" title="Filter by goods type" className="form-select" value={goodsTypeFilter} onChange={(event) => setGoodsTypeFilter(event.target.value)}>
+            <option value="">All Goods Types</option>
+            {GOODS_TYPES.map((type) => (
+              <option key={type.value} value={type.value}>{type.label}</option>
+            ))}
+          </select>
           <select aria-label="Filter by stock status" title="Filter by stock status" className="form-select" value={stockFilter} onChange={(event) => setStockFilter(event.target.value)}>
             <option value="">All Stock Statuses</option>
             <option value="in">In stock</option>
@@ -230,13 +240,14 @@ export default function PhaseOneInventory() {
           <button
             className="btn btn-secondary"
             type="button"
-            disabled={!hasActiveFilters && sortBy === 'product' && itemNumberDir === 'asc'}
+            disabled={!hasActiveFilters && sortBy === 'item-number' && itemNumberDir === 'asc'}
             onClick={() => {
               setSearch('');
               setCategoryFilter('');
+              setGoodsTypeFilter('');
               setStockFilter('');
               setLotStatusFilter('');
-              setSortBy('product');
+              setSortBy('item-number');
               setItemNumberDir('asc');
             }}
           >
@@ -270,7 +281,7 @@ export default function PhaseOneInventory() {
                         {getProductDisplayName(product)}
                       </div>
                       <div className="inventory-row-meta">
-                        {product.category || 'Uncategorized'} · {product.packagingDetails || product.unitSize || 'Not set'} · {getProductOrderUnitLabel(product)}
+                        {getGoodsTypeLabel(product.goodsType)} · {product.category || 'Uncategorized'} · {product.packagingDetails || product.unitSize || 'Not set'} · {getProductOrderUnitLabel(product)}
                       </div>
                     </td>
                     <td className="cell-monospace cell-align-left">
