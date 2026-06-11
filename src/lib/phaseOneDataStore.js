@@ -3,6 +3,7 @@ import {
   normalizeLotCode,
   QUICKBOOKS_SETTINGS,
 } from '../data/phaseOneData';
+import { normalizeGoodsType } from './goodsTypes';
 
 function profileToUi(profile) {
   const contactEmail = profile.contact_email ?? null;
@@ -78,6 +79,7 @@ function productToUi(product) {
     category: product.category,
     baseCataloguePrice,
     itemNumber: product.item_number ?? '',
+    goodsType: normalizeGoodsType(product.goods_type),
     upc: product.upc ?? '',
     packagingDetails: product.packaging_details ?? '',
     unitsPerCase: product.units_per_case == null ? null : Number(product.units_per_case),
@@ -313,6 +315,7 @@ function productToDb(product) {
     category: product.category ?? null,
     base_catalogue_price: Number(product.baseCataloguePrice ?? 0),
     item_number: product.itemNumber ?? null,
+    goods_type: normalizeGoodsType(product.goodsType),
     upc: product.upc ?? null,
     packaging_details: product.packagingDetails ?? null,
     units_per_case: product.unitsPerCase == null || product.unitsPerCase === '' ? null : Number(product.unitsPerCase),
@@ -1135,6 +1138,7 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_hst_applicable: Boolean(product.hstApplicable),
         p_image_url: product.imageUrl ?? null,
         p_image_path: product.imagePath ?? null,
+        p_goods_type: normalizeGoodsType(product.goodsType),
       });
     }
     case 'ADD_CLIENT':
