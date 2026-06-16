@@ -62,6 +62,7 @@ const demoState = {
     batches: BATCHES,
   }),
   sidebarCollapsed: false,
+  selectedFacility: 'all',
   toasts: [],
   initialized: true,
   authConfigured: false,
@@ -92,6 +93,7 @@ const remoteBootState = {
   reportRows: [],
   trashReportRows: [],
   sidebarCollapsed: false,
+  selectedFacility: 'all',
   toasts: [],
   initialized: false,
   authConfigured: true,
@@ -310,6 +312,8 @@ function reducer(state, action) {
     }
     case 'TOGGLE_SIDEBAR':
       return { ...state, sidebarCollapsed: !state.sidebarCollapsed };
+    case 'SET_SELECTED_FACILITY':
+      return { ...state, selectedFacility: action.payload };
     case 'SET_CURRENT_USER':
       return { ...state, currentUserId: action.payload };
     case 'ADD_PRODUCT':
@@ -946,7 +950,7 @@ function reducer(state, action) {
   }
 }
 
-const localOnlyActions = new Set(['TOGGLE_SIDEBAR', 'ADD_TOAST', 'REMOVE_TOAST', 'SET_USER_DISABLED']);
+const localOnlyActions = new Set(['TOGGLE_SIDEBAR', 'SET_SELECTED_FACILITY', 'ADD_TOAST', 'REMOVE_TOAST', 'SET_USER_DISABLED']);
 const serverWorkflowActions = new Set([
   'LOCK_ORDER',
   'UNLOCK_ORDER',
@@ -963,6 +967,7 @@ const serverWorkflowActions = new Set([
   'EDIT_PRODUCTION_BATCH',
   'SOFT_DELETE_BATCH',
   'RESTORE_BATCH',
+  'TRANSFER_STOCK',
   'ASSIGN_DRIVER',
   'BULK_ASSIGN_DRIVER',
   'SEND_INVOICE_EMAIL',

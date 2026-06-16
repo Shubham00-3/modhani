@@ -1923,6 +1923,20 @@
   padding: 2px 8px;
 }
 
+/* Factory tag shown before a lot code when viewing all locations. */
+.inventory-lot-facility {
+  display: inline-block;
+  margin-right: 5px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  vertical-align: middle;
+}
+
 .inventory-no-lots {
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);

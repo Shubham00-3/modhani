@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Bell, LogOut, Menu, Package, Search, ShoppingCart, X } from 'lucide-react';
+import { AlertTriangle, Bell, Check, LogOut, MapPin, Menu, Package, Search, ShoppingCart, X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { formatTime } from '../../data/phaseOneData';
 import { formatRelativeTime } from '../../lib/notifications';
+import { ALL_FACILITIES, FACILITIES, getFacilityName } from '../../lib/facilities';
 
 const pageTitles = {
   '/': 'Overview',
@@ -48,8 +49,13 @@ export default function PhaseOneTopBar() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [notificationPanelPath, setNotificationPanelPath] = useState(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [locationMenuOpen, setLocationMenuOpen] = useState(false);
   const notificationPanelRef = useRef(null);
   const userMenuRef = useRef(null);
+  const locationMenuRef = useRef(null);
+  const selectedFacility = state.selectedFacility ?? ALL_FACILITIES;
+  const selectedFacilityLabel =
+    selectedFacility === ALL_FACILITIES ? 'All Locations' : getFacilityName(selectedFacility);
   const currentTitle = pageTitles[location.pathname] || 'ModhaniOS';
   const dashboardSearchValue = searchParams.get('q') ?? '';
   const qbHealthy = state.quickBooks.connected && state.quickBooks.status === 'connected';
@@ -117,6 +123,32 @@ export default function PhaseOneTopBar() {
     };
   }, [userMenuOpen]);
 
+  useEffect(() => {
+    if (!locationMenuOpen) return undefined;
+
+    function handlePointerDown(event) {
+      if (!locationMenuRef.current?.contains(event.target)) {
+        setLocationMenuOpen(false);
+      }
+    }
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') setLocationMenuOpen(false);
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [locationMenuOpen]);
+
+  function selectFacility(facilityId) {
+    dispatch({ type: 'SET_SELECTED_FACILITY', payload: facilityId });
+    setLocationMenuOpen(false);
+  }
+
   function capitalize(str) {
     return str ? str.charAt(0).toUpperCase() + str.slice(1) : str;
   }
@@ -181,6 +213,49 @@ export default function PhaseOneTopBar() {
             ))}
           </select>
         ) : null}
+
+        <div className="topbar-location" ref={locationMenuRef}>
+          <button
+            className={`topbar-location-btn${selectedFacility !== ALL_FACILITIES ? ' is-scoped' : ''}`}
+            type="button"
+            aria-label="Switch factory location"
+            aria-expanded={locationMenuOpen}
+            title="Switch factory location"
+            onClick={() => setLocationMenuOpen((open) => !open)}
+          >
+            <MapPin size={16} />
+            <span className="topbar-location-label">{selectedFacilityLabel}</span>
+          </button>
+
+          {locationMenuOpen ? (
+            <div className="topbar-location-panel" role="menu">
+              <div className="topbar-location-panel-title">Viewing inventory for</div>
+              <button
+                className="topbar-location-option"
+                type="button"
+                role="menuitemradio"
+                aria-checked={selectedFacility === ALL_FACILITIES}
+                onClick={() => selectFacility(ALL_FACILITIES)}
+              >
+                <span>All Locations <span className="topbar-location-option-hint">(company total)</span></span>
+                {selectedFacility === ALL_FACILITIES ? <Check size={15} /> : null}
+              </button>
+              {FACILITIES.map((facility) => (
+                <button
+                  key={facility.id}
+                  className="topbar-location-option"
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={selectedFacility === facility.id}
+                  onClick={() => selectFacility(facility.id)}
+                >
+                  <span>{facility.name} <span className="topbar-location-option-hint">({facility.code})</span></span>
+                  {selectedFacility === facility.id ? <Check size={15} /> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
 
         <div className="topbar-notifications" ref={notificationPanelRef}>
           <button

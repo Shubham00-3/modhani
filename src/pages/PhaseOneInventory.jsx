@@ -16,6 +16,7 @@ import {
 import { LOW_STOCK_THRESHOLD, getStockStatus } from '../lib/inventoryThresholds';
 import { compareItemNumbers } from '../lib/productSort';
 import { GOODS_TYPES, getGoodsTypeLabel, normalizeGoodsType } from '../lib/goodsTypes';
+import { ALL_FACILITIES, FACILITIES, getFacilityCode, getFacilityName } from '../lib/facilities';
 import ProductImageLightbox from '../components/ProductImageLightbox';
 
 function getStockStatusLabel(status) {
@@ -26,6 +27,8 @@ function getStockStatusLabel(status) {
 
 export default function PhaseOneInventory() {
   const { state } = useApp();
+  const selectedFacility = state.selectedFacility ?? ALL_FACILITIES;
+  const showAllFacilities = selectedFacility === ALL_FACILITIES;
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [goodsTypeFilter, setGoodsTypeFilter] = useState('');
@@ -46,22 +49,35 @@ export default function PhaseOneInventory() {
     return activeProducts
       .map((product) => {
         const productBatches = state.batches.filter((batch) => batch.productId === product.id);
-        const visibleBatches = lotStatusFilter
-          ? productBatches.filter((batch) => batch.status === lotStatusFilter)
-          : productBatches;
-        const activeBatches = productBatches.filter((batch) => batch.status === 'active' && batch.qtyRemaining > 0);
-        const totalProduced = productBatches.reduce((sum, batch) => sum + Number(batch.qtyProduced ?? 0), 0);
+        // Remaining stock split per factory, plus the company total.
+        const remainingByFacility = Object.fromEntries(FACILITIES.map((facility) => [facility.id, 0]));
+        productBatches.forEach((batch) => {
+          if (batch.facilityId && batch.facilityId in remainingByFacility) {
+            remainingByFacility[batch.facilityId] += Number(batch.qtyRemaining ?? 0);
+          }
+        });
         const totalRemaining = productBatches.reduce((sum, batch) => sum + Number(batch.qtyRemaining ?? 0), 0);
+        // When the topbar is scoped to one factory, every figure on the row
+        // (remaining, status, lots, FIFO) reflects just that factory.
+        const displayRemaining = showAllFacilities ? totalRemaining : (remainingByFacility[selectedFacility] ?? 0);
+        const facilityBatches = showAllFacilities
+          ? productBatches
+          : productBatches.filter((batch) => batch.facilityId === selectedFacility);
+        const visibleBatches = lotStatusFilter
+          ? facilityBatches.filter((batch) => batch.status === lotStatusFilter)
+          : facilityBatches;
+        const activeBatches = facilityBatches.filter((batch) => batch.status === 'active' && batch.qtyRemaining > 0);
         const oldestLot = [...activeBatches].sort((a, b) => new Date(a.productionDate) - new Date(b.productionDate))[0];
-        const stockStatus = getStockStatus(totalRemaining);
+        const stockStatus = getStockStatus(displayRemaining);
         const lotCodes = visibleBatches.map((batch) => batch.batchNumber).join(' ');
 
         return {
           product,
           batches: visibleBatches,
           activeBatches,
-          totalProduced,
+          remainingByFacility,
           totalRemaining,
+          displayRemaining,
           oldestLot,
           stockStatus,
           searchText: [
@@ -97,12 +113,12 @@ export default function PhaseOneInventory() {
           return (a.product.category || '').localeCompare(b.product.category || '')
             || getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
         }
-        if (sortBy === 'remaining-asc') return a.totalRemaining - b.totalRemaining;
-        if (sortBy === 'remaining-desc') return b.totalRemaining - a.totalRemaining;
+        if (sortBy === 'remaining-asc') return a.displayRemaining - b.displayRemaining;
+        if (sortBy === 'remaining-desc') return b.displayRemaining - a.displayRemaining;
         if (sortBy === 'status') {
           const statusOrder = { out: 0, low: 1, in: 2 };
           return statusOrder[a.stockStatus] - statusOrder[b.stockStatus]
-            || a.totalRemaining - b.totalRemaining;
+            || a.displayRemaining - b.displayRemaining;
         }
         if (sortBy === 'oldest-lot') {
           const aDate = a.oldestLot?.productionDate ? new Date(a.oldestLot.productionDate).getTime() : Number.MAX_SAFE_INTEGER;
@@ -112,7 +128,7 @@ export default function PhaseOneInventory() {
 
         return getProductDisplayName(a.product).localeCompare(getProductDisplayName(b.product));
       });
-  }, [activeProducts, categoryFilter, goodsTypeFilter, itemNumberDir, lotStatusFilter, search, sortBy, state.batches, stockFilter]);
+  }, [activeProducts, categoryFilter, goodsTypeFilter, itemNumberDir, lotStatusFilter, search, selectedFacility, showAllFacilities, sortBy, state.batches, stockFilter]);
 
   const historyRows = useMemo(() => buildInventoryHistory(state), [state]);
   const hasActiveFilters = Boolean(search || categoryFilter || goodsTypeFilter || stockFilter || lotStatusFilter);
@@ -263,14 +279,22 @@ export default function PhaseOneInventory() {
                   <th style={{ width: 48 }} aria-label="Product image" />
                   <th style={{ width: 90 }}>Item #</th>
                   <th>Product</th>
-                  <th>Remaining</th>
-                  <th>Produced</th>
+                  {showAllFacilities ? (
+                    <>
+                      {FACILITIES.map((facility) => (
+                        <th key={facility.id} className="cell-align-right">{facility.name}</th>
+                      ))}
+                      <th className="cell-align-right">Total</th>
+                    </>
+                  ) : (
+                    <th className="cell-align-right">Remaining · {getFacilityName(selectedFacility)}</th>
+                  )}
                   <th>Status</th>
                   <th>Active Lots</th>
                 </tr>
               </thead>
               <tbody>
-                {inventoryRows.map(({ product, batches, activeBatches, totalProduced, totalRemaining, oldestLot, stockStatus }) => (
+                {inventoryRows.map(({ product, batches, activeBatches, remainingByFacility, totalRemaining, displayRemaining, oldestLot, stockStatus }) => (
                   <tr key={product.id} className={`inventory-row inventory-row-${stockStatus}`}>
                     <td>
                       <ProductImage product={product} onPreview={setPreviewProduct} small />
@@ -284,10 +308,22 @@ export default function PhaseOneInventory() {
                         {getGoodsTypeLabel(product.goodsType)} · {product.category || 'Uncategorized'} · {product.packagingDetails || product.unitSize || 'Not set'} · {getProductOrderUnitLabel(product)}
                       </div>
                     </td>
-                    <td className="cell-monospace cell-align-left">
-                      <span className="inventory-row-remaining">{totalRemaining.toLocaleString()}</span>
-                    </td>
-                    <td className="cell-monospace cell-align-left">{totalProduced.toLocaleString()}</td>
+                    {showAllFacilities ? (
+                      <>
+                        {FACILITIES.map((facility) => (
+                          <td key={facility.id} className="cell-monospace cell-align-right">
+                            {(remainingByFacility[facility.id] ?? 0).toLocaleString()}
+                          </td>
+                        ))}
+                        <td className="cell-monospace cell-align-right">
+                          <span className="inventory-row-remaining">{totalRemaining.toLocaleString()}</span>
+                        </td>
+                      </>
+                    ) : (
+                      <td className="cell-monospace cell-align-right">
+                        <span className="inventory-row-remaining">{displayRemaining.toLocaleString()}</span>
+                      </td>
+                    )}
                     <td>
                       <span className={`badge badge-${stockStatus === 'low' ? 'partial' : stockStatus === 'out' ? 'declined' : 'fulfilled'}`}>
                         {getStockStatusLabel(stockStatus)}
@@ -298,6 +334,9 @@ export default function PhaseOneInventory() {
                         <div className="inventory-lot-badges">
                           {batches.map((batch) => (
                             <span key={batch.id} className={`badge badge-${batch.status}`}>
+                              {showAllFacilities && getFacilityCode(batch.facilityId)
+                                ? <span className="inventory-lot-facility">{getFacilityCode(batch.facilityId)}</span>
+                                : null}
                               {batch.batchNumber}: {batch.qtyRemaining.toLocaleString()}
                             </span>
                           ))}

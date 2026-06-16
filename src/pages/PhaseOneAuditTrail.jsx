@@ -15,6 +15,7 @@ const ACTION_LABELS = {
   production_edited: 'Production Edited',
   production_trashed: 'Production Trashed',
   production_restored: 'Production Restored',
+  stock_transferred: 'Stock Transferred',
   user_disabled: 'User Disabled',
   user_enabled: 'User Re-enabled',
   driver_assigned: 'Driver Assigned',

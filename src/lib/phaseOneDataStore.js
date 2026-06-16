@@ -145,6 +145,7 @@ function batchToUi(batch) {
     qtyProduced: Number(batch.qty_produced),
     qtyRemaining: Number(batch.qty_remaining),
     status: batch.status,
+    facilityId: batch.facility_id ?? null,
     updatedAt: batch.updated_at,
     deletedAt: batch.deleted_at ?? null,
     deletedBy: batch.deleted_by ?? null,
@@ -386,6 +387,7 @@ function batchToDb(batch) {
     qty_produced: Number(batch.qtyProduced),
     qty_remaining: Number(batch.qtyRemaining),
     status: batch.status,
+    facility_id: batch.facilityId ?? null,
   };
 }
 
@@ -1068,6 +1070,7 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_production_date: action.payload.productionDate,
         p_qty_produced: action.payload.qtyProduced,
         p_user_id: currentUser.id,
+        p_facility_id: action.payload.facilityId,
       });
     case 'EDIT_PRODUCTION_BATCH':
       return callRpc(supabase, 'modhanios_edit_production_batch', {
@@ -1081,6 +1084,14 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_batch_id: action.payload.id,
         p_user_id: currentUser.id,
         p_reason: action.payload.reason ?? null,
+      });
+    case 'TRANSFER_STOCK':
+      return callRpc(supabase, 'modhanios_transfer_stock', {
+        p_batch_id: action.payload.batchId,
+        p_to_facility: action.payload.toFacility,
+        p_qty: action.payload.qty,
+        p_reason: action.payload.reason ?? null,
+        p_user_id: currentUser.id,
       });
     case 'RESTORE_BATCH':
       return callRpc(supabase, 'modhanios_restore_batch', {
@@ -1227,6 +1238,7 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_production_date: action.payload.productionDate,
         p_qty_produced: action.payload.qtyProduced,
         p_user_id: currentUser.id,
+        p_facility_id: action.payload.facilityId,
       });
     case 'UPDATE_BATCH':
       return upsertRow(supabase, 'batches', batchToDb(action.payload));

@@ -116,7 +116,7 @@ body {
   font-size: var(--font-size-base);
   color: var(--color-text);
   background-color: var(--color-bg);
-  line-height: 1.6;
+  line-height: 1.45;
   overflow-x: hidden;
   min-width: 320px;
 }
@@ -191,9 +191,12 @@ img {
 .app-content {
   flex: 1;
   padding: var(--space-8);
-  max-width: 1400px;
+  max-width: 1680px;
   width: 100%;
-  margin: 0 auto;
+  /* Left-align content against the sidebar instead of centering it. On wide
+     monitors the old `margin: 0 auto` left a large empty gap between the
+     sidebar and the content; left-aligning closes that gap. */
+  margin: 0;
   min-width: 0;
 }
 
@@ -937,6 +940,99 @@ img {
 .topbar-qb-status-btn:focus-visible {
   outline: none;
   border-color: var(--color-primary);
+}
+
+/* ---------- Topbar location switcher ---------- */
+.topbar-location {
+  position: relative;
+}
+
+.topbar-location-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+
+.topbar-location-btn:hover {
+  border-color: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+/* When scoped to a single factory the control doubles as the active-location
+   tag so staff can't forget which factory's data they're looking at. */
+.topbar-location-btn.is-scoped {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+}
+
+.topbar-location-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-location-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 240px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-2);
+  z-index: 50;
+  animation: fadeInDown 0.15s ease;
+}
+
+.topbar-location-panel-title {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.topbar-location-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.topbar-location-option:hover {
+  background: var(--color-bg-secondary);
+}
+
+.topbar-location-option[aria-checked='true'] {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.topbar-location-option-hint {
+  color: var(--color-text-secondary);
+  font-weight: 400;
 }
 
 /* ---------- Auth ---------- */
@@ -2328,10 +2424,20 @@ img {
 }
 
 .data-table tbody td {
-  padding: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   font-size: var(--font-size-base);
   border-bottom: 1px solid var(--color-border-light);
   vertical-align: middle;
+  /* Keep single values (dates like "Jun 30 2026", counts, lot codes) on one
+     line. Cells that truncate (.cell-truncate) clip with an ellipsis, and
+     block children (badge groups, meta rows) manage their own wrapping, so
+     this only affects bare inline text. */
+  white-space: nowrap;
+}
+
+/* Opt back into wrapping for cells that hold free-form text. */
+.data-table tbody td.cell-wrap {
+  white-space: normal;
 }
 
 .data-table .cell-monospace {

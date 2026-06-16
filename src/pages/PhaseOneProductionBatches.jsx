@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowDownUp, FlaskConical, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
+import { AlertTriangle, ArrowDownUp, ArrowLeftRight, FlaskConical, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
 import { compareItemNumbers } from '../lib/productSort';
+import { ALL_FACILITIES, FACILITIES, applyFacilityLotSuffix, getFacilityName } from '../lib/facilities';
 import {
   formatCaseQuantityBreakdown,
   formatDate,
@@ -23,12 +24,17 @@ function getProductionProductFilterKey(product) {
 
 export default function PhaseOneProductionBatches() {
   const { state, dispatch, addToast } = useApp();
+  const selectedFacility = state.selectedFacility ?? ALL_FACILITIES;
+  const showAllFacilities = selectedFacility === ALL_FACILITIES;
+  // Transfers between factories are admin-only (manage_settings permission).
+  const canTransfer = Boolean(state.currentUser?.permissions?.manageSettings);
   const [searchParams, setSearchParams] = useSearchParams();
   const activeProducts = useMemo(() => getActiveCatalogProducts(state.products), [state.products]);
   const canLogProduction = activeProducts.length > 0;
   const [showModal, setShowModal] = useState(false);
   const [editingBatch, setEditingBatch] = useState(null);
   const [trashingBatch, setTrashingBatch] = useState(null);
+  const [transferringBatch, setTransferringBatch] = useState(null);
   const [productFilter, setProductFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortBy, setSortBy] = useState('recent');
@@ -58,6 +64,7 @@ export default function PhaseOneProductionBatches() {
 
   const filteredBatches = useMemo(() => {
     return activeBatches
+      .filter((batch) => showAllFacilities || batch.facilityId === selectedFacility)
       .filter((batch) => {
         if (!productFilter) return true;
         return getProductionProductFilterKey(getProduct(state.products, batch.productId)) === productFilter;
@@ -95,7 +102,7 @@ export default function PhaseOneProductionBatches() {
         const aTime = new Date(a.updatedAt ?? a.productionDate).getTime();
         return bTime - aTime || String(b.batchNumber ?? '').localeCompare(String(a.batchNumber ?? ''));
       });
-  }, [activeBatches, dashboardSearch, sortDir, productFilter, sortBy, state.products, statusFilter]);
+  }, [activeBatches, dashboardSearch, selectedFacility, showAllFacilities, sortDir, productFilter, sortBy, state.products, statusFilter]);
   const hasActiveFilters = Boolean(productFilter || statusFilter || dashboardSearch);
 
   const oldestActive = activeBatches
@@ -237,8 +244,8 @@ export default function PhaseOneProductionBatches() {
                 <tr>
                   <th>Lot Code</th>
                   <th>Product</th>
+                  <th>Factory</th>
                   <th>Production Date</th>
-                  <th>Produced</th>
                   <th>Remaining</th>
                   <th>Status</th>
                   <th style={{ width: 110 }}>Actions</th>
@@ -253,12 +260,23 @@ export default function PhaseOneProductionBatches() {
                     <td className="cell-truncate">
                       <span className="text-truncate" title={batchProductName}>{batchProductName}</span>
                     </td>
+                    <td>{getFacilityName(batch.facilityId)}</td>
                     <td>{formatDate(batch.productionDate)}</td>
-                    <td className="cell-monospace cell-align-left">{batch.qtyProduced.toLocaleString()}</td>
                     <td className="cell-monospace cell-align-left">{batch.qtyRemaining.toLocaleString()}</td>
                     <td><span className={`badge badge-${batch.status}`}>{batch.status}</span></td>
                     <td>
                       <div style={{ display: 'inline-flex', gap: 4 }}>
+                        {canTransfer && batch.status === 'active' && batch.qtyRemaining > 0 ? (
+                          <button
+                            className="um-icon-btn"
+                            type="button"
+                            title="Transfer to other factory"
+                            aria-label={`Transfer lot ${batch.batchNumber} to the other factory`}
+                            onClick={() => setTransferringBatch(batch)}
+                          >
+                            <ArrowLeftRight size={14} />
+                          </button>
+                        ) : null}
                         <button
                           className="um-icon-btn"
                           type="button"
@@ -437,6 +455,159 @@ export default function PhaseOneProductionBatches() {
           }}
         />
       ) : null}
+
+      {transferringBatch ? (
+        <TransferStockModal
+          batch={transferringBatch}
+          products={state.products}
+          onClose={() => setTransferringBatch(null)}
+          onConfirm={async ({ toFacility, qty, reason }) => {
+            const result = await dispatch({
+              type: 'TRANSFER_STOCK',
+              payload: { batchId: transferringBatch.id, toFacility, qty, reason },
+            });
+            if (result?.ok) {
+              addToast(
+                `Transferred ${qty.toLocaleString()} of lot ${transferringBatch.batchNumber} to ${getFacilityName(toFacility)}.`
+              );
+              setTransferringBatch(null);
+            }
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function TransferStockModal({ batch, products, onClose, onConfirm }) {
+  useModalBehavior(onClose);
+  const product = getProduct(products, batch.productId);
+  const available = Number(batch.qtyRemaining ?? 0);
+  // Destination = the factory the lot is NOT currently in. With two factories
+  // it's unambiguous; if more are added later this becomes a real choice.
+  const destinations = FACILITIES.filter((facility) => facility.id !== batch.facilityId);
+  const [toFacility, setToFacility] = useState(destinations[0]?.id ?? '');
+  const [qty, setQty] = useState(String(available));
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const quantityBreakdown = formatCaseQuantityBreakdown(product, qty);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const numericQty = Number(qty);
+    if (!toFacility) {
+      window.alert('Choose a destination factory.');
+      return;
+    }
+    if (!Number.isFinite(numericQty) || numericQty <= 0) {
+      window.alert('Enter a quantity greater than zero.');
+      return;
+    }
+    if (numericQty > available) {
+      window.alert(`Only ${available.toLocaleString()} units are available to transfer.`);
+      return;
+    }
+    if (numericQty > 0 && !isValidCaseQuantityStep(numericQty)) {
+      window.alert('Transfer quantity can use up to 2 decimal places.');
+      return;
+    }
+    if (!reason.trim()) {
+      window.alert('Enter a reason for this transfer.');
+      return;
+    }
+    setSaving(true);
+    await onConfirm({ toFacility, qty: numericQty, reason: reason.trim() });
+    setSaving(false);
+  }
+
+  return (
+    <div className="modal-overlay" onClick={handleOverlayClick(onClose)}>
+      <div className="modal" onClick={(event) => event.stopPropagation()}>
+        <div className="modal-header">
+          <h3 className="modal-title">
+            <ArrowLeftRight size={18} style={{ marginRight: 8, verticalAlign: 'middle' }} />
+            Transfer Lot {batch.batchNumber}
+          </h3>
+          <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving}>
+            <X size={18} />
+          </button>
+        </div>
+        <form className="modal-body" onSubmit={handleSubmit}>
+          <p style={{ marginTop: 0, color: 'var(--color-text-secondary)', fontSize: 14 }}>
+            Moving units of <strong>{getProductDisplayName(product)}</strong> from{' '}
+            <strong>{getFacilityName(batch.facilityId)}</strong>. The lot code stays the same
+            (it identifies where the lot was made); only the stock location changes.
+          </p>
+          <div className="grid-2">
+            <div className="form-group">
+              <label className="form-label">From</label>
+              <input className="form-input" value={getFacilityName(batch.facilityId)} disabled />
+            </div>
+            <div className="form-group">
+              <label className="form-label">To factory</label>
+              <select
+                className="form-select"
+                value={toFacility}
+                onChange={(event) => setToFacility(event.target.value)}
+              >
+                {destinations.map((facility) => (
+                  <option key={facility.id} value={facility.id}>
+                    {facility.name} ({facility.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Quantity to transfer</label>
+            <input
+              className="form-input"
+              type="number"
+              min="0.01"
+              step="0.01"
+              max={available}
+              value={qty}
+              onChange={(event) => setQty(event.target.value)}
+              required
+              autoFocus
+            />
+            <div className="form-hint">
+              {available.toLocaleString()} available at {getFacilityName(batch.facilityId)}.
+              {quantityBreakdown ? ` ${quantityBreakdown}` : ''}
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: 'var(--space-2)', alignSelf: 'flex-start' }}
+              onClick={() => setQty(String(available))}
+            >
+              Transfer all {available.toLocaleString()}
+            </button>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Reason (required)</label>
+            <input
+              className="form-input"
+              type="text"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              placeholder="e.g. Rebalancing stock for Tillsonburg orders"
+              required
+            />
+            <div className="form-hint">
+              A reason is required for every transfer. It is kept on the audit trail.
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-ghost" type="button" onClick={onClose} disabled={saving}>
+              Cancel
+            </button>
+            <button className="btn btn-primary" type="submit" disabled={saving || !toFacility}>
+              {saving ? 'Transferring...' : 'Transfer Stock'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -618,13 +789,23 @@ function LogProductionModal({ onClose, onSave }) {
   const [isProductSearchFocused, setIsProductSearchFocused] = useState(false);
   const [quantity, setQuantity] = useState('');
   const [productionDate, setProductionDate] = useState(new Date().toISOString().slice(0, 10));
-  const [lotCode, setLotCode] = useState(() => getNextLotCode(state.batches, productionDate));
+  // Default to the factory the topbar is scoped to (if any), else the first.
+  const defaultFacility =
+    state.selectedFacility && state.selectedFacility !== ALL_FACILITIES
+      ? state.selectedFacility
+      : FACILITIES[0].id;
+  const [facilityId, setFacilityId] = useState(defaultFacility);
+  const [lotCode, setLotCode] = useState(() =>
+    applyFacilityLotSuffix(getNextLotCode(state.batches, productionDate), defaultFacility)
+  );
   const [isSaving, setIsSaving] = useState(false);
   const selectedProduct = getProduct(state.products, productId);
 
+  // Re-derive the lot code from the production date and append the factory
+  // suffix (e.g. 26167-BR) whenever the date or facility changes.
   useEffect(() => {
-    setLotCode(getNextLotCode(state.batches, productionDate));
-  }, [productionDate, state.batches]);
+    setLotCode(applyFacilityLotSuffix(getNextLotCode(state.batches, productionDate), facilityId));
+  }, [productionDate, state.batches, facilityId]);
 
   const filteredProducts = useMemo(() => {
     const search = productSearch.trim().toLowerCase();
@@ -723,12 +904,29 @@ function LogProductionModal({ onClose, onSave }) {
               </div>
             ) : null}
           </div>
+          <div className="form-group">
+            <label className="form-label">Factory</label>
+            <select
+              className="form-select"
+              value={facilityId}
+              onChange={(event) => setFacilityId(event.target.value)}
+            >
+              {FACILITIES.map((facility) => (
+                <option key={facility.id} value={facility.id}>
+                  {facility.name} ({facility.code})
+                </option>
+              ))}
+            </select>
+            <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
+              The factory that ran this production. Appended to the lot code for traceability.
+            </div>
+          </div>
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Lot Code</label>
               <input className="form-input" value={lotCode} onChange={(event) => setLotCode(event.target.value)} />
               <div style={{ marginTop: 'var(--space-2)', color: 'var(--color-text-secondary)', fontSize: 'var(--font-size-sm)' }}>
-                Auto-filled from the production date. Staff can override it when needed.
+                Auto-filled from the production date and factory ({getFacilityName(facilityId)}). Staff can override it when needed.
               </div>
             </div>
             <div className="form-group">
@@ -781,6 +979,7 @@ function LogProductionModal({ onClose, onSave }) {
                   qtyProduced: numericQuantity,
                   qtyRemaining: numericQuantity,
                   status: 'active',
+                  facilityId,
                 });
               } finally {
                 setIsSaving(false);
