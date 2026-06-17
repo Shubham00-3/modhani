@@ -12,10 +12,22 @@ export const FACILITIES = [
 // Sentinel for the "show everything / company total" view in the switcher.
 export const ALL_FACILITIES = 'all';
 
+// Fallback factory for lots with a missing/unknown facility_id (legacy stock
+// that predates the location split, or data where the backfill hasn't run).
+// Brampton is the primary site, so unassigned stock counts there rather than
+// disappearing from the per-factory columns.
+export const DEFAULT_FACILITY = 'brampton';
+
 const FACILITY_BY_ID = Object.fromEntries(FACILITIES.map((f) => [f.id, f]));
 
 export function getFacility(id) {
   return FACILITY_BY_ID[String(id ?? '').trim().toLowerCase()] ?? null;
+}
+
+// Resolve any stored/blank facility_id to a known factory id, defaulting
+// unassigned/unknown values to the primary site so totals always reconcile.
+export function resolveFacilityId(id) {
+  return getFacility(id)?.id ?? DEFAULT_FACILITY;
 }
 
 export function getFacilityName(id) {

@@ -1899,6 +1899,11 @@
 .inventory-row-name {
   font-weight: 700;
   line-height: 1.3;
+  /* Long product names must wrap inside the column, not overflow into the
+     number columns. The global single-line cell rule (for dates) is overridden
+     here for this free-text cell. */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .inventory-row-meta {
@@ -1906,6 +1911,8 @@
   font-size: var(--font-size-xs);
   margin-top: 2px;
   line-height: 1.35;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .inventory-row-remaining {

@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowDownUp, ArrowLeftRight, FlaskConical, Pencil, Plus,
 import { useApp } from '../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
 import { compareItemNumbers } from '../lib/productSort';
-import { ALL_FACILITIES, FACILITIES, applyFacilityLotSuffix, getFacilityName } from '../lib/facilities';
+import { ALL_FACILITIES, FACILITIES, applyFacilityLotSuffix, getFacilityName, resolveFacilityId } from '../lib/facilities';
 import {
   formatCaseQuantityBreakdown,
   formatDate,
@@ -64,7 +64,7 @@ export default function PhaseOneProductionBatches() {
 
   const filteredBatches = useMemo(() => {
     return activeBatches
-      .filter((batch) => showAllFacilities || batch.facilityId === selectedFacility)
+      .filter((batch) => showAllFacilities || resolveFacilityId(batch.facilityId) === selectedFacility)
       .filter((batch) => {
         if (!productFilter) return true;
         return getProductionProductFilterKey(getProduct(state.products, batch.productId)) === productFilter;
@@ -260,7 +260,7 @@ export default function PhaseOneProductionBatches() {
                     <td className="cell-truncate">
                       <span className="text-truncate" title={batchProductName}>{batchProductName}</span>
                     </td>
-                    <td>{getFacilityName(batch.facilityId)}</td>
+                    <td>{getFacilityName(resolveFacilityId(batch.facilityId))}</td>
                     <td>{formatDate(batch.productionDate)}</td>
                     <td className="cell-monospace cell-align-left">{batch.qtyRemaining.toLocaleString()}</td>
                     <td><span className={`badge badge-${batch.status}`}>{batch.status}</span></td>
@@ -485,7 +485,7 @@ function TransferStockModal({ batch, products, onClose, onConfirm }) {
   const available = Number(batch.qtyRemaining ?? 0);
   // Destination = the factory the lot is NOT currently in. With two factories
   // it's unambiguous; if more are added later this becomes a real choice.
-  const destinations = FACILITIES.filter((facility) => facility.id !== batch.facilityId);
+  const destinations = FACILITIES.filter((facility) => facility.id !== resolveFacilityId(batch.facilityId));
   const [toFacility, setToFacility] = useState(destinations[0]?.id ?? '');
   const [qty, setQty] = useState(String(available));
   const [reason, setReason] = useState('');
@@ -535,13 +535,13 @@ function TransferStockModal({ batch, products, onClose, onConfirm }) {
         <form className="modal-body" onSubmit={handleSubmit}>
           <p style={{ marginTop: 0, color: 'var(--color-text-secondary)', fontSize: 14 }}>
             Moving units of <strong>{getProductDisplayName(product)}</strong> from{' '}
-            <strong>{getFacilityName(batch.facilityId)}</strong>. The lot code stays the same
+            <strong>{getFacilityName(resolveFacilityId(batch.facilityId))}</strong>. The lot code stays the same
             (it identifies where the lot was made); only the stock location changes.
           </p>
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">From</label>
-              <input className="form-input" value={getFacilityName(batch.facilityId)} disabled />
+              <input className="form-input" value={getFacilityName(resolveFacilityId(batch.facilityId))} disabled />
             </div>
             <div className="form-group">
               <label className="form-label">To factory</label>
@@ -572,7 +572,7 @@ function TransferStockModal({ batch, products, onClose, onConfirm }) {
               autoFocus
             />
             <div className="form-hint">
-              {available.toLocaleString()} available at {getFacilityName(batch.facilityId)}.
+              {available.toLocaleString()} available at {getFacilityName(resolveFacilityId(batch.facilityId))}.
               {quantityBreakdown ? ` ${quantityBreakdown}` : ''}
             </div>
             <button
