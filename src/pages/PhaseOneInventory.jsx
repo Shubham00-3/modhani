@@ -48,7 +48,12 @@ export default function PhaseOneInventory() {
 
     return activeProducts
       .map((product) => {
-        const productBatches = state.batches.filter((batch) => batch.productId === product.id);
+        // Exclude trashed (soft-deleted) lots: trashing marks a lot 'cleared'
+        // but keeps qty_remaining (for restore), so counting them inflates the
+        // Remaining total and shows ghost badges that aren't in the active count.
+        const productBatches = state.batches.filter(
+          (batch) => batch.productId === product.id && !batch.deletedAt
+        );
         // Remaining stock split per factory, plus the company total.
         const remainingByFacility = Object.fromEntries(FACILITIES.map((facility) => [facility.id, 0]));
         productBatches.forEach((batch) => {

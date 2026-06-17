@@ -115,7 +115,11 @@ export default function PhaseOneOverview() {
   const recentOrders = [...recentOrdersSource].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 6);
   const inventoryPreviewRows = activeProducts
     .map((product) => {
-      const productBatches = state.batches.filter((batch) => batch.productId === product.id);
+      // Exclude trashed (soft-deleted) lots so their leftover qty_remaining
+      // doesn't inflate stock totals (matches the Inventory page).
+      const productBatches = state.batches.filter(
+        (batch) => batch.productId === product.id && !batch.deletedAt
+      );
       const activeBatches = productBatches
         .filter((batch) => batch.status === 'active' && batch.qtyRemaining > 0)
         .sort((a, b) => new Date(a.productionDate) - new Date(b.productionDate));
