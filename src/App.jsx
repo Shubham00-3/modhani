@@ -7,6 +7,7 @@ import PhaseOneOverview from './pages/PhaseOneOverview';
 import PhaseOneOrdersInvoicing from './pages/PhaseOneOrdersInvoicing';
 import PhaseOneProductionBatches from './pages/PhaseOneProductionBatches';
 import PhaseOneInventory from './pages/PhaseOneInventory';
+import PhaseOneMaterials from './pages/PhaseOneMaterials';
 import PhaseOneReports from './pages/PhaseOneReports';
 import PhaseOneSettings from './pages/PhaseOneSettings';
 import PhaseOneAuditTrail from './pages/PhaseOneAuditTrail';
@@ -112,6 +113,7 @@ export default function App() {
         <Route path="/pod" element={<PhaseOnePOD />} />
         <Route path="/production" element={<PhaseOneProductionBatches />} />
         <Route path="/inventory" element={<PhaseOneInventory />} />
+        <Route path="/materials" element={<PhaseOneMaterials />} />
         <Route path="/reports" element={<PhaseOneReports />} />
         <Route path="/audit" element={<PhaseOneAuditTrail />} />
         <Route path="/clients-locations" element={<PhaseOneClientsLocations />} />

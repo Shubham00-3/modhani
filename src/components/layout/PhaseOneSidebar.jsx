@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   BarChart3,
+  Boxes,
   Building2,
   FileCheck,
   FlaskConical,
@@ -21,6 +22,7 @@ const navItems = [
   { to: '/pod', label: 'Proof of Delivery', icon: FileCheck },
   { to: '/production', label: 'Production & Lots', icon: FlaskConical },
   { to: '/inventory', label: 'Inventory', icon: Package },
+  { to: '/materials', label: 'Materials', icon: Boxes },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/audit', label: 'Audit Trail', icon: ScrollText },
   { to: '/clients-locations', label: 'Clients & Locations', icon: Building2 },

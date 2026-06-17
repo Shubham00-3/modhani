@@ -153,6 +153,39 @@ function batchToUi(batch) {
   };
 }
 
+function materialToUi(material) {
+  return {
+    id: material.id,
+    name: material.name,
+    type: material.type,
+    unit: material.unit,
+    supplier: material.supplier ?? '',
+    lowStockThreshold: material.low_stock_threshold == null ? null : Number(material.low_stock_threshold),
+    isActive: material.is_active !== false,
+    createdAt: material.created_at,
+    updatedAt: material.updated_at,
+  };
+}
+
+function materialLotToUi(lot) {
+  return {
+    id: lot.id,
+    materialId: lot.material_id,
+    supplierLotCode: lot.supplier_lot_code,
+    facilityId: lot.facility_id,
+    qtyReceived: Number(lot.qty_received),
+    qtyRemaining: Number(lot.qty_remaining),
+    receivedDate: lot.received_date,
+    expiryDate: lot.expiry_date ?? null,
+    unitCost: lot.unit_cost == null ? null : Number(lot.unit_cost),
+    status: lot.status,
+    deletedAt: lot.deleted_at ?? null,
+    deletedBy: lot.deleted_by ?? null,
+    deletedReason: lot.deleted_reason ?? null,
+    updatedAt: lot.updated_at,
+  };
+}
+
 function auditToUi(entry) {
   return {
     id: entry.id,
@@ -513,6 +546,8 @@ export async function fetchRemoteState(supabase, userId) {
     customerClientAssignmentsResult,
     customerLocationAssignmentsResult,
     trashReportRowsResult,
+    materialsResult,
+    materialLotsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('clients').select('*').order('name'),
@@ -540,6 +575,8 @@ export async function fetchRemoteState(supabase, userId) {
     supabase.from('customer_client_assignments').select('*'),
     supabase.from('customer_location_assignments').select('*'),
     supabase.from('report_trashed_lots').select('*').order('deleted_at', { ascending: false }),
+    supabase.from('materials').select('*').order('name'),
+    supabase.from('material_lots').select('*').order('received_date', { ascending: false }),
   ]);
 
   const results = [
@@ -563,6 +600,8 @@ export async function fetchRemoteState(supabase, userId) {
     customerClientAssignmentsResult,
     customerLocationAssignmentsResult,
     trashReportRowsResult,
+    materialsResult,
+    materialLotsResult,
   ];
 
   const firstError = results
@@ -575,6 +614,8 @@ export async function fetchRemoteState(supabase, userId) {
         result !== customerClientAssignmentsResult &&
         result !== customerLocationAssignmentsResult &&
         result !== trashReportRowsResult &&
+        result !== materialsResult &&
+        result !== materialLotsResult &&
         // tiers tables are tolerated as empty on pre-migration databases so
         // the UI can still mount; they'll show up after the migration runs.
         result !== tiersResult &&
@@ -698,6 +739,8 @@ export async function fetchRemoteState(supabase, userId) {
     customerClientAssignments: customerClientAssignmentsResult.error ? [] : (customerClientAssignmentsResult.data ?? []).map(customerClientAssignmentToUi),
     customerLocationAssignments: customerLocationAssignmentsResult.error ? [] : (customerLocationAssignmentsResult.data ?? []).map(customerLocationAssignmentToUi),
     trashReportRows: trashReportRowsResult.error ? [] : (trashReportRowsResult.data ?? []).map(trashReportLineToUi),
+    materials: materialsResult.error ? [] : (materialsResult.data ?? []).map(materialToUi),
+    materialLots: materialLotsResult.error ? [] : (materialLotsResult.data ?? []).map(materialLotToUi),
   };
 }
 
@@ -1093,6 +1136,25 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_reason: action.payload.reason ?? null,
         p_user_id: currentUser.id,
       });
+    case 'RECEIVE_MATERIAL':
+      return callRpc(supabase, 'modhanios_receive_material', {
+        p_lot_id: action.payload.id,
+        p_material_id: action.payload.materialId,
+        p_supplier_lot_code: action.payload.supplierLotCode,
+        p_facility_id: action.payload.facilityId,
+        p_qty: Number(action.payload.qty),
+        p_received_date: action.payload.receivedDate,
+        p_expiry_date: action.payload.expiryDate ?? null,
+        p_unit_cost:
+          action.payload.unitCost == null || action.payload.unitCost === '' ? null : Number(action.payload.unitCost),
+        p_user_id: currentUser.id,
+      });
+    case 'SOFT_DELETE_MATERIAL_LOT':
+      return callRpc(supabase, 'modhanios_soft_delete_material_lot', {
+        p_lot_id: action.payload.id,
+        p_user_id: currentUser.id,
+        p_reason: action.payload.reason ?? null,
+      });
     case 'RESTORE_BATCH':
       return callRpc(supabase, 'modhanios_restore_batch', {
         p_batch_id: action.payload.id,
@@ -1152,6 +1214,20 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
         p_goods_type: normalizeGoodsType(product.goodsType),
       });
     }
+    case 'UPSERT_MATERIAL':
+      return callRpc(supabase, 'modhanios_upsert_material', {
+        p_id: action.payload.id,
+        p_name: action.payload.name,
+        p_type: action.payload.type,
+        p_unit: action.payload.unit,
+        p_supplier: action.payload.supplier ?? null,
+        p_low_stock_threshold:
+          action.payload.lowStockThreshold == null || action.payload.lowStockThreshold === ''
+            ? null
+            : Number(action.payload.lowStockThreshold),
+        p_is_active: action.payload.isActive !== false,
+        p_user_id: currentUser.id,
+      });
     case 'ADD_CLIENT':
     case 'UPDATE_CLIENT': {
       const existingClient =

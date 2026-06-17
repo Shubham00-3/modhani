@@ -11,6 +11,7 @@ const pageTitles = {
   '/orders': 'Orders & Invoicing',
   '/production': 'Production & Lots',
   '/inventory': 'Inventory',
+  '/materials': 'Materials',
   '/reports': 'Reports',
   '/clients-locations': 'Clients & Locations',
   '/customers': 'Customers',
