@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Plus, Trash2, X } from 'lucide-react';
 import { useApp } from '../../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../../hooks/useModalBehavior';
 import { getProductImageUrl } from '../../data/phaseOneData';
@@ -10,6 +10,19 @@ export function ProductModal({ product, onClose }) {
   const { state, dispatch, addToast } = useApp();
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(getProductImageUrl(product, { fallback: true }));
+
+  // Recipe / bill of materials for this product (Phase B). Seeded from the
+  // stored recipe lines; replaced wholesale on save. qtyPerUnit = how much of a
+  // material one produced unit consumes (auto-deducted at production logging).
+  const initialRecipe = useMemo(
+    () =>
+      (state.recipeLines ?? [])
+        .filter((line) => line.productId === product?.id)
+        .map((line) => ({ materialId: line.materialId, qtyPerUnit: String(line.qtyPerUnit), note: line.note ?? '' })),
+    [state.recipeLines, product?.id]
+  );
+  const [recipeLines, setRecipeLines] = useState(initialRecipe);
+  const hadInitialRecipe = initialRecipe.length > 0;
   const [form, setForm] = useState(
     product
       ? {
@@ -135,11 +148,34 @@ export function ProductModal({ product, onClose }) {
           },
         });
 
-        if (result.ok) {
-          onClose();
+        if (!result.ok) {
+          return false;
         }
 
-        return result.ok;
+        // Persist the recipe. Only touch it when there's something to save or an
+        // existing recipe to clear, so plain product edits don't spam the audit.
+        const cleanLines = recipeLines
+          .map((line) => ({ materialId: line.materialId, qtyPerUnit: Number(line.qtyPerUnit), note: line.note?.trim() || null }))
+          .filter((line) => line.materialId && Number.isFinite(line.qtyPerUnit) && line.qtyPerUnit > 0);
+        const recipeDuplicate = cleanLines.find(
+          (line, index) => cleanLines.findIndex((other) => other.materialId === line.materialId) !== index
+        );
+        if (recipeDuplicate) {
+          addToast('Each material can appear only once in a recipe.', 'warning');
+          return false;
+        }
+        if (cleanLines.length > 0 || hadInitialRecipe) {
+          const recipeResult = await dispatch({
+            type: 'SAVE_PRODUCT_RECIPE',
+            payload: { productId, lines: cleanLines },
+          });
+          if (!recipeResult.ok) {
+            return false;
+          }
+        }
+
+        onClose();
+        return true;
       }}
     >
       <FormInput label="Product Name" value={form.name} onChange={(value) => setForm((current) => ({ ...current, name: value }))} />
@@ -210,7 +246,98 @@ export function ProductModal({ product, onClose }) {
           </div>
         </div>
       </div>
+      <RecipeEditor materials={state.materials ?? []} lines={recipeLines} onChange={setRecipeLines} />
     </SimpleModal>
+  );
+}
+
+// Bill-of-materials editor shown inside the product modal. Each line is a
+// material consumed per produced unit; on production these auto-deduct (FIFO)
+// from the producing factory's stock. Materials come from the catalog.
+function RecipeEditor({ materials, lines, onChange }) {
+  const activeMaterials = useMemo(
+    () => materials.filter((material) => material.isActive !== false).sort((a, b) => a.name.localeCompare(b.name)),
+    [materials]
+  );
+  const materialById = useMemo(() => Object.fromEntries(materials.map((m) => [m.id, m])), [materials]);
+
+  function updateLine(index, patch) {
+    onChange(lines.map((line, i) => (i === index ? { ...line, ...patch } : line)));
+  }
+  function addLine() {
+    onChange([...lines, { materialId: activeMaterials[0]?.id ?? '', qtyPerUnit: '', note: '' }]);
+  }
+  function removeLine(index) {
+    onChange(lines.filter((_, i) => i !== index));
+  }
+
+  return (
+    <div className="form-group" style={{ borderTop: '1px solid var(--color-border)', paddingTop: 'var(--space-4)', marginTop: 'var(--space-2)' }}>
+      <label className="form-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span>Recipe / Bill of Materials</span>
+        <span style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 400 }}>
+          per 1 unit produced
+        </span>
+      </label>
+      <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', marginBottom: 'var(--space-3)' }}>
+        Materials consumed to make one unit. Logging production auto-deducts these from that factory&apos;s stock (oldest lot first).
+      </div>
+
+      {!activeMaterials.length ? (
+        <div className="alert alert-warning" style={{ marginBottom: 0 }}>
+          <div className="alert-content">
+            <div className="alert-description">Add materials in the Materials page before building a recipe.</div>
+          </div>
+        </div>
+      ) : (
+        <>
+          {lines.length ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {lines.map((line, index) => {
+                const unit = materialById[line.materialId]?.unit ?? '';
+                return (
+                  <div key={index} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+                    <select
+                      className="form-select"
+                      style={{ flex: 2, minWidth: 0 }}
+                      value={line.materialId}
+                      onChange={(event) => updateLine(index, { materialId: event.target.value })}
+                    >
+                      {activeMaterials.map((material) => (
+                        <option key={material.id} value={material.id}>
+                          {material.name} ({material.unit})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      className="form-input"
+                      style={{ flex: 1, minWidth: 0 }}
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={line.qtyPerUnit}
+                      placeholder="Qty"
+                      onChange={(event) => updateLine(index, { qtyPerUnit: event.target.value })}
+                    />
+                    <span style={{ width: 36, color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)' }}>{unit}</span>
+                    <button className="um-icon-btn um-icon-btn-danger" type="button" title="Remove material" onClick={() => removeLine(index)}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-2)' }}>
+              No recipe yet — this product won&apos;t deduct any materials when produced.
+            </div>
+          )}
+          <button className="btn btn-secondary btn-sm" type="button" onClick={addLine} style={{ marginTop: 'var(--space-3)' }}>
+            <Plus size={14} /> Add material
+          </button>
+        </>
+      )}
+    </div>
   );
 }
 

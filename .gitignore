@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Local dev scratch, QA artifacts, and tool state
+.tmp-*
+.claude/
+supabase/.temp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

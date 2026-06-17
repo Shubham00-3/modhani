@@ -8,8 +8,9 @@ import { ALL_FACILITIES, FACILITIES, getFacilityName, resolveFacilityId } from '
 const MATERIAL_TYPES = [
   { value: 'raw', label: 'Raw material' },
   { value: 'packaging', label: 'Packaging' },
+  { value: 'consumable', label: 'Consumable' },
 ];
-const MATERIAL_UNITS = ['kg', 'L', 'each'];
+const MATERIAL_UNITS = ['kg', 'L', 'each', 'lb', 'ft', 'Pail'];
 // Lots within this many days of their expiry date raise a warning.
 const EXPIRY_WARN_DAYS = 14;
 

@@ -65,6 +65,8 @@ const demoState = {
   selectedFacility: 'all',
   materials: [],
   materialLots: [],
+  recipeLines: [],
+  materialConsumptions: [],
   toasts: [],
   initialized: true,
   authConfigured: false,
@@ -98,6 +100,8 @@ const remoteBootState = {
   selectedFacility: 'all',
   materials: [],
   materialLots: [],
+  recipeLines: [],
+  materialConsumptions: [],
   toasts: [],
   initialized: false,
   authConfigured: true,
@@ -983,6 +987,7 @@ const serverAdminActions = new Set([
   'ADD_PRODUCT',
   'UPDATE_PRODUCT',
   'UPSERT_MATERIAL',
+  'SAVE_PRODUCT_RECIPE',
   'ADD_CLIENT',
   'UPDATE_CLIENT',
   'ADD_LOCATION',
@@ -1642,7 +1647,7 @@ export function AppProvider({ children }) {
           return { ok: false, error };
         }
 
-        const { error } = serverWorkflowActions.has(action.type)
+        const { data: actionData, error } = serverWorkflowActions.has(action.type)
           ? await executeWorkflowAction(supabase, action, currentUser)
           : await executeAdminAction(supabase, action, currentUser, previousState);
 
@@ -1682,7 +1687,7 @@ export function AppProvider({ children }) {
           notifyOrderEvent(action.payload.orderId, emailEventType);
         }
 
-        return { ok: true };
+        return { ok: true, data: actionData };
       }
 
       const nextState = reducer(previousState, action);

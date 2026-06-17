@@ -415,7 +415,15 @@ export default function PhaseOneProductionBatches() {
           onSave={async (payload) => {
             const result = await dispatch({ type: 'LOG_PRODUCTION_BATCH', payload });
             if (!result?.ok) return;
-            addToast(`Lot Code ${payload.batchNumber} logged.`);
+            const shortfalls = result.data?.shortfalls ?? [];
+            if (shortfalls.length) {
+              const summary = shortfalls
+                .map((s) => `${s.material_name} (short ${Number(s.short_qty).toLocaleString()} ${s.unit ?? ''})`.trim())
+                .join(', ');
+              addToast(`Lot ${payload.batchNumber} logged, but stock ran short: ${summary}. Receive more material.`, 'warning');
+            } else {
+              addToast(`Lot Code ${payload.batchNumber} logged.`);
+            }
             setShowModal(false);
           }}
         />

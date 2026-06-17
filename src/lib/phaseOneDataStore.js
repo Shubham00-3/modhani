@@ -186,6 +186,30 @@ function materialLotToUi(lot) {
   };
 }
 
+function recipeLineToUi(line) {
+  return {
+    id: line.id,
+    productId: line.product_id,
+    materialId: line.material_id,
+    qtyPerUnit: Number(line.qty_per_unit),
+    note: line.note ?? '',
+    createdAt: line.created_at,
+    updatedAt: line.updated_at,
+  };
+}
+
+function materialConsumptionToUi(row) {
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    materialId: row.material_id,
+    materialLotId: row.material_lot_id,
+    facilityId: row.facility_id,
+    qty: Number(row.qty),
+    createdAt: row.created_at,
+  };
+}
+
 function auditToUi(entry) {
   return {
     id: entry.id,
@@ -548,6 +572,8 @@ export async function fetchRemoteState(supabase, userId) {
     trashReportRowsResult,
     materialsResult,
     materialLotsResult,
+    productRecipeLinesResult,
+    materialConsumptionsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('clients').select('*').order('name'),
@@ -577,6 +603,8 @@ export async function fetchRemoteState(supabase, userId) {
     supabase.from('report_trashed_lots').select('*').order('deleted_at', { ascending: false }),
     supabase.from('materials').select('*').order('name'),
     supabase.from('material_lots').select('*').order('received_date', { ascending: false }),
+    supabase.from('product_recipe_lines').select('*'),
+    supabase.from('material_consumptions').select('*').order('created_at', { ascending: false }),
   ]);
 
   const results = [
@@ -602,6 +630,8 @@ export async function fetchRemoteState(supabase, userId) {
     trashReportRowsResult,
     materialsResult,
     materialLotsResult,
+    productRecipeLinesResult,
+    materialConsumptionsResult,
   ];
 
   const firstError = results
@@ -616,6 +646,8 @@ export async function fetchRemoteState(supabase, userId) {
         result !== trashReportRowsResult &&
         result !== materialsResult &&
         result !== materialLotsResult &&
+        result !== productRecipeLinesResult &&
+        result !== materialConsumptionsResult &&
         // tiers tables are tolerated as empty on pre-migration databases so
         // the UI can still mount; they'll show up after the migration runs.
         result !== tiersResult &&
@@ -741,6 +773,8 @@ export async function fetchRemoteState(supabase, userId) {
     trashReportRows: trashReportRowsResult.error ? [] : (trashReportRowsResult.data ?? []).map(trashReportLineToUi),
     materials: materialsResult.error ? [] : (materialsResult.data ?? []).map(materialToUi),
     materialLots: materialLotsResult.error ? [] : (materialLotsResult.data ?? []).map(materialLotToUi),
+    recipeLines: productRecipeLinesResult.error ? [] : (productRecipeLinesResult.data ?? []).map(recipeLineToUi),
+    materialConsumptions: materialConsumptionsResult.error ? [] : (materialConsumptionsResult.data ?? []).map(materialConsumptionToUi),
   };
 }
 
@@ -1226,6 +1260,16 @@ export async function executeAdminAction(supabase, action, currentUser, currentS
             ? null
             : Number(action.payload.lowStockThreshold),
         p_is_active: action.payload.isActive !== false,
+        p_user_id: currentUser.id,
+      });
+    case 'SAVE_PRODUCT_RECIPE':
+      return callRpc(supabase, 'modhanios_save_product_recipe', {
+        p_product_id: action.payload.productId,
+        p_lines: (action.payload.lines ?? []).map((line) => ({
+          material_id: line.materialId,
+          qty_per_unit: Number(line.qtyPerUnit),
+          note: line.note ?? null,
+        })),
         p_user_id: currentUser.id,
       });
     case 'ADD_CLIENT':
