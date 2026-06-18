@@ -178,11 +178,41 @@ function materialLotToUi(lot) {
     receivedDate: lot.received_date,
     expiryDate: lot.expiry_date ?? null,
     unitCost: lot.unit_cost == null ? null : Number(lot.unit_cost),
+    supplier: lot.supplier ?? '',
+    description: lot.description ?? '',
+    billOfLadingNo: lot.bill_of_lading_no ?? '',
+    invoiceNo: lot.invoice_no ?? '',
+    temperature: lot.temperature ?? '',
+    coaReceived: lot.coa_received == null ? null : lot.coa_received === true,
+    receiverInitials: lot.receiver_initials ?? '',
     status: lot.status,
     deletedAt: lot.deleted_at ?? null,
     deletedBy: lot.deleted_by ?? null,
     deletedReason: lot.deleted_reason ?? null,
+    createdAt: lot.created_at,
     updatedAt: lot.updated_at,
+  };
+}
+
+function rawMilkReceivingRecordToUi(row) {
+  return {
+    materialLotId: row.material_lot_id,
+    receivedTime: row.received_time ?? '',
+    volumeLtr: row.volume_ltr == null ? null : Number(row.volume_ltr),
+    siloNo: row.silo_no ?? '',
+    appearanceOdour: row.appearance_odour ?? '',
+    milkTemperature: row.milk_temperature ?? '',
+    ph: row.ph == null ? null : Number(row.ph),
+    antibioticResult: row.antibiotic_result ?? '',
+    fatPercent: row.fat_percent == null ? null : Number(row.fat_percent),
+    sealNo: row.seal_no ?? '',
+    tankerNo: row.tanker_no ?? '',
+    driverSignature: row.driver_signature ?? '',
+    setupPreparedBy: row.setup_prepared_by ?? '',
+    receiverInitials: row.receiver_initials ?? '',
+    verifiedBy: row.verified_by ?? '',
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -206,6 +236,21 @@ function materialConsumptionToUi(row) {
     materialLotId: row.material_lot_id,
     facilityId: row.facility_id,
     qty: Number(row.qty),
+    createdAt: row.created_at,
+  };
+}
+
+function materialShortfallToUi(row) {
+  return {
+    id: row.id,
+    batchId: row.batch_id,
+    productId: row.product_id,
+    materialId: row.material_id,
+    facilityId: row.facility_id,
+    requiredQty: Number(row.required_qty ?? 0),
+    consumedQty: Number(row.consumed_qty ?? 0),
+    shortQty: Number(row.short_qty ?? 0),
+    unit: row.unit ?? '',
     createdAt: row.created_at,
   };
 }
@@ -574,6 +619,8 @@ export async function fetchRemoteState(supabase, userId) {
     materialLotsResult,
     productRecipeLinesResult,
     materialConsumptionsResult,
+    rawMilkReceivingRecordsResult,
+    materialShortfallsResult,
   ] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('clients').select('*').order('name'),
@@ -605,6 +652,8 @@ export async function fetchRemoteState(supabase, userId) {
     supabase.from('material_lots').select('*').order('received_date', { ascending: false }),
     supabase.from('product_recipe_lines').select('*'),
     supabase.from('material_consumptions').select('*').order('created_at', { ascending: false }),
+    supabase.from('raw_milk_receiving_records').select('*').order('created_at', { ascending: false }),
+    supabase.from('material_shortfalls').select('*').order('created_at', { ascending: false }),
   ]);
 
   const results = [
@@ -632,6 +681,8 @@ export async function fetchRemoteState(supabase, userId) {
     materialLotsResult,
     productRecipeLinesResult,
     materialConsumptionsResult,
+    rawMilkReceivingRecordsResult,
+    materialShortfallsResult,
   ];
 
   const firstError = results
@@ -648,6 +699,8 @@ export async function fetchRemoteState(supabase, userId) {
         result !== materialLotsResult &&
         result !== productRecipeLinesResult &&
         result !== materialConsumptionsResult &&
+        result !== rawMilkReceivingRecordsResult &&
+        result !== materialShortfallsResult &&
         // tiers tables are tolerated as empty on pre-migration databases so
         // the UI can still mount; they'll show up after the migration runs.
         result !== tiersResult &&
@@ -775,6 +828,12 @@ export async function fetchRemoteState(supabase, userId) {
     materialLots: materialLotsResult.error ? [] : (materialLotsResult.data ?? []).map(materialLotToUi),
     recipeLines: productRecipeLinesResult.error ? [] : (productRecipeLinesResult.data ?? []).map(recipeLineToUi),
     materialConsumptions: materialConsumptionsResult.error ? [] : (materialConsumptionsResult.data ?? []).map(materialConsumptionToUi),
+    rawMilkReceivingRecords: rawMilkReceivingRecordsResult.error
+      ? []
+      : (rawMilkReceivingRecordsResult.data ?? []).map(rawMilkReceivingRecordToUi),
+    materialShortfalls: materialShortfallsResult.error
+      ? []
+      : (materialShortfallsResult.data ?? []).map(materialShortfallToUi),
   };
 }
 
@@ -1182,6 +1241,35 @@ export async function executeWorkflowAction(supabase, action, currentUser) {
         p_unit_cost:
           action.payload.unitCost == null || action.payload.unitCost === '' ? null : Number(action.payload.unitCost),
         p_user_id: currentUser.id,
+        p_supplier: action.payload.supplier ?? null,
+        p_description: action.payload.description ?? null,
+        p_bill_of_lading_no: action.payload.billOfLadingNo ?? null,
+        p_invoice_no: action.payload.invoiceNo ?? null,
+        p_temperature: action.payload.temperature ?? null,
+        p_coa_received: action.payload.coaReceived ?? null,
+        p_receiver_initials: action.payload.receiverInitials ?? null,
+        p_raw_milk_time: action.payload.rawMilk?.receivedTime ?? null,
+        p_raw_milk_volume_ltr:
+          action.payload.rawMilk?.volumeLtr == null || action.payload.rawMilk?.volumeLtr === ''
+            ? null
+            : Number(action.payload.rawMilk.volumeLtr),
+        p_silo_no: action.payload.rawMilk?.siloNo ?? null,
+        p_appearance_odour: action.payload.rawMilk?.appearanceOdour ?? null,
+        p_milk_temperature: action.payload.rawMilk?.milkTemperature ?? null,
+        p_ph:
+          action.payload.rawMilk?.ph == null || action.payload.rawMilk?.ph === ''
+            ? null
+            : Number(action.payload.rawMilk.ph),
+        p_antibiotic_result: action.payload.rawMilk?.antibioticResult ?? null,
+        p_fat_percent:
+          action.payload.rawMilk?.fatPercent == null || action.payload.rawMilk?.fatPercent === ''
+            ? null
+            : Number(action.payload.rawMilk.fatPercent),
+        p_seal_no: action.payload.rawMilk?.sealNo ?? null,
+        p_tanker_no: action.payload.rawMilk?.tankerNo ?? null,
+        p_driver_signature: action.payload.rawMilk?.driverSignature ?? null,
+        p_setup_prepared_by: action.payload.rawMilk?.setupPreparedBy ?? null,
+        p_verified_by: action.payload.rawMilk?.verifiedBy ?? null,
       });
     case 'SOFT_DELETE_MATERIAL_LOT':
       return callRpc(supabase, 'modhanios_soft_delete_material_lot', {

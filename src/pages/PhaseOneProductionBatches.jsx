@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, ArrowDownUp, ArrowLeftRight, FlaskConical, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, ArrowDownUp, ArrowLeftRight, FlaskConical, GitBranch, Pencil, Plus, RotateCcw, Trash2, Undo2, X } from 'lucide-react';
 import { useApp } from '../context/useApp';
 import { useModalBehavior, handleOverlayClick } from '../hooks/useModalBehavior';
 import { compareItemNumbers } from '../lib/productSort';
@@ -24,6 +24,7 @@ function getProductionProductFilterKey(product) {
 
 export default function PhaseOneProductionBatches() {
   const { state, dispatch, addToast } = useApp();
+  const navigate = useNavigate();
   const selectedFacility = state.selectedFacility ?? ALL_FACILITIES;
   const showAllFacilities = selectedFacility === ALL_FACILITIES;
   // Transfers between factories are admin-only (manage_settings permission).
@@ -248,7 +249,7 @@ export default function PhaseOneProductionBatches() {
                   <th>Production Date</th>
                   <th>Remaining</th>
                   <th>Status</th>
-                  <th style={{ width: 110 }}>Actions</th>
+                  <th style={{ width: 140 }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -277,6 +278,15 @@ export default function PhaseOneProductionBatches() {
                             <ArrowLeftRight size={14} />
                           </button>
                         ) : null}
+                        <button
+                          className="um-icon-btn"
+                          type="button"
+                          title="Trace material lots used"
+                          aria-label={`Trace materials used for lot ${batch.batchNumber}`}
+                          onClick={() => navigate(`/materials?tab=traceability&traceBatch=${encodeURIComponent(batch.batchNumber)}`)}
+                        >
+                          <GitBranch size={14} />
+                        </button>
                         <button
                           className="um-icon-btn"
                           type="button"

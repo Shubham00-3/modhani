@@ -329,7 +329,7 @@ function RecipeEditor({ materials, lines, onChange }) {
             </div>
           ) : (
             <div style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', marginBottom: 'var(--space-2)' }}>
-              No recipe yet — this product won&apos;t deduct any materials when produced.
+              No recipe yet - this product won&apos;t deduct any materials when produced.
             </div>
           )}
           <button className="btn btn-secondary btn-sm" type="button" onClick={addLine} style={{ marginTop: 'var(--space-3)' }}>

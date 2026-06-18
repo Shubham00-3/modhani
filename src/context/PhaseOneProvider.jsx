@@ -67,6 +67,8 @@ const demoState = {
   materialLots: [],
   recipeLines: [],
   materialConsumptions: [],
+  rawMilkReceivingRecords: [],
+  materialShortfalls: [],
   toasts: [],
   initialized: true,
   authConfigured: false,
@@ -102,6 +104,8 @@ const remoteBootState = {
   materialLots: [],
   recipeLines: [],
   materialConsumptions: [],
+  rawMilkReceivingRecords: [],
+  materialShortfalls: [],
   toasts: [],
   initialized: false,
   authConfigured: true,
@@ -339,6 +343,135 @@ function reducer(state, action) {
         products: nextProducts,
       };
     }
+    case 'UPSERT_MATERIAL': {
+      const exists = state.materials.some((material) => material.id === action.payload.id);
+      const nextMaterial = {
+        ...action.payload,
+        supplier: action.payload.supplier ?? '',
+        lowStockThreshold: action.payload.lowStockThreshold ?? null,
+        isActive: action.payload.isActive !== false,
+        updatedAt: new Date().toISOString(),
+      };
+      return {
+        ...state,
+        materials: exists
+          ? state.materials.map((material) => (material.id === action.payload.id ? { ...material, ...nextMaterial } : material))
+          : [...state.materials, { ...nextMaterial, createdAt: new Date().toISOString() }],
+      };
+    }
+    case 'RECEIVE_MATERIAL': {
+      const now = new Date().toISOString();
+      const existingLot = state.materialLots.find(
+        (lot) =>
+          lot.materialId === action.payload.materialId &&
+          lot.supplierLotCode === action.payload.supplierLotCode &&
+          lot.facilityId === action.payload.facilityId
+      );
+      const nextLots = existingLot
+        ? state.materialLots.map((lot) =>
+            lot.id === existingLot.id
+              ? {
+                  ...lot,
+                  qtyReceived: Number(lot.qtyReceived ?? 0) + Number(action.payload.qty ?? 0),
+                  qtyRemaining: Number(lot.qtyRemaining ?? 0) + Number(action.payload.qty ?? 0),
+                  expiryDate: action.payload.expiryDate ?? lot.expiryDate ?? null,
+                  unitCost: action.payload.unitCost ?? lot.unitCost ?? null,
+                  supplier: action.payload.supplier ?? lot.supplier ?? '',
+                  description: action.payload.description ?? lot.description ?? '',
+                  billOfLadingNo: action.payload.billOfLadingNo ?? lot.billOfLadingNo ?? '',
+                  invoiceNo: action.payload.invoiceNo ?? lot.invoiceNo ?? '',
+                  temperature: action.payload.temperature ?? lot.temperature ?? '',
+                  coaReceived: action.payload.coaReceived ?? lot.coaReceived ?? null,
+                  receiverInitials: action.payload.receiverInitials ?? lot.receiverInitials ?? '',
+                  status: 'active',
+                  deletedAt: null,
+                  deletedBy: null,
+                  deletedReason: null,
+                  updatedAt: now,
+                }
+              : lot
+          )
+        : [
+            {
+              id: action.payload.id,
+              materialId: action.payload.materialId,
+              supplierLotCode: action.payload.supplierLotCode,
+              facilityId: action.payload.facilityId,
+              qtyReceived: Number(action.payload.qty ?? 0),
+              qtyRemaining: Number(action.payload.qty ?? 0),
+              receivedDate: action.payload.receivedDate,
+              expiryDate: action.payload.expiryDate ?? null,
+              unitCost: action.payload.unitCost ?? null,
+              supplier: action.payload.supplier ?? '',
+              description: action.payload.description ?? '',
+              billOfLadingNo: action.payload.billOfLadingNo ?? '',
+              invoiceNo: action.payload.invoiceNo ?? '',
+              temperature: action.payload.temperature ?? '',
+              coaReceived: action.payload.coaReceived ?? null,
+              receiverInitials: action.payload.receiverInitials ?? '',
+              status: 'active',
+              deletedAt: null,
+              deletedBy: null,
+              deletedReason: null,
+              createdAt: now,
+              updatedAt: now,
+            },
+            ...state.materialLots,
+          ];
+      const lotId = existingLot?.id ?? action.payload.id;
+      const rawMilk = action.payload.rawMilk;
+      const nextRawMilkRecords = rawMilk
+        ? [
+            {
+              materialLotId: lotId,
+              ...rawMilk,
+              volumeLtr: rawMilk.volumeLtr == null || rawMilk.volumeLtr === '' ? Number(action.payload.qty ?? 0) : Number(rawMilk.volumeLtr),
+              ph: rawMilk.ph == null || rawMilk.ph === '' ? null : Number(rawMilk.ph),
+              fatPercent: rawMilk.fatPercent == null || rawMilk.fatPercent === '' ? null : Number(rawMilk.fatPercent),
+              receiverInitials: action.payload.receiverInitials ?? '',
+              createdAt: now,
+              updatedAt: now,
+            },
+            ...state.rawMilkReceivingRecords.filter((record) => record.materialLotId !== lotId),
+          ]
+        : state.rawMilkReceivingRecords;
+      return {
+        ...state,
+        materialLots: nextLots,
+        rawMilkReceivingRecords: nextRawMilkRecords,
+      };
+    }
+    case 'SOFT_DELETE_MATERIAL_LOT':
+      return {
+        ...state,
+        materialLots: state.materialLots.map((lot) =>
+          lot.id === action.payload.id
+            ? {
+                ...lot,
+                deletedAt: new Date().toISOString(),
+                deletedBy: state.currentUserId,
+                deletedReason: action.payload.reason,
+                status: 'cleared',
+              }
+            : lot
+        ),
+      };
+    case 'SAVE_PRODUCT_RECIPE':
+      return {
+        ...state,
+        recipeLines: [
+          ...state.recipeLines.filter((line) => line.productId !== action.payload.productId),
+          ...(action.payload.lines ?? []).map((line, index) => ({
+            id: `recipe-${action.payload.productId}-${index}-${Date.now()}`,
+            productId: action.payload.productId,
+            materialId: line.materialId,
+            qtyPerUnit: Number(line.qtyPerUnit),
+            note: line.note ?? '',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })),
+        ],
+      };
     case 'ADD_CLIENT':
       return { ...state, clients: [...state.clients, action.payload] };
     case 'UPDATE_CLIENT':
@@ -526,8 +659,76 @@ function reducer(state, action) {
       return { ...state, clients: nextClients, clientPricing: nextClientPricing };
     }
     case 'ADD_BATCH':
-    case 'LOG_PRODUCTION_BATCH':
       return { ...state, batches: [...state.batches, action.payload] };
+    case 'LOG_PRODUCTION_BATCH': {
+      const now = new Date().toISOString();
+      let nextLots = state.materialLots;
+      const nextConsumptions = [];
+      const nextShortfalls = [];
+      state.recipeLines
+        .filter((line) => line.productId === action.payload.productId)
+        .forEach((line) => {
+          let remaining = Number(line.qtyPerUnit ?? 0) * Number(action.payload.qtyProduced ?? 0);
+          const requiredQty = remaining;
+          let consumedQty = 0;
+          nextLots
+            .filter(
+              (lot) =>
+                lot.materialId === line.materialId &&
+                lot.facilityId === action.payload.facilityId &&
+                !lot.deletedAt &&
+                lot.status === 'active' &&
+                Number(lot.qtyRemaining ?? 0) > 0
+            )
+            .sort((left, right) => new Date(left.receivedDate) - new Date(right.receivedDate))
+            .forEach((lot) => {
+              if (remaining <= 0) return;
+              const take = Math.min(Number(lot.qtyRemaining ?? 0), remaining);
+              remaining -= take;
+              consumedQty += take;
+              nextLots = nextLots.map((entry) =>
+                entry.id === lot.id
+                  ? {
+                      ...entry,
+                      qtyRemaining: Number(entry.qtyRemaining ?? 0) - take,
+                      status: Number(entry.qtyRemaining ?? 0) - take <= 0 ? 'cleared' : 'active',
+                      updatedAt: now,
+                    }
+                  : entry
+              );
+              nextConsumptions.push({
+                id: `mcons-${Date.now()}-${nextConsumptions.length}`,
+                batchId: action.payload.id,
+                materialId: line.materialId,
+                materialLotId: lot.id,
+                facilityId: action.payload.facilityId,
+                qty: take,
+                createdAt: now,
+              });
+            });
+          if (remaining > 0) {
+            nextShortfalls.push({
+              id: `mshort-${Date.now()}-${nextShortfalls.length}`,
+              batchId: action.payload.id,
+              productId: action.payload.productId,
+              materialId: line.materialId,
+              facilityId: action.payload.facilityId,
+              requiredQty,
+              consumedQty,
+              shortQty: remaining,
+              unit: state.materials.find((material) => material.id === line.materialId)?.unit ?? '',
+              createdAt: now,
+            });
+          }
+        });
+      return {
+        ...state,
+        batches: [...state.batches, action.payload],
+        materialLots: nextLots,
+        materialConsumptions: [...nextConsumptions, ...state.materialConsumptions],
+        materialShortfalls: [...nextShortfalls, ...state.materialShortfalls],
+      };
+    }
     case 'UPDATE_BATCH':
       return {
         ...state,
@@ -1244,6 +1445,12 @@ export function AppProvider({ children }) {
             customerPortal: null,
             quickBooks: QUICKBOOKS_SETTINGS,
             reportRows: [],
+            materials: [],
+            materialLots: [],
+            recipeLines: [],
+            materialConsumptions: [],
+            rawMilkReceivingRecords: [],
+            materialShortfalls: [],
           },
         });
         return;
@@ -1311,6 +1518,8 @@ export function AppProvider({ children }) {
         'batches', 'batch_assignments',
         'clients', 'locations', 'products', 'client_product_prices',
         'tiers', 'tier_products',
+        'materials', 'material_lots', 'product_recipe_lines',
+        'material_consumptions', 'raw_milk_receiving_records', 'material_shortfalls',
         'quickbooks_sync_jobs', 'quickbooks_settings',
       ];
     } else if (role === 'driver') {

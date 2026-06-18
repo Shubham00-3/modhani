@@ -2792,6 +2792,11 @@ input[type='checkbox']:disabled {
   animation: slideUp var(--transition-slow);
 }
 
+.modal-wide {
+  max-width: 880px;
+  width: 94vw;
+}
+
 /* When a <form> wraps the body/footer it must itself be a flex column that can
    shrink, otherwise the form grows past the modal's max-height and the body's
    overflow scroll never engages (content spills out the bottom of the modal). */
