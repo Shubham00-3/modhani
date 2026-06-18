@@ -3,6 +3,7 @@
 -- - raw milk QA receiving details
 -- - persistent material shortfall records
 -- - production consumption links to the actual persisted batch row
+-- PR preview retrigger: keep this migration visible to Supabase branching.
 
 -- 1. Extend received material lots with the general Receiving Log fields.
 alter table public.material_lots
